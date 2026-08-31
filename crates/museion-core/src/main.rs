@@ -24,6 +24,7 @@ museion -- offline library index and search
   museion search --db <file> <query...> [--limit N]
   museion ask    --db <file> <question...> [--llama <url>] [--reranker <url>]
   museion status --db <file>
+  museion hardware
 
 Options
   --library <dir>   Directory holding .zim archives
@@ -96,6 +97,7 @@ fn run() -> Result<()> {
         "search" => cmd_search(&args),
         "ask" => cmd_ask(&args),
         "gather" => cmd_gather(&args),
+        "hardware" => cmd_hardware(),
         "status" => cmd_status(&args),
         "" | "help" | "-h" => {
             println!("{USAGE}");
@@ -387,6 +389,25 @@ fn cmd_ask(args: &Args) -> Result<()> {
         }
         println!();
     }
+    Ok(())
+}
+
+fn cmd_hardware() -> Result<()> {
+    let hw = museion_core::detect_hardware()?;
+    let (label, mem) = match &hw.accelerator {
+        museion_core::Accelerator::Cuda { name, vram_mb } => (format!("{name} (CUDA)"), *vram_mb),
+        museion_core::Accelerator::Metal { name, unified_mb } => (format!("{name} (Metal)"), *unified_mb),
+        museion_core::Accelerator::Vulkan { name, vram_mb } => (format!("{name} (Vulkan)"), *vram_mb),
+        museion_core::Accelerator::Cpu => ("no usable GPU".to_string(), 0),
+    };
+    println!("
+  Accelerator : {label}");
+    if mem > 0 {
+        println!("  Memory      : {} MB", thousands(mem as usize));
+    }
+    println!("  System RAM  : {} MB", thousands(hw.system_ram_mb as usize));
+    println!("  Tier        : {:?} -- {}", hw.tier, hw.tier.describe());
+    println!();
     Ok(())
 }
 
