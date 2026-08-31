@@ -57,6 +57,10 @@ dist/
 build/
 .vite/
 
+# Tauri regenerates these from tauri.conf.json and the plugin set on every
+# build, so committing them only produces churn.
+apps/desktop/src-tauri/gen/
+
 # Local machine state
 .env
 .env.*

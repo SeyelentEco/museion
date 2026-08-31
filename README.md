@@ -40,21 +40,35 @@ is silent, Hypatia is built to say so rather than invent something — see
 
 ## Status
 
-**M0 — the content layer.** The catalog, the fetcher, and verification work today.
-The desktop app is not built yet.
-
-What runs right now:
+Working end to end: fetch a library, index it, ask it questions, get cited answers.
 
 ```bash
+# 1. Fetch content (822 MB, verified against upstream checksums)
 npm install
-node scripts/fetch.js --list
 node scripts/fetch.js go-bag --dest /path/to/library
-node scripts/verify.js --dest /path/to/library
+
+# 2. Build the search index (needs kiwix-serve running over the library)
+cargo build --release
+./target/release/museion index --library /path/to/library
+
+# 3. Ask
+./target/release/museion ask --db /path/to/library/museion-index.db \
+  "how much bleach makes a gallon of water safe to drink?"
 ```
 
-That gives you a verified 822 MB library of post-disaster, water, medicine, food and knots
-references. It is already useful with any ZIM reader — [Kiwix](https://kiwix.org) will open
-it — while the app is being built.
+The desktop app builds too — `cd apps/desktop && npm install && npx tauri build` — with an
+Ask tab, a Browse tab over the raw archives, and a Library tab that detects your hardware
+and supervises the local services.
+
+**What it answers like.** Asked about bleach dosing, it gives ¼ teaspoon per gallon [1],
+notes the 16-drops alternative [4][5], and warns to use only unscented bleach, to filter
+cloudy water first, and that bleach will not remove chemical pollutants — every claim
+carrying a page-level citation into *Purifying Water During an Emergency*.
+
+Asked what caused the Bronze Age collapse, it says the library doesn't cover that.
+
+Not yet built: automatic downloading of the helper binaries, and the setup wizard that runs
+`llama-fit-params` for you. Both are pointed at by hand for now.
 
 ---
 

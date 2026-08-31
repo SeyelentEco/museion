@@ -1,0 +1,23 @@
+[package]
+name = "museion-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Museion: an offline knowledge library with a local AI assistant"
+
+[lib]
+name = "museion_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+museion-core = { path = "../../../crates/museion-core" }
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+ureq = { version = "2.10", features = ["json"] }

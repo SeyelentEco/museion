@@ -3,8 +3,18 @@
 Museion assumes nothing about your machine. It detects what you have at setup and picks a
 model that fits, and you can always override the choice.
 
-*(Planned for M1 — this document records the decisions the setup wizard will implement,
-and the measurements behind them.)*
+Check what it sees on your machine with:
+
+```bash
+museion hardware
+```
+
+On the machine this was developed against that reports an RTX 3060, 12,288 MB of VRAM,
+65,276 MB of system RAM, and the Capable tier.
+
+Detection and tiering are implemented. Automatically *downloading* the chosen model, and
+running `llama-fit-params` to compute the offload split, are still to come — for now the
+model paths are set by hand on the Library tab.
 
 ## The counterintuitive part
 

@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Museion</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <div class="brand">
+          <span class="mark"></span>
+          <span class="name">Museion</span>
+        </div>
+        <nav>
+          <button class="tab" data-tab="ask" aria-current="true">Ask</button>
+          <button class="tab" data-tab="browse">Browse</button>
+          <button class="tab" data-tab="setup">Library</button>
+        </nav>
+        <div id="service-state" class="service-state" title="Local services">
+          <span class="dot" data-svc="kiwix"></span>
+          <span class="dot" data-svc="chat"></span>
+          <span class="dot" data-svc="rerank"></span>
+        </div>
+      </header>
+
+      <main>
+        <!-- Ask -->
+        <section id="panel-ask" class="panel active">
+          <div id="transcript" class="transcript">
+            <div class="empty" id="ask-empty">
+              <h1>Ask the library</h1>
+              <p>
+                Answers come only from the archives on this disk, with citations you can open
+                and read yourself. If the library doesn't cover something, it will say so.
+              </p>
+              <ul class="examples" id="examples">
+                <li>How much bleach makes a gallon of water safe to drink?</li>
+                <li>How do I safely can green beans to avoid botulism?</li>
+                <li>Treating a deep wound when there is no doctor</li>
+                <li>How do I tie a bowline?</li>
+              </ul>
+            </div>
+          </div>
+          <form id="ask-form" class="composer">
+            <input
+              id="question"
+              type="text"
+              autocomplete="off"
+              placeholder="Ask a question…"
+              aria-label="Question"
+            />
+            <button id="ask-send" type="submit">Ask</button>
+          </form>
+        </section>
+
+        <!-- Browse -->
+        <section id="panel-browse" class="panel">
+          <div id="browse-unavailable" class="empty">
+            <h1>Browse the archives</h1>
+            <p>The content server isn't running yet. Start the services from the Library tab.</p>
+          </div>
+          <iframe id="browse-frame" title="Library" hidden></iframe>
+        </section>
+
+        <!-- Library / setup -->
+        <section id="panel-setup" class="panel">
+          <div class="setup">
+            <h1>Library</h1>
+
+            <div class="card" id="card-hardware">
+              <h2>This machine</h2>
+              <dl id="hardware"><dd class="muted">Detecting…</dd></dl>
+            </div>
+
+            <div class="card">
+              <h2>Content</h2>
+              <p class="muted" id="library-summary">No library configured.</p>
+              <div class="row">
+                <input id="library-dir" type="text" placeholder="Path to your library folder" />
+                <button id="pick-library" type="button">Choose…</button>
+              </div>
+              <p class="hint">
+                Museion has no default location: content runs from under a gigabyte to well over
+                250&nbsp;GB, so where it lives is your choice.
+              </p>
+            </div>
+
+            <div class="card">
+              <h2>Models</h2>
+              <div class="row">
+                <input id="chat-model" type="text" placeholder="Chat model (.gguf)" />
+                <button id="pick-chat" type="button">Choose…</button>
+              </div>
+              <div class="row">
+                <input id="reranker-model" type="text" placeholder="Reranker (.gguf, optional)" />
+                <button id="pick-reranker" type="button">Choose…</button>
+              </div>
+              <p class="hint">
+                The reranker is optional. Without it answers still work, ordered by keyword
+                relevance alone.
+              </p>
+            </div>
+
+            <div class="card">
+              <h2>Helper programs</h2>
+              <div class="row">
+                <input id="kiwix-exe" type="text" placeholder="kiwix-serve" />
+                <button id="pick-kiwix" type="button">Choose…</button>
+              </div>
+              <div class="row">
+                <input id="llama-exe" type="text" placeholder="llama-server" />
+                <button id="pick-llama" type="button">Choose…</button>
+              </div>
+              <p class="hint">
+                Kiwix and llama.cpp are separate projects, so they are pointed at separately —
+                if you already have either installed, use the copy you have.
+              </p>
+            </div>
+
+            <div class="actions">
+              <button id="save-config" type="button" class="primary">Save</button>
+              <button id="start-services" type="button">Start services</button>
+              <button id="stop-services" type="button">Stop services</button>
+            </div>
+            <p id="setup-status" class="status" role="status"></p>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,17 @@
+[workspace]
+resolver = "2"
+members = ["crates/museion-core", "apps/desktop/src-tauri"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+# The desktop app is the thing people run, so it is built for size and speed
+# rather than for compile time. An offline tool is downloaded once and used for
+# years; a slower build is a fair trade.
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
