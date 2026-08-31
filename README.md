@@ -77,14 +77,23 @@ Three local processes, no Docker, no Python runtime to package:
 
 ### Why there is no embedding step
 
-Every ZIM file already ships with a **Xapian full-text index**. Projects that embed every
-article chunk into a vector database before you can ask anything spend hours per archive
-and two to three times the disk — and you still can't query until it finishes.
+Projects that embed every article chunk into a vector database before you can ask anything
+spend hours per archive and two to three times the disk — and you still can't query until
+it finishes. Museion doesn't do that.
 
-Museion searches the index that is already there, then reranks the top candidates with a
-small cross-encoder to fix keyword search's weakness at paraphrase. Your library is
-queryable the moment the download completes. A semantic index over a small core corpus is
-a later, optional refinement — not a precondition for the thing working.
+Most ZIM archives already ship with a working **Xapian full-text index**, so Museion
+searches the index that is already there and reranks the top candidates with a small
+cross-encoder to fix keyword search's weakness at paraphrase. Those archives are queryable
+the moment the download completes.
+
+Some archives — notably everything built by web crawl, which includes the whole `zimgit-*`
+series in the Go Bag — ship an index that is technically present but effectively empty. We
+measured it: zero hits for *chlorine*, *bleach*, *wound* or *bowline* across the entire
+bundle. For those, Museion builds a local SQLite FTS5 index at import: minutes for the Go
+Bag, not the hours a vector database would cost. Which path an archive takes is detected
+automatically.
+
+[docs/retrieval.md](docs/retrieval.md) has the measurements and the reasoning.
 
 ### Why the fetcher looks the way it does
 

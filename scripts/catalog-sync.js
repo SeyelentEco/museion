@@ -67,11 +67,21 @@ async function probe(url) {
   return { sha256, size_bytes, magnet, torrent };
 }
 
-/** zimgit-post-disaster_en_2024-05.zim -> { stem: 'zimgit-post-disaster', date: '2024-05' } */
+/**
+ * Split a Kiwix filename into its stable part and its release date.
+ *
+ *   zimgit-post-disaster_en_2024-05.zim          -> zimgit-post-disaster        + 2024-05
+ *   wikipedia_en_chemistry_nopic_2026-07.zim     -> wikipedia_en_chemistry_nopic + 2026-07
+ *
+ * Kiwix names are project_lang_selection_flavour_date, and the number of
+ * segments varies, so only the trailing YYYY-MM is parsed. Trying to identify
+ * the language segment positionally gets "nopic" wrong and leaks the date into
+ * the id, which then breaks staleness checking -- the one thing the date is for.
+ */
 function parseZimName(filename) {
-  const m = filename.match(/^(.*)_([a-z]{2,3}(?:-[a-zA-Z]+)?)_(\d{4}-\d{2})\.zim$/);
-  if (!m) return { stem: filename.replace(/\.zim$/, ''), lang: null, date: null };
-  return { stem: m[1], lang: m[2], date: m[3] };
+  const m = filename.match(/^(.+)_(\d{4}-\d{2})\.zim$/);
+  if (!m) return { stem: filename.replace(/\.zim$/, ''), date: null };
+  return { stem: m[1], date: m[2] };
 }
 
 /**
@@ -163,7 +173,8 @@ async function check() {
     }
     const html = dirCache.get(dir);
     const { stem } = parseZimName(src.filename);
-    const found = [...html.matchAll(new RegExp(`${stem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}_[a-z]{2,3}_(\\d{4}-\\d{2})\\.zim(?!\\.)`, 'g'))];
+    const escaped = stem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const found = [...html.matchAll(new RegExp(`${escaped}_(\\d{4}-\\d{2})\\.zim(?!\\.)`, 'g'))];
     const latest = found.map((m) => m[1]).sort().at(-1);
 
     if (latest && src.version && latest > src.version) {
