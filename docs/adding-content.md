@@ -25,6 +25,33 @@ the raw index at [download.kiwix.org/zim](https://download.kiwix.org/zim/).
 Categories are `survival`, `medicine`, `making`, `reference`. They drive how content is
 grouped in the app, so pick the one a person looking for that material would reach for.
 
+## Read what it prints. Filenames lie.
+
+`catalog-sync` looks the archive up in the Kiwix catalogue and prints what upstream says it
+actually is:
+
+```
+probing appropedia_en_all_maxi_2026-02.zim ... 555 MB, sha256 dcf200ba723c...
+  upstream title : Appropedia
+  upstream says  : Shared knowledge to build rich, sustainable lives
+  tags           : appropedia;_pictures:yes;_ftindex:yes
+```
+
+This exists because of a near miss. `survivors_en_all_maxi` reads, in a preparedness
+catalogue, exactly like the Survivor Library — a well-known collection of pre-industrial
+technical works. It is in fact a YouTube archive for the video game *Vampire Survivors*:
+13,780 entries of gameplay teasers. It was one command away from shipping in the Homestead
+bundle, labelled "public domain works", for people to download expecting to learn how to
+make things.
+
+So the manifest's title and description come from upstream, not from whoever adds the
+entry. If the tool reports **`!! not found in the Kiwix catalogue`**, do not assume — fetch
+the archive and look inside it with `zimdump list` before adding it.
+
+The `_ftindex` tag is worth noticing too: it declares whether the archive carries a usable
+full-text index, which decides how Museion has to index it. Kiwix is honest about it — the
+zimgit archives declare `_ftindex:no`, exactly matching what measurement showed.
+
 ## Keeping the catalog fresh
 
 Kiwix reissues archives periodically and removes old dated versions, so a manifest that
