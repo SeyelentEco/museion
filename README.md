@@ -43,18 +43,26 @@ is silent, Hypatia is built to say so rather than invent something — see
 Working end to end: fetch a library, index it, ask it questions, get cited answers.
 
 ```bash
-# 1. Fetch content (822 MB, verified against upstream checksums)
 npm install
+
+# 1. Helper programs — kiwix-serve, llama-server, pdfium.
+#    Picks the right build for your machine (CUDA / Vulkan / Metal / CPU).
+node scripts/fetch-tools.mjs --dest ./bin
+
+# 2. Content (822 MB, verified against upstream checksums)
 node scripts/fetch.js go-bag --dest /path/to/library
 
-# 2. Build the search index (needs kiwix-serve running over the library)
+# 3. Build the search index (needs kiwix-serve running over the library)
 cargo build --release
-./target/release/museion index --library /path/to/library
+./target/release/museion index --library /path/to/library --pdfium ./bin
 
-# 3. Ask
+# 4. Ask
 ./target/release/museion ask --db /path/to/library/museion-index.db \
   "how much bleach makes a gallon of water safe to drink?"
 ```
+
+You still supply a chat model yourself — any GGUF llama.cpp can load. `museion hardware`
+says which class of model your machine should run and why.
 
 The desktop app builds too — `cd apps/desktop && npm install && npx tauri build` — with an
 Ask tab, a Browse tab over the raw archives, and a Library tab that detects your hardware
@@ -67,8 +75,8 @@ carrying a page-level citation into *Purifying Water During an Emergency*.
 
 Asked what caused the Bronze Age collapse, it says the library doesn't cover that.
 
-Not yet built: automatic downloading of the helper binaries, and the setup wizard that runs
-`llama-fit-params` for you. Both are pointed at by hand for now.
+Not yet built: the setup wizard that runs `llama-fit-params` to compute your GPU offload
+split, and automatic model download. Model paths are set by hand on the Library tab.
 
 ---
 
