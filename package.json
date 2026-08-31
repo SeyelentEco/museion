@@ -1,0 +1,19 @@
+{
+  "name": "museion",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "An offline knowledge library and local-AI assistant for when the internet is gone",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "fetch": "node scripts/fetch.js",
+    "verify": "node scripts/verify.js",
+    "catalog:sync": "node scripts/catalog-sync.js"
+  },
+  "dependencies": {
+    "yaml": "^2.6.1"
+  }
+}

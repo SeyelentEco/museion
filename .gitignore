@@ -1,0 +1,66 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Museion never commits content or binaries.
+#
+# A single "git add" of a ZIM or GGUF permanently bloats history and cannot be
+# undone without rewriting every commit. These rules are load-bearing: if you
+# add a new content or binary type, add it HERE FIRST, before you download it.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Content archives (2-250 GB)
+*.zim
+*.zim.*
+*.zimaa
+*.pmtiles
+*.mbtiles
+
+# Models (1-40 GB)
+*.gguf
+*.gguf.*
+*.safetensors
+*.bin
+*.onnx
+
+# Downloaded sidecar binaries (kiwix-serve, llama-server)
+/bin/
+/vendor/
+*.exe
+*.dll
+*.dylib
+*.so
+*.so.*
+
+# Default library / download locations, if anyone points them inside the repo
+/library/
+/downloads/
+*.part
+*.partial
+*.download
+
+# Archives that content and binaries arrive in
+*.zip
+*.tar
+*.tar.*
+*.tgz
+*.7z
+
+# Toolchain output
+node_modules/
+apps/desktop/src-tauri/target/
+dist/
+build/
+.vite/
+
+# Local machine state
+.env
+.env.*
+!.env.example
+*.local.json
+/config.local.*
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.swp

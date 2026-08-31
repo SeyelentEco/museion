@@ -1,0 +1,11 @@
+# Normalise to LF in the repository. Museion is developed on Windows and
+# deployed on macOS; without this, checksums and diffs churn between platforms.
+* text=auto eol=lf
+
+# Never let a content or binary file be treated as text, in case it somehow
+# escapes .gitignore. Belt and braces.
+*.zim   binary
+*.gguf  binary
+*.exe   binary
+*.dll   binary
+*.dylib binary
