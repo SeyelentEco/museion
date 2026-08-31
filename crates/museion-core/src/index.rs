@@ -184,8 +184,8 @@ impl Index {
         })
     }
 
-    /// How much of a question's *information* a passage must carry to count as
-    /// an answer.
+    /// How much of a question's *information* the best passage in the library
+    /// must carry before the library is considered to cover the topic at all.
     ///
     /// Terms are OR-ed in the FTS query, because a question's phrasing rarely
     /// matches a document's. The cost is that an OR query always matches
@@ -202,6 +202,15 @@ impl Index {
     /// For a tool consulted precisely when the answer cannot be checked
     /// anywhere else, returning an irrelevant passage confidently is worse than
     /// returning none.
+    ///
+    /// Crucially this is a threshold on the *best* passage, not on each one.
+    /// Applying it per passage looked reasonable and quietly broke retrieval:
+    /// asked how to can green beans safely, it discarded the pages holding the
+    /// actual packing steps and processing times -- which describe the method
+    /// without ever using the words "green", "beans" or "botulism" -- and kept
+    /// the book's index page, which contains all three and teaches nothing.
+    /// Deciding topic coverage is this gate's job; deciding which passage
+    /// answers best is the reranker's.
     const MIN_TERM_COVERAGE: f64 = 0.5;
 
     /// Search the local index. Returns page-level hits ranked by BM25 and
@@ -289,14 +298,32 @@ impl Index {
             }
 
             hit.coverage = if total > 0.0 { carried / total } else { 0.0 };
-            if hit.coverage + 1e-9 >= Self::MIN_TERM_COVERAGE {
-                hit.body = body;
-                out.push(hit);
-            }
+            hit.body = body;
+            out.push(hit);
             if out.len() >= limit {
                 break;
             }
         }
+
+        // Topic gate: if nothing in the library carries enough of the question's
+        // information, the library does not cover it and the honest answer is
+        // none at all.
+        let best = out.iter().map(|h| h.coverage).fold(0.0_f64, f64::max);
+        if best + 1e-9 < Self::MIN_TERM_COVERAGE {
+            return Ok(Vec::new());
+        }
+
+        // Contents and index pages list every topic in a book and so match
+        // almost any question about it, while containing none of the answer.
+        // Asked how to can green beans safely, the top passage was the contents
+        // page of a canning guide -- it named the topic and taught nothing.
+        //
+        // They are demoted rather than dropped, because number-dense pages are
+        // not all navigation: dosage charts and altitude tables look similar and
+        // are exactly what someone needs. Measured on this corpus, prose sits at
+        // 0.03-0.06, real tables reach 0.14 at the 95th percentile, and the
+        // contents page measured 0.42.
+        out.sort_by_key(|h| is_navigation_page(&h.body));
         Ok(out)
     }
 
@@ -378,6 +405,28 @@ fn to_fts_query(input: &str) -> String {
         .map(|w| format!("\"{w}\""))
         .collect::<Vec<_>>()
         .join(" OR ")
+}
+
+/// Fraction of tokens above which a page reads as navigation rather than
+/// content. Chosen from the corpus: comfortably above real tables (0.14 at the
+/// 95th percentile) and comfortably below a measured contents page (0.42).
+const NAVIGATION_NUMBER_DENSITY: f64 = 0.30;
+
+/// Whether a page looks like a table of contents or an index: mostly entries
+/// and page numbers. Returns a sort key, so `false` (content) sorts first.
+pub fn is_navigation_page(body: &str) -> bool {
+    let tokens: Vec<&str> = body.split_whitespace().collect();
+    if tokens.len() < 20 {
+        return false;
+    }
+    let numeric = tokens
+        .iter()
+        .filter(|t| {
+            let core: String = t.chars().filter(|c| !".,()[]-:;".contains(*c)).collect();
+            !core.is_empty() && core.chars().all(|c| c.is_ascii_digit()) && core.len() <= 6
+        })
+        .count();
+    (numeric as f64 / tokens.len() as f64) > NAVIGATION_NUMBER_DENSITY
 }
 
 /// The words in a question that carry meaning, lowercased and de-duplicated.
@@ -534,6 +583,25 @@ mod tests {
         assert!(!good.is_empty(), "should still answer in-corpus questions");
 
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn recognises_a_contents_page_but_spares_a_real_table() {
+        // Shape of the measured contents page: entries followed by page numbers.
+        let toc = "Canning Foods 47 ACID FOODS 4, 7 ALTITUDE TABLES 8, 16 ALUM 27 ANSWERS TO \
+                   CANNING QUESTIONS Fruits and Tomatoes 7 Jams Jellies Preserves 44 Pickles 21 \
+                   Vegetables 18 Meat 32 Poultry 35 Seafood 38 Storage 41 Altitude 8";
+        assert!(is_navigation_page(toc));
+
+        // A dosage table is number-heavy and must survive: it is often the answer.
+        let table = "Give 250 mg of amoxicillin three times a day for children weighing under \
+                     10 kg, and 500 mg three times a day for adults, continuing the course for \
+                     7 days even after the fever has gone, because stopping early allows the \
+                     infection to return in a more resistant form";
+        assert!(!is_navigation_page(table));
+
+        // Short passages are left alone; there is not enough signal to judge.
+        assert!(!is_navigation_page("Water 1 2 3"));
     }
 
     #[test]

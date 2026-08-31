@@ -83,11 +83,16 @@ impl<'a> Asker<'a> {
 
         match reranker.rerank(question, &docs) {
             Ok(scored) => {
-                let picked = scored
+                let mut picked: Vec<Hit> = scored
                     .into_iter()
                     .take(KEEP)
                     .filter_map(|(i, _)| candidates.get(i).cloned())
                     .collect();
+                // Demote contents and index pages *after* reranking. Doing it
+                // before is pointless: the reranker re-sorts, and it likes them,
+                // because an index page really does mention every term in the
+                // question. It just cannot answer one.
+                picked.sort_by_key(|h| crate::index::is_navigation_page(&h.body));
                 Ok((picked, true))
             }
             Err(e) => {

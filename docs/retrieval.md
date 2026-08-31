@@ -171,6 +171,45 @@ This matters more here than in an online tool. Someone consulting Museion genera
 check the answer anywhere else, so a confident irrelevant passage is worse than an honest
 "the library doesn't have this".
 
+## The gate belongs at the topic, not the passage
+
+The IDF gate above was first applied to every passage individually. That looked reasonable
+and quietly broke retrieval.
+
+Asked *"how do I safely can green beans to avoid botulism"*, the answer became: the sources
+don't contain canning procedures. It was wrong. `Canning Food` pages 16–18 and 29 hold the
+packing steps, processing times and USDA recommendations. They were discarded because they
+describe the method without ever using the words *green*, *beans* or *botulism* — while the
+book's **index page**, which contains all three and teaches nothing, sailed through.
+
+The gate answers one question: *does the library cover this topic at all?* That is a
+property of the best passage in the corpus, not of each passage. Deciding which passage
+answers best is the reranker's job. Applying the topic gate per passage let it overrule the
+component that was actually good at the decision.
+
+Restructured — threshold on the best passage, everything else passed to the reranker — the
+same question now returns the pressure-canner requirement, 240°F, 10 lb weighted / 11 lb
+dial gauge, the altitude adjustment, and both hot- and raw-pack procedures, all cited. The
+Bronze Age question is still refused, because no passage anywhere clears the bar.
+
+Getting canning times wrong causes botulism, which makes this the sharpest available
+illustration of the point: **a retrieval filter that looks conservative can be the thing
+that makes an answer dangerous.** Being unable to answer is safe. Being wrong about the
+reason you cannot answer is not.
+
+## Contents pages are not answers
+
+Index and contents pages match almost any question about a book, because they list every
+topic in it, and contain none of the answer. The reranker likes them for the same reason a
+keyword search does.
+
+They are demoted rather than dropped, and demoted *after* reranking — doing it before is
+pointless, since the reranker simply re-sorts them back to the top. Dropping them outright
+would be wrong too: number-dense pages include dosage charts and altitude tables, which are
+often exactly what someone needs. Measured on this corpus, prose runs 0.03–0.06 numeric
+token density, real tables reach 0.14 at the 95th percentile, and the contents page that
+prompted this measured 0.42.
+
 ## An open question for M1
 
 Common single words return oddly few hits even on the good archives — "iron" returns 1

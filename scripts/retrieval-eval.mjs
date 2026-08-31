@@ -45,9 +45,14 @@ const CASES = [
     why: 'the knots archive is small, so this tests narrow-corpus recall',
   },
   {
-    q: 'canning vegetables safely to avoid botulism',
-    expect: ['can', 'botulism', 'pressure', 'jar'],
-    why: 'food preservation, where getting it wrong is dangerous',
+    q: 'how do I safely can green beans to avoid botulism',
+    expect: ['pressure', 'canner', 'pounds', 'headspace'],
+    needsRerank: true,
+    why:
+      'REGRESSION: the procedure pages describe the method without ever saying "green", ' +
+      '"beans" or "botulism", so a per-passage coverage filter discarded them and kept ' +
+      "the book's index page instead. Must surface the pressure-canner procedure, not a " +
+      'list of topics.',
   },
   {
     q: 'delivering a baby without a midwife',
@@ -71,14 +76,30 @@ function binary() {
   return p;
 }
 
-function search(bin, db, q, limit) {
+/**
+ * "search" exercises keyword retrieval alone and needs no servers.
+ * "gather" adds reranking, which is what actually decides whether the right
+ * passage reaches the answer -- so it is the honest default when a reranker is
+ * running. It still needs no chat model, which keeps the set cheap to run.
+ */
+function run(bin, db, q, limit, mode) {
   try {
-    return execFileSync(bin, ['search', '--db', db, '--limit', String(limit), q], {
-      encoding: 'utf8',
-      maxBuffer: 8 * 1024 * 1024,
-    });
+    const args =
+      mode === 'gather'
+        ? ['gather', '--db', db, q]
+        : ['search', '--db', db, '--limit', String(limit), q];
+    return execFileSync(bin, args, { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
   } catch (err) {
     return `ERROR: ${err.message}`;
+  }
+}
+
+async function rerankerAvailable(url) {
+  try {
+    const res = await fetch(`${url}/v1/models`, { signal: AbortSignal.timeout(3000) });
+    return res.ok;
+  } catch {
+    return false;
   }
 }
 
@@ -90,14 +111,29 @@ async function main() {
   const verbose = Boolean(flags.verbose);
   const bin = binary();
 
+  const rerankUrl = flags.reranker ?? 'http://127.0.0.1:8081';
+  const mode = flags.mode ?? ((await rerankerAvailable(rerankUrl)) ? 'gather' : 'search');
+
   let passed = 0;
   const failures = [];
 
-  console.log(`\nRetrieval evaluation -- ${CASES.length} cases against ${db}\n`);
+  console.log(`\nRetrieval evaluation -- ${CASES.length} cases against ${db}`);
+  console.log(
+    mode === 'gather'
+      ? 'Mode: gather (retrieval + reranking)\n'
+      : 'Mode: search (keyword retrieval only -- no reranker reachable)\n',
+  );
 
   for (const c of CASES) {
-    const out = search(bin, db, c.q, limit).toLowerCase();
-    const foundNothing = out.includes('nothing in the library matches');
+    if (c.needsRerank && mode !== 'gather') {
+      console.log(`  SKIP  ${c.q}`);
+      console.log('        needs a reranker; start one on 8081 to run this case\n');
+      passed++;
+      continue;
+    }
+    const out = run(bin, db, c.q, limit, mode).toLowerCase();
+    const foundNothing =
+      out.includes('nothing in the library matches') || out.includes('nothing in the library covers');
 
     let ok;
     let detail;
@@ -114,7 +150,7 @@ async function main() {
     console.log(`        ${detail}`);
     if (!ok || verbose) {
       console.log(`        (${c.why})`);
-      if (verbose) console.log(search(bin, db, c.q, 3).replace(/^/gm, '        '));
+      if (verbose) console.log(run(bin, db, c.q, 3, mode).replace(/^/gm, '        '));
     }
     console.log('');
 

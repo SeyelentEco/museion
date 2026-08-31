@@ -95,6 +95,7 @@ fn run() -> Result<()> {
         "index" => cmd_index(&args),
         "search" => cmd_search(&args),
         "ask" => cmd_ask(&args),
+        "gather" => cmd_gather(&args),
         "status" => cmd_status(&args),
         "" | "help" | "-h" => {
             println!("{USAGE}");
@@ -262,6 +263,54 @@ fn cmd_search(args: &Args) -> Result<()> {
         println!("{:>2}. {}{}", i + 1, h.doc_title, who);
         println!("    page {} of {}", h.page, h.book);
         println!("    {}", truncate_to(&h.snippet, 150));
+        println!();
+    }
+    Ok(())
+}
+
+/// Retrieval plus reranking, without generating an answer.
+///
+/// This is the stage worth regression-testing: it is where a question either
+/// finds the right passages or does not, and it runs without loading a chat
+/// model, so the evaluation set is cheap enough to run on every change.
+fn cmd_gather(args: &Args) -> Result<()> {
+    let question = args.rest.join(" ");
+    if question.trim().is_empty() {
+        bail!("gather what?");
+    }
+    let index = Index::open(&db_path(args)?)?;
+
+    let rerank_url = args
+        .flags
+        .get("reranker")
+        .cloned()
+        .unwrap_or_else(|| "http://127.0.0.1:8081".into());
+    let reranker = Llama::new(&rerank_url);
+    let use_rerank = !args.flags.contains_key("no-rerank") && reranker.is_up();
+
+    // A chat model is not needed to gather, but Asker wants one; it is never
+    // called on this path.
+    let chat = Llama::new("http://127.0.0.1:8080");
+    let asker = Asker {
+        index: &index,
+        chat: &chat,
+        reranker: if use_rerank { Some(&reranker) } else { None },
+    };
+
+    let (hits, reranked) = asker.gather(&question)?;
+    if hits.is_empty() {
+        println!("\nNothing in the library covers that.\n");
+        return Ok(());
+    }
+
+    println!(
+        "\n{} passage(s){}\n",
+        hits.len(),
+        if reranked { ", reranked" } else { ", keyword ranking only" }
+    );
+    for (i, h) in hits.iter().enumerate() {
+        println!("{:>2}. {} -- page {}", i + 1, h.doc_title, h.page);
+        println!("    {}", truncate_to(&h.body, 220));
         println!();
     }
     Ok(())
