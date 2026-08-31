@@ -43,9 +43,16 @@
 *.tgz
 *.7z
 
+# Generated indexes (rebuilt from content; never source of truth)
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
 # Toolchain output
 node_modules/
-apps/desktop/src-tauri/target/
+target/
 dist/
 build/
 .vite/

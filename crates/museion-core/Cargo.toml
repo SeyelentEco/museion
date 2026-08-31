@@ -1,0 +1,27 @@
+[package]
+name = "museion-core"
+version = "0.1.0"
+edition = "2021"
+description = "Museion retrieval core: ZIM content indexing and search"
+license = "MIT"
+
+[lib]
+name = "museion_core"
+path = "src/lib.rs"
+
+[[bin]]
+name = "museion"
+path = "src/main.rs"
+
+[dependencies]
+# Bundled SQLite: no system dependency, and FTS5 is guaranteed present.
+rusqlite = { version = "0.32", features = ["bundled"] }
+# pdfium is Chromium's PDF engine, loaded dynamically at runtime so the library
+# ships alongside the other sidecars rather than being linked statically.
+pdfium-render = "0.8"
+ureq = "2.10"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+regex = "1"
+sha2 = "0.10"
