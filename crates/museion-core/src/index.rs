@@ -25,6 +25,9 @@ pub struct Hit {
     pub rank: f64,
     /// Fraction of the question's content terms this passage actually contains.
     pub coverage: f64,
+    /// Full text of the page. This is what gets quoted to the model; the
+    /// snippet is only for display.
+    pub body: String,
 }
 
 #[derive(Debug, Default)]
@@ -257,6 +260,7 @@ impl Index {
                         snippet: r.get(5)?,
                         rank: r.get(6)?,
                         coverage: 0.0,
+                        body: String::new(),
                     },
                     r.get::<_, String>(7)?,
                 ))
@@ -286,6 +290,7 @@ impl Index {
 
             hit.coverage = if total > 0.0 { carried / total } else { 0.0 };
             if hit.coverage + 1e-9 >= Self::MIN_TERM_COVERAGE {
+                hit.body = body;
                 out.push(hit);
             }
             if out.len() >= limit {

@@ -77,6 +77,29 @@ export async function loadSources() {
   return byId;
 }
 
+/**
+ * Model manifests, keyed by id.
+ *
+ * Models live apart from content because they are chosen by what hardware
+ * someone has rather than by what they want to read, but they are fetched and
+ * verified by exactly the same machinery -- a multi-gigabyte download that
+ * silently truncates is no better for a model than for an archive.
+ */
+export async function loadModels() {
+  const files = await readYamlDir(join(REPO_ROOT, 'models'));
+  const byId = new Map();
+  for (const { path, doc } of files) {
+    for (const f of ['id', 'title', 'role', 'filename', 'size_bytes', 'sha256', 'urls']) {
+      if (doc[f] == null) throw new Error(`${path}: missing required field "${f}"`);
+    }
+    if (!/^[0-9a-f]{64}$/.test(doc.sha256)) {
+      throw new Error(`${path}: "sha256" must be 64 lowercase hex characters`);
+    }
+    byId.set(doc.id, { ...doc, _path: path, _isModel: true });
+  }
+  return byId;
+}
+
 /** Every bundle in the catalog, keyed by id. */
 export async function loadBundles() {
   const files = await readYamlDir(join(CATALOG_DIR, 'bundles'));
@@ -96,7 +119,15 @@ export async function loadBundles() {
  * which is what people actually type.
  */
 export async function resolveTarget(target) {
-  const [sources, bundles] = await Promise.all([loadSources(), loadBundles()]);
+  const [sources, bundles, models] = await Promise.all([
+    loadSources(),
+    loadBundles(),
+    loadModels(),
+  ]);
+
+  if (models.has(target)) {
+    return { bundle: null, sources: [models.get(target)] };
+  }
 
   if (bundles.has(target)) {
     const bundle = bundles.get(target);
@@ -115,7 +146,11 @@ export async function resolveTarget(target) {
     return { bundle: null, sources: [sources.get(target)] };
   }
 
-  const known = [...bundles.keys()].map((k) => `  ${k}  (bundle)`).concat([...sources.keys()].map((k) => `  ${k}`));
+  const known = [
+    ...[...bundles.keys()].map((k) => `  ${k}  (bundle)`),
+    ...[...sources.keys()].map((k) => `  ${k}`),
+    ...[...models.keys()].map((k) => `  ${k}  (model)`),
+  ];
   throw new Error(`Unknown target ${JSON.stringify(target)}.\n\nAvailable:\n${known.join('\n')}`);
 }
 

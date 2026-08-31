@@ -11,8 +11,9 @@ use anyhow::{bail, Context, Result};
 use museion_core::{
     index::AddOutcome,
     kiwix::{book_id_from_filename, ArchiveKind},
-    Index, Kiwix, PdfExtractor,
+    Asker, Index, Kiwix, Llama, PdfExtractor,
 };
+use std::io::Write;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -21,15 +22,19 @@ museion -- offline library index and search
 
   museion index  --library <dir> [--db <file>] [--kiwix <url>] [--force]
   museion search --db <file> <query...> [--limit N]
+  museion ask    --db <file> <question...> [--llama <url>] [--reranker <url>]
   museion status --db <file>
 
 Options
-  --library <dir>  Directory holding .zim archives
-  --db <file>      Index file (default: <library>/museion-index.db)
-  --kiwix <url>    kiwix-serve base URL (default: http://127.0.0.1:8090)
-  --pdfium <dir>   Directory holding the pdfium library (default: ./bin)
-  --force          Re-index archives that are already present
-  --limit N        Number of results (default 10)
+  --library <dir>   Directory holding .zim archives
+  --db <file>       Index file (default: <library>/museion-index.db)
+  --kiwix <url>     kiwix-serve base URL (default: http://127.0.0.1:8090)
+  --pdfium <dir>    Directory holding the pdfium library (default: ./bin)
+  --llama <url>     chat model server (default: http://127.0.0.1:8080)
+  --reranker <url>  reranker server (default: http://127.0.0.1:8081)
+  --no-rerank       Skip reranking, use keyword ranking alone
+  --force           Re-index archives that are already present
+  --limit N         Number of results (default 10)
 ";
 
 struct Args {
@@ -89,6 +94,7 @@ fn run() -> Result<()> {
     match args.cmd.as_str() {
         "index" => cmd_index(&args),
         "search" => cmd_search(&args),
+        "ask" => cmd_ask(&args),
         "status" => cmd_status(&args),
         "" | "help" | "-h" => {
             println!("{USAGE}");
@@ -256,6 +262,80 @@ fn cmd_search(args: &Args) -> Result<()> {
         println!("{:>2}. {}{}", i + 1, h.doc_title, who);
         println!("    page {} of {}", h.page, h.book);
         println!("    {}", truncate_to(&h.snippet, 150));
+        println!();
+    }
+    Ok(())
+}
+
+fn cmd_ask(args: &Args) -> Result<()> {
+    let question = args.rest.join(" ");
+    if question.trim().is_empty() {
+        bail!("ask what?");
+    }
+
+    let index = Index::open(&db_path(args)?)?;
+    if index.stats()?.documents == 0 {
+        bail!(
+            "the index is empty, so there is nothing to answer from.\n\n  \
+             Build it first:  museion index --library <dir>"
+        );
+    }
+
+    let chat_url = args
+        .flags
+        .get("llama")
+        .cloned()
+        .unwrap_or_else(|| "http://127.0.0.1:8080".into());
+    let chat = Llama::new(&chat_url);
+    if !chat.is_up() {
+        bail!(
+            "no chat model at {chat_url}\n\n  \
+             Start llama-server with a chat model, then try again."
+        );
+    }
+
+    let rerank_url = args
+        .flags
+        .get("reranker")
+        .cloned()
+        .unwrap_or_else(|| "http://127.0.0.1:8081".into());
+    let reranker = Llama::new(&rerank_url);
+    let use_rerank = !args.flags.contains_key("no-rerank") && reranker.is_up();
+    if !use_rerank && !args.flags.contains_key("no-rerank") {
+        eprintln!("  (no reranker at {rerank_url}; falling back to keyword ranking)");
+    }
+
+    let asker = Asker {
+        index: &index,
+        chat: &chat,
+        reranker: if use_rerank { Some(&reranker) } else { None },
+    };
+
+    println!();
+    let mut streamed = false;
+    let answer = asker.ask(&question, |t| {
+        streamed = true;
+        print!("{t}");
+        let _ = std::io::stdout().flush();
+    })?;
+    // Nothing streams when retrieval found nothing, and that answer -- the
+    // library saying it does not cover this -- is the one that must not be
+    // swallowed.
+    if !streamed {
+        print!("{}", answer.text);
+    }
+    println!("\n");
+
+    if !answer.sources.is_empty() {
+        println!("Sources{}:", if answer.reranked { " (reranked)" } else { "" });
+        for (i, h) in answer.sources.iter().enumerate() {
+            let who = if h.author.is_empty() {
+                String::new()
+            } else {
+                format!(", {}", h.author)
+            };
+            println!("  [{}] {}{} -- page {}", i + 1, h.doc_title, who, h.page);
+        }
         println!();
     }
     Ok(())

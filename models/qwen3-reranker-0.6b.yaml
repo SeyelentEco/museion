@@ -1,0 +1,47 @@
+# The reranker.
+#
+# Keyword search finds passages containing a question's words; it has no
+# opinion about whether they answer it. This 0.6B cross-encoder reads each
+# candidate passage against the actual question and scores relevance, which is
+# what fixes keyword search's weakness at paraphrase.
+#
+# Runs on CPU by default. On a 12 GB card the chat model wants essentially all
+# of the VRAM, and a 0.6B cross-encoder over ~40 candidates costs a couple of
+# seconds on CPU -- a good trade for not competing with the model generating
+# the answer.
+#
+# ggml-org's own conversion is used deliberately: community GGUF conversions of
+# Qwen3-Reranker are widely reported to emit near-zero scores (~4.5e-23),
+# because the classification head is lost unless the model is converted with
+# the right pooling. A reranker that returns identical scores for everything is
+# worse than none -- it silently destroys the ordering it was meant to fix.
+
+id: qwen3-reranker-0.6b
+title: Qwen3 Reranker 0.6B
+role: reranker
+filename: qwen3-reranker-0.6b-q8_0.gguf
+size_bytes: 639153184
+sha256: 22c9979ce4fbcdc5acdc310c6641c32797eff1aa980b8f7a2db8a8ea23429a48
+quant: Q8_0
+urls:
+  - https://huggingface.co/ggml-org/Qwen3-Reranker-0.6B-Q8_0-GGUF/resolve/main/qwen3-reranker-0.6b-q8_0.gguf
+# --reranking is equivalent to --embedding with --pooling rank, and is what
+# exposes the /v1/rerank endpoint.
+#
+# The batch sizes are not incidental. llama-server rejects any single input
+# longer than the *physical* batch with "input (N tokens) is too large to
+# process", and extracted PDF text tokenizes far denser than plain prose -- a
+# 1200-character passage measured 515 tokens against the 512 default, so the
+# reranker failed on exactly the long technical passages it was most needed
+# for. 2048 leaves real headroom.
+server_args:
+  - --reranking
+  - --pooling
+  - rank
+  - --batch-size
+  - "2048"
+  - --ubatch-size
+  - "2048"
+license:
+  name: Apache-2.0
+  attribution: Alibaba Qwen team; GGUF conversion by ggml-org
