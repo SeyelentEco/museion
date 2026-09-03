@@ -98,6 +98,21 @@ async function main() {
     } catch (err) {
       clearProgress();
       console.error(`  FAILED   ${src.filename}\n           ${err.message.replace(/\n/g, '\n           ')}`);
+      // Every HTTP source is down or unreachable. BitTorrent has no single
+      // host to lose, so offer it -- but as a link for the person's own
+      // client, not something Museion does itself. A preparedness tool that
+      // quietly turned every user into a seed would be making a decision
+      // about their bandwidth and their visibility on their behalf.
+      if (src.magnet || src.torrent) {
+        console.error(
+          `\n  Every web source failed. This archive is also on BitTorrent:\n` +
+            (src.torrent ? `    torrent: ${src.torrent}\n` : '') +
+            (src.magnet ? `    magnet:  ${src.magnet.split('&as=')[0]}\n` : '') +
+            `  Download it with your own client, put ${src.filename} in\n` +
+            `  ${dest}, then run:\n` +
+            `    node scripts/verify.js ${src.id} --dest ${dest}\n`,
+        );
+      }
       throw new Error(`${src.id} could not be fetched`);
     }
   }

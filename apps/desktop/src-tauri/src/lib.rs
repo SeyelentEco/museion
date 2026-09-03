@@ -544,10 +544,30 @@ async fn fetch_bundle(app: tauri::AppHandle, state: State<'_, AppState>, id: Str
                 continue;
             }
             let urls = s.all_urls();
-            download::download_verified(
+            let result = download::download_verified(
                 &Spec { urls: &urls, dest: &target, size_bytes: s.size_bytes, sha256: &s.sha256 },
                 |p| emit_progress(&app2, &s.id, p.received, p.total, if p.resuming { "resuming" } else { "" }),
-            )?;
+            );
+            if let Err(e) = result {
+                // All web sources gone. Hand over the torrent for the person's
+                // own client rather than joining a swarm on their behalf.
+                let mut msg = format!("{e:#}");
+                if s.torrent.is_some() || s.magnet.is_some() {
+                    msg.push_str("\n\nEvery web source failed. This archive is also on BitTorrent:");
+                    if let Some(t) = &s.torrent {
+                        msg.push_str(&format!("\n  torrent: {t}"));
+                    }
+                    if let Some(m) = s.short_magnet() {
+                        msg.push_str(&format!("\n  magnet:  {m}"));
+                    }
+                    msg.push_str(&format!(
+                        "\nDownload it with your own client, put {} in {}, and press Fetch again -- it will be verified and skipped.",
+                        s.filename,
+                        lib2.display()
+                    ));
+                }
+                anyhow::bail!(msg);
+            }
             fetched += 1;
         }
         Ok(fetched)

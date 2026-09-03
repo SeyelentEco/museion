@@ -31,6 +31,19 @@ run the same command again and it picks up where it stopped. Files are only give
 real name once the checksum matches, so a half-written archive can never be mistaken for a
 complete one.
 
+## If the downloads fail
+
+Every archive has eight web mirrors, and the fetcher tries them all. If every one is
+down or unreachable from where you are, it prints the archive's torrent and magnet link
+instead — Kiwix publishes both for every file. Download it with any BitTorrent client,
+put the file in your library folder, and run `verify.js` (or press Fetch again in the
+app): it is checked against the same checksum and picked up as if it had come from a
+mirror.
+
+Museion deliberately does not download via BitTorrent itself, and never seeds. Whether
+your machine joins a swarm, and what that does to your bandwidth and visibility, is a
+decision for you and your own client, not one a tool should make for you.
+
 ## Verify on the drive, before you leave
 
 ```bash

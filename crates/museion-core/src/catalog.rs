@@ -35,7 +35,23 @@ pub struct Source {
     pub urls: Vec<String>,
     #[serde(default)]
     pub mirrors: Vec<String>,
+    /// BitTorrent alternatives, offered only after every web source fails.
+    /// Museion never downloads via the swarm itself and never seeds; these
+    /// are handed to the person for their own client.
+    #[serde(default)]
+    pub torrent: Option<String>,
+    #[serde(default)]
+    pub magnet: Option<String>,
     pub license: Option<License>,
+}
+
+impl Source {
+    /// The magnet link trimmed to what a client needs: infohash, length, name.
+    /// Kiwix's full magnet carries a dozen webseed URLs that are the same
+    /// mirrors that just failed, and they make it unreadable when printed.
+    pub fn short_magnet(&self) -> Option<String> {
+        self.magnet.as_ref().map(|m| m.split("&as=").next().unwrap_or(m).to_string())
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
