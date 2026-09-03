@@ -2,6 +2,12 @@
 
 Everything below needs internet. Once it is done, nothing does. Do it *before* you need it.
 
+**The short way:** install the app, open the Library tab, choose three folders (library,
+models, helper programs), pick a bundle, and press **Fetch everything**. It does steps 2–6
+below for you, shows what it will download and how large it is before it starts, and
+resumes if interrupted. The rest of this page is the same thing by hand, which is also
+how you'd prepare a drive on one machine to carry to another.
+
 Budget: about ten minutes of your attention and, on a normal connection, half an hour of
 downloading for the Go Bag plus a 4B model, or a few hours if you take the 35B MoE.
 

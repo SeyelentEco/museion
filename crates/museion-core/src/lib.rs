@@ -13,6 +13,8 @@
 //! See docs/retrieval.md for the measurements this design came out of.
 
 pub mod ask;
+pub mod catalog;
+pub mod download;
 pub mod fit;
 pub mod hardware;
 pub mod index;
@@ -20,6 +22,7 @@ pub mod indexer;
 pub mod kiwix;
 pub mod llama;
 pub mod pdf;
+pub mod tools;
 
 pub use ask::{Answer, Asker};
 pub use fit::{fit_model, Fit};

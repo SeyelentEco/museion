@@ -381,6 +381,183 @@ async fn fit_chat_model(state: State<'_, AppState>) -> UiResult<String> {
     ))
 }
 
+// ----------------------------------------------------------------- setup
+
+#[derive(Serialize)]
+pub struct PlanItem {
+    id: String,
+    title: String,
+    size_bytes: u64,
+}
+
+#[derive(Serialize)]
+pub struct SetupPlan {
+    hardware: HardwareInfo,
+    chat_model: Option<PlanItem>,
+    reranker: Option<PlanItem>,
+    tools: Vec<PlanItem>,
+    bundles: Vec<PlanItem>,
+}
+
+/// What a first run on this machine would fetch, and how big it is, so the
+/// person can decide before anything downloads.
+#[tauri::command]
+fn setup_plan() -> UiResult<SetupPlan> {
+    use museion_core::catalog;
+    let hw = museion_core::detect_hardware().map_err(ui_err)?;
+    let hardware = get_hardware()?;
+    let chat_model = catalog::chat_model_for(hw.tier, hw.system_ram_mb)
+        .map_err(ui_err)?
+        .map(|m| PlanItem { id: m.id, title: m.title, size_bytes: m.size_bytes });
+    let reranker = catalog::reranker_model()
+        .map_err(ui_err)?
+        .map(|m| PlanItem { id: m.id, title: m.title, size_bytes: m.size_bytes });
+    let tools = museion_core::tools::plan(&hw.accelerator)
+        .map_err(ui_err)?
+        .into_iter()
+        .map(|(name, key, size)| PlanItem { id: key, title: name, size_bytes: size })
+        .collect();
+    let mut bundles = Vec::new();
+    for b in catalog::bundles().map_err(ui_err)? {
+        let (_, srcs) = catalog::bundle(&b.id).map_err(ui_err)?;
+        bundles.push(PlanItem {
+            id: b.id,
+            title: b.title,
+            size_bytes: srcs.iter().map(|s| s.size_bytes).sum(),
+        });
+    }
+    Ok(SetupPlan { hardware, chat_model, reranker, tools, bundles })
+}
+
+#[derive(Serialize, Clone)]
+struct FetchProgress {
+    item: String,
+    received: u64,
+    total: u64,
+    note: String,
+}
+
+fn emit_progress(app: &tauri::AppHandle, item: &str, received: u64, total: u64, note: &str) {
+    let _ = app.emit(
+        "fetch-progress",
+        FetchProgress { item: item.into(), received, total, note: note.into() },
+    );
+}
+
+/// Download the helper programs into `dest` and point the config at them.
+#[tauri::command]
+async fn fetch_tools(app: tauri::AppHandle, state: State<'_, AppState>, dest: String) -> UiResult<String> {
+    use museion_core::tools::{self, Step};
+    let hw = museion_core::detect_hardware().map_err(ui_err)?;
+    let dest = PathBuf::from(dest);
+    let app2 = app.clone();
+    let installed = tauri::async_runtime::spawn_blocking(move || {
+        tools::install(&hw.accelerator, &dest, |s| match s {
+            Step::Downloading { tool, file, received, total } => {
+                emit_progress(&app2, &tool, received, total, &file)
+            }
+            Step::Unpacking { tool } => emit_progress(&app2, &tool, 0, 0, "unpacking"),
+            Step::Done { tool } => emit_progress(&app2, &tool, 1, 1, "done"),
+            Step::Skipped { tool, reason } => emit_progress(&app2, &tool, 0, 0, &reason),
+        })
+    })
+    .await
+    .map_err(ui_err)?
+    .map_err(ui_err)?;
+
+    let mut cfg = state.config.lock().map_err(ui_err)?.clone();
+    cfg.kiwix_exe = installed.kiwix_serve.clone();
+    cfg.llama_exe = installed.llama_server.clone();
+    cfg.pdfium_dir = Some(installed.pdfium_dir.clone());
+    cfg.save(&state.config_path).map_err(ui_err)?;
+    *state.config.lock().map_err(ui_err)? = cfg;
+
+    Ok(format!(
+        "kiwix-serve: {}  llama-server: {}",
+        installed.kiwix_serve.map_or("missing".into(), |p| p.display().to_string()),
+        installed.llama_server.map_or("missing".into(), |p| p.display().to_string()),
+    ))
+}
+
+/// Download a model by catalogue id into the models directory and point the
+/// config at it, as chat model or reranker according to its role.
+#[tauri::command]
+async fn fetch_model(app: tauri::AppHandle, state: State<'_, AppState>, id: String, dest: String) -> UiResult<String> {
+    use museion_core::{catalog, download::{self, Spec}};
+    let model = catalog::models()
+        .map_err(ui_err)?
+        .into_iter()
+        .find(|m| m.id == id)
+        .ok_or_else(|| format!("no model {id:?} in the catalogue"))?;
+    let dir = PathBuf::from(dest);
+    let target = dir.join(&model.filename);
+    let app2 = app.clone();
+    let m2 = model.clone();
+    let t2 = target.clone();
+    tauri::async_runtime::spawn_blocking(move || -> anyhow::Result<()> {
+        if download::is_verified(&t2, m2.size_bytes, &m2.sha256)? {
+            return Ok(());
+        }
+        download::download_verified(
+            &Spec { urls: &m2.urls, dest: &t2, size_bytes: m2.size_bytes, sha256: &m2.sha256 },
+            |p| emit_progress(&app2, &m2.id, p.received, p.total, if p.resuming { "resuming" } else { "" }),
+        )?;
+        Ok(())
+    })
+    .await
+    .map_err(ui_err)?
+    .map_err(ui_err)?;
+
+    let mut cfg = state.config.lock().map_err(ui_err)?.clone();
+    cfg.models_dir = Some(dir);
+    if model.role == "reranker" {
+        cfg.reranker_model = Some(target.clone());
+    } else {
+        cfg.chat_model = Some(target.clone());
+        cfg.chat_args = model.server_args.clone();
+    }
+    cfg.save(&state.config_path).map_err(ui_err)?;
+    *state.config.lock().map_err(ui_err)? = cfg;
+    Ok(target.display().to_string())
+}
+
+/// Download every archive in a bundle into the library directory.
+#[tauri::command]
+async fn fetch_bundle(app: tauri::AppHandle, state: State<'_, AppState>, id: String) -> UiResult<String> {
+    use museion_core::{catalog, download::{self, Spec}};
+    let library = state
+        .config
+        .lock()
+        .map_err(ui_err)?
+        .library_dir
+        .clone()
+        .ok_or("choose a library folder first")?;
+    let (_, sources) = catalog::bundle(&id).map_err(ui_err)?;
+    let app2 = app.clone();
+    let lib2 = library.clone();
+    let n = tauri::async_runtime::spawn_blocking(move || -> anyhow::Result<usize> {
+        let mut fetched = 0;
+        for s in sources {
+            let target = lib2.join(&s.filename);
+            if download::is_verified(&target, s.size_bytes, &s.sha256)? {
+                emit_progress(&app2, &s.id, s.size_bytes, s.size_bytes, "already present");
+                continue;
+            }
+            let urls = s.all_urls();
+            download::download_verified(
+                &Spec { urls: &urls, dest: &target, size_bytes: s.size_bytes, sha256: &s.sha256 },
+                |p| emit_progress(&app2, &s.id, p.received, p.total, if p.resuming { "resuming" } else { "" }),
+            )?;
+            fetched += 1;
+        }
+        Ok(fetched)
+    })
+    .await
+    .map_err(ui_err)?
+    .map_err(ui_err)?;
+    Ok(format!("{n} archive(s) downloaded into {}", library.display()))
+}
+
 #[tauri::command]
 fn kiwix_url(state: State<AppState>) -> UiResult<String> {
     let cfg = state.config.lock().map_err(ui_err)?;
@@ -413,6 +590,10 @@ pub fn run() {
             ask,
             build_index,
             fit_chat_model,
+            setup_plan,
+            fetch_tools,
+            fetch_model,
+            fetch_bundle,
             kiwix_url,
         ])
         .build(tauri::generate_context!())

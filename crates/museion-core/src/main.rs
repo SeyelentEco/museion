@@ -22,6 +22,7 @@ museion -- offline library index and search
   museion status --db <file>
   museion hardware
   museion fit    --model <gguf> [--fit-exe <path>] [--ctx N]
+  museion tools  --dest <dir> [--cpu]
 
 Options
   --library <dir>   Directory holding .zim archives
@@ -96,6 +97,7 @@ fn run() -> Result<()> {
         "gather" => cmd_gather(&args),
         "hardware" => cmd_hardware(),
         "fit" => cmd_fit(&args),
+        "tools" => cmd_tools(&args),
         "status" => cmd_status(&args),
         "" | "help" | "-h" => {
             println!("{USAGE}");
@@ -167,6 +169,47 @@ fn cmd_fit(args: &Args) -> Result<()> {
         fit.gpu_layers.map(|n| n.to_string()).unwrap_or_else(|| "all".into())
     );
     println!("  Arguments  : {}\n", fit.args.join(" "));
+    Ok(())
+}
+
+/// Fetch and unpack the helper programs for this machine.
+///
+///   museion tools --dest ./bin        (picks CUDA / Vulkan / Metal / CPU)
+///   museion tools --dest ./bin --cpu  (force the CPU build)
+fn cmd_tools(args: &Args) -> Result<()> {
+    use museion_core::tools::{self, Step};
+    let dest = args.flags.get("dest").context("--dest <dir> is required")?;
+    let accel = if args.flags.contains_key("cpu") {
+        museion_core::Accelerator::Cpu
+    } else {
+        museion_core::detect_hardware()?.accelerator
+    };
+    println!("
+Into: {dest}");
+    for (name, key, size) in tools::plan(&accel)? {
+        println!("  {name:<14} {key:<16} {}", thousands((size / 1_048_576) as usize) + " MB");
+    }
+    println!();
+    let installed = tools::install(&accel, Path::new(dest), |s| match s {
+        Step::Downloading { file, received, total, .. } => {
+            if std::io::stdout().flush().is_ok() {
+                print!("\r  fetching {file:<44} {:>3}%", if total > 0 { received * 100 / total } else { 0 });
+            }
+        }
+        Step::Unpacking { tool } => println!("\r  unpacking {tool:<50}"),
+        Step::Done { tool } => println!("  ok        {tool}"),
+        Step::Skipped { tool, reason } => println!("  --        {tool}: {reason}"),
+    })?;
+    println!(
+        "
+  kiwix-serve  : {}
+  llama-server : {}
+  pdfium       : {}
+",
+        installed.kiwix_serve.map_or("missing".into(), |p| p.display().to_string()),
+        installed.llama_server.map_or("missing".into(), |p| p.display().to_string()),
+        installed.pdfium_dir.display()
+    );
     Ok(())
 }
 

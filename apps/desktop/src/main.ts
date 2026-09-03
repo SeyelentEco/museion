@@ -219,6 +219,8 @@ async function refreshSetup() {
   $<HTMLInputElement>('#kiwix-exe').value = cfg.kiwix_exe ?? '';
   $<HTMLInputElement>('#llama-exe').value = cfg.llama_exe ?? '';
 
+  void loadPlan();
+
   const st = await invoke<Status>('get_status');
   $('#library-summary').textContent = st.documents
     ? `${fmt(st.documents)} documents, ${fmt(st.pages)} pages, ${fmt(st.words)} words indexed.`
@@ -292,6 +294,156 @@ $('#stop-services').addEventListener('click', async () => {
 
 void listen<string>('service-progress', (e) => statusMsg(e.payload));
 void listen<string>('index-progress', (e) => statusMsg(e.payload));
+
+/* ------------------------------------------------------------------ wizard */
+
+interface PlanItem {
+  id: string;
+  title: string;
+  size_bytes: number;
+}
+interface SetupPlan {
+  hardware: Hardware;
+  chat_model: PlanItem | null;
+  reranker: PlanItem | null;
+  tools: PlanItem[];
+  bundles: PlanItem[];
+}
+interface FetchProgress {
+  item: string;
+  received: number;
+  total: number;
+  note: string;
+}
+
+function gb(n: number) {
+  return n >= 1e9 ? `${(n / 1e9).toFixed(n >= 1e10 ? 0 : 1)} GB` : `${Math.round(n / 1e6)} MB`;
+}
+
+let plan: SetupPlan | null = null;
+
+async function loadPlan() {
+  const dl = $('#wiz-plan');
+  try {
+    plan = await invoke<SetupPlan>('setup_plan');
+  } catch (e) {
+    dl.textContent = String(e);
+    return;
+  }
+  dl.textContent = '';
+  const add = (k: string, v: string) => {
+    dl.append(el('dt', undefined, k));
+    dl.append(el('dd', undefined, v));
+  };
+  add('This machine', `${plan.hardware.accelerator} — ${plan.hardware.tier} tier`);
+  add('Helper programs', plan.tools.map((t) => `${t.title} (${gb(t.size_bytes)})`).join(', '));
+  add('Reranker', plan.reranker ? `${plan.reranker.title} (${gb(plan.reranker.size_bytes)})` : '—');
+  add(
+    'Chat model',
+    plan.chat_model
+      ? `${plan.chat_model.title} (${gb(plan.chat_model.size_bytes)})`
+      : 'none fits this machine',
+  );
+
+  const sel = $<HTMLSelectElement>('#wiz-bundle');
+  sel.textContent = '';
+  for (const b of plan.bundles) {
+    const o = document.createElement('option');
+    o.value = b.id;
+    o.textContent = `${b.title} — ${gb(b.size_bytes)}`;
+    if (b.id === 'go-bag') o.selected = true;
+    sel.append(o);
+  }
+
+  const cfg = await invoke<Config>('get_config');
+  $<HTMLInputElement>('#wiz-library').value = cfg.library_dir ?? '';
+  $<HTMLInputElement>('#wiz-models').value = (cfg as Config & { models_dir?: string }).models_dir ?? '';
+  $<HTMLInputElement>('#wiz-tools').value =
+    cfg.kiwix_exe?.replace(/[\\/][^\\/]*$/, '') ?? '';
+}
+
+function showProgress(label: string, frac: number | null) {
+  const box = $('#wiz-progress');
+  box.hidden = false;
+  $('#wiz-label').textContent = label;
+  $<HTMLElement>('#wiz-fill').style.width = frac === null ? '100%' : `${Math.round(frac * 100)}%`;
+}
+
+void listen<FetchProgress>('fetch-progress', (e) => {
+  const p = e.payload;
+  const frac = p.total > 0 ? p.received / p.total : null;
+  const size = p.total > 0 ? ` ${gb(p.received)} / ${gb(p.total)}` : '';
+  showProgress(`${p.item}${p.note ? ` — ${p.note}` : ''}${size}`, frac);
+});
+
+$('#wiz-pick-library').addEventListener('click', () =>
+  pickInto('#wiz-library', true, 'Folder for the library'),
+);
+$('#wiz-pick-models').addEventListener('click', () =>
+  pickInto('#wiz-models', true, 'Folder for models'),
+);
+$('#wiz-pick-tools').addEventListener('click', () =>
+  pickInto('#wiz-tools', true, 'Folder for helper programs'),
+);
+
+/**
+ * The whole first run, in order: programs, reranker, chat model, content,
+ * services, index, fit. Each step is resumable and skips what is already
+ * present, so a failure partway through costs a retry, not a restart.
+ */
+$('#wiz-go').addEventListener('click', async () => {
+  if (!plan) return;
+  const lib = $<HTMLInputElement>('#wiz-library').value.trim();
+  const models = $<HTMLInputElement>('#wiz-models').value.trim();
+  const tools = $<HTMLInputElement>('#wiz-tools').value.trim();
+  if (!lib || !models || !tools) {
+    statusMsg('Choose all three folders first.', true);
+    return;
+  }
+  const btn = $('#wiz-go');
+  btn.setAttribute('disabled', 'true');
+  try {
+    const current = await invoke<Config>('get_config');
+    await invoke('set_config', { config: { ...current, library_dir: lib } });
+
+    showProgress('Fetching helper programs…', null);
+    await invoke('fetch_tools', { dest: tools });
+
+    if (plan.reranker) {
+      showProgress(`Fetching ${plan.reranker.title}…`, 0);
+      await invoke('fetch_model', { id: plan.reranker.id, dest: models });
+    }
+    if (plan.chat_model) {
+      showProgress(`Fetching ${plan.chat_model.title}…`, 0);
+      await invoke('fetch_model', { id: plan.chat_model.id, dest: models });
+    }
+
+    const bundle = $<HTMLSelectElement>('#wiz-bundle').value;
+    showProgress(`Fetching ${bundle}…`, 0);
+    await invoke('fetch_bundle', { id: bundle });
+
+    showProgress('Starting services…', null);
+    await invoke('start_services');
+
+    showProgress('Building the index…', null);
+    await invoke('build_index', { force: false });
+
+    if (plan.chat_model && plan.hardware.tier !== 'Modest') {
+      showProgress('Fitting the model to this GPU…', null);
+      await invoke('fit_chat_model');
+    }
+
+    showProgress('Ready. Ask something.', 1);
+    statusMsg('Set-up complete.');
+    await refreshSetup();
+    await refreshServiceDots();
+  } catch (e) {
+    showProgress(`Stopped: ${String(e)}`, null);
+    statusMsg(String(e), true);
+  } finally {
+    btn.removeAttribute('disabled');
+  }
+});
 
 $('#build-index').addEventListener('click', async () => {
   const btn = $('#build-index');

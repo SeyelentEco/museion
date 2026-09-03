@@ -75,11 +75,12 @@ carrying a page-level citation into *Purifying Water During an Emergency*.
 
 Asked what caused the Bronze Age collapse, it says the library doesn't cover that.
 
-The Library tab builds the index, fits the chat model to your GPU (it runs
-`llama-fit-params` and stores the offload split), and supervises the local services. Model
-manifests for each hardware tier live under `models/` and fetch like content. What's still
-missing is the glue that picks and downloads the model *for* you from the detected tier —
-today you run `museion hardware`, fetch the matching manifest, and point the Library tab at it.
+The Library tab has a first-run flow: it detects your hardware, shows exactly what it
+would fetch and how large each piece is — helper programs, the reranker, the chat model
+for your tier, the content bundle you pick — then downloads it all (resumable, verified),
+starts the services, builds the index, and fits the model to your GPU. The catalogue is
+compiled into the app, so an installed copy knows where everything comes from without
+the repo. Everything the flow does, `museion` does from the command line too.
 
 ---
 

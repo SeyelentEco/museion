@@ -69,6 +69,35 @@
           <div class="setup">
             <h1>Library</h1>
 
+            <div class="card wizard" id="card-wizard">
+              <h2>Set up this machine</h2>
+              <p class="muted">
+                Everything below needs internet once. After that, nothing does. Museion
+                never chooses where things go — pick a folder with room.
+              </p>
+              <div class="row">
+                <input id="wiz-library" type="text" placeholder="Folder for the library (archives + index)" />
+                <button id="wiz-pick-library" type="button">Choose…</button>
+              </div>
+              <div class="row">
+                <input id="wiz-models" type="text" placeholder="Folder for models (2–37 GB)" />
+                <button id="wiz-pick-models" type="button">Choose…</button>
+              </div>
+              <div class="row">
+                <input id="wiz-tools" type="text" placeholder="Folder for helper programs" />
+                <button id="wiz-pick-tools" type="button">Choose…</button>
+              </div>
+              <dl id="wiz-plan"><dd class="muted">Working out what this machine needs…</dd></dl>
+              <div class="row">
+                <select id="wiz-bundle" aria-label="Content bundle"></select>
+                <button id="wiz-go" type="button" class="primary">Fetch everything</button>
+              </div>
+              <div class="progress" id="wiz-progress" hidden>
+                <div class="bar"><div class="fill" id="wiz-fill"></div></div>
+                <div class="label" id="wiz-label"></div>
+              </div>
+            </div>
+
             <div class="card" id="card-hardware">
               <h2>This machine</h2>
               <dl id="hardware"><dd class="muted">Detecting…</dd></dl>

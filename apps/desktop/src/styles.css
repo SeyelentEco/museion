@@ -274,5 +274,33 @@ dt { color: var(--ink-mute); }
 dd { margin: 0; }
 
 .actions { display: flex; gap: 0.6rem; margin-top: 1.25rem; }
+
+select {
+  flex: 1 1 auto;
+  padding: 0.6rem 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink);
+  font: inherit;
+}
+
+.wizard { border-color: var(--accent-dim); }
+.wizard dl { margin: 0.75rem 0; }
+
+.progress { margin-top: 0.85rem; }
+.bar {
+  height: 8px;
+  background: var(--surface-2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.fill {
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  transition: width 0.25s;
+}
+.progress .label { margin-top: 0.4rem; font-size: 0.87rem; color: var(--ink-mid); font-family: var(--mono); }
 .status { margin-top: 0.9rem; color: var(--ink-mid); min-height: 1.4rem; }
 .status.err { color: var(--bad); white-space: pre-wrap; }

@@ -22,6 +22,8 @@ pub struct Config {
     pub llama_exe: Option<PathBuf>,
     /// Directory holding the pdfium library, used when indexing PDF archives.
     pub pdfium_dir: Option<PathBuf>,
+    /// Directory the setup flow downloads models into.
+    pub models_dir: Option<PathBuf>,
     /// GGUF for the chat model.
     pub chat_model: Option<PathBuf>,
     /// GGUF for the reranker.

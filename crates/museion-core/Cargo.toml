@@ -25,3 +25,8 @@ serde_json = "1"
 anyhow = "1"
 regex = "1"
 sha2 = "0.10"
+# The catalogue is embedded in the binary. An installed app has no repo checkout
+# to read manifests from, and a preparedness tool must carry its own knowledge
+# of where things come from.
+serde_yaml = "0.9"
+include_dir = "0.7"
