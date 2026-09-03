@@ -316,8 +316,11 @@ interface FetchProgress {
   note: string;
 }
 
+// Binary units, matching scripts/fetch.js --list, so the app and the command
+// line never quote two different sizes for the same file.
 function gb(n: number) {
-  return n >= 1e9 ? `${(n / 1e9).toFixed(n >= 1e10 ? 0 : 1)} GB` : `${Math.round(n / 1e6)} MB`;
+  const g = n / 1073741824;
+  return g >= 1 ? `${g.toFixed(g >= 10 ? 0 : 1)} GB` : `${Math.round(n / 1048576)} MB`;
 }
 
 let plan: SetupPlan | null = null;

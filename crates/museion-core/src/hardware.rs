@@ -190,20 +190,49 @@ fn sysctl(key: &str) -> Option<String> {
     Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
+/// System RAM straight from the Win32 API.
+///
+/// This used to shell out to `wmic`, which reported 65 GB from the command
+/// line and 0 MB from inside the app -- dropping a 12 GB card to the Modest
+/// tier and fetching the wrong model. wmic is also deprecated and absent on
+/// current Windows 11 builds, and writes UTF-16 to a pipe in some contexts.
+/// GlobalMemoryStatusEx has none of those problems and needs no process.
 #[cfg(target_os = "windows")]
 fn detect_system_ram_mb() -> u64 {
-    Command::new("wmic")
-        .args(["computersystem", "get", "TotalPhysicalMemory", "/value"])
-        .output()
-        .ok()
-        .and_then(|o| {
-            String::from_utf8_lossy(&o.stdout)
-                .lines()
-                .find_map(|l| l.split_once('=').map(|(_, v)| v.trim().to_string()))
-        })
-        .and_then(|v| v.parse::<u64>().ok())
-        .map(|b| b / 1024 / 1024)
-        .unwrap_or(0)
+    #[repr(C)]
+    struct MemoryStatusEx {
+        length: u32,
+        memory_load: u32,
+        total_phys: u64,
+        avail_phys: u64,
+        total_page_file: u64,
+        avail_page_file: u64,
+        total_virtual: u64,
+        avail_virtual: u64,
+        avail_extended_virtual: u64,
+    }
+    extern "system" {
+        fn GlobalMemoryStatusEx(buffer: *mut MemoryStatusEx) -> i32;
+    }
+    let mut m = MemoryStatusEx {
+        length: std::mem::size_of::<MemoryStatusEx>() as u32,
+        memory_load: 0,
+        total_phys: 0,
+        avail_phys: 0,
+        total_page_file: 0,
+        avail_page_file: 0,
+        total_virtual: 0,
+        avail_virtual: 0,
+        avail_extended_virtual: 0,
+    };
+    // SAFETY: the struct is repr(C) with the documented layout and its length
+    // field is set, which is all the call requires.
+    let ok = unsafe { GlobalMemoryStatusEx(&mut m) };
+    if ok == 0 {
+        0
+    } else {
+        m.total_phys / 1024 / 1024
+    }
 }
 
 #[cfg(not(target_os = "windows"))]

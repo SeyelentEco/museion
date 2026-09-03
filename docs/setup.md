@@ -93,7 +93,10 @@ tier; a 4B model just fits.
 cd apps/desktop && npm install && npx tauri build
 ```
 
-The installer lands in `target/release/bundle/`. On first launch the Library tab asks for
+The installer lands in `target/release/bundle/`. Build the app with `tauri build`, not a
+bare `cargo build`: only the Tauri CLI compiles the web UI in. A cargo-built exe opens a
+window pointed at the dev server and shows "localhost refused to connect" — and a later
+`cargo build --release --workspace` will quietly overwrite a good exe with that. On first launch the Library tab asks for
 the paths from steps 2 and 4. **Save**, **Start services**, **Build index** (if you skipped
 step 5), **Fit model to this machine** (if you skipped step 6). Then ask.
 
