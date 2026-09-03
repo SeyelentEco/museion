@@ -1,0 +1,35 @@
+# The chat model for the Capable and Generous tiers (8-24 GB of VRAM).
+#
+# A sparse mixture-of-experts: 35B parameters across 256 experts, of which
+# about 3B fire per token. Attention and the KV cache sit on the GPU; the expert
+# tensors sit in system RAM and are pulled in as needed. That is why it needs
+# 24 GB of system RAM as well as an 8 GB card -- the experts have to live
+# somewhere -- and why it outruns a dense 12B that fits entirely in VRAM
+# (43.6 vs 30.6 tok/s measured on the same RTX 3060).
+#
+# UD-Q4_K_M rather than anything sub-4-bit: IQ3-class quants emit malformed
+# tool calls even with a correct chat template, and the retrieval loop leans on
+# structured output.
+
+id: qwen3.6-35b-a3b-q4
+title: Qwen3.6 35B-A3B (Q4_K_M)
+role: chat
+tiers: [Capable, Generous]
+filename: Qwen3.6-35B-A3B-UD-Q4_K_M.gguf
+size_bytes: 22134528992
+sha256: ac0e2c1189e055faa36eff361580e79c5bd6f8e76bffb4ce547f167d53e31a61
+quant: UD-Q4_K_M
+context: 262144
+urls:
+  - https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf
+requires:
+  system_ram_mb: 24000
+# Offload split (-ngl / -ot) is not fixed here. It is computed per machine by
+# llama-fit-params at setup, because two people with the same nominal card
+# have different amounts free.
+server_args:
+  - --ctx-size
+  - "32768"
+license:
+  name: Apache-2.0
+  attribution: Alibaba Qwen team; GGUF quantisation by Unsloth

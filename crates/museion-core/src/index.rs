@@ -76,20 +76,40 @@ impl Index {
                 key   TEXT PRIMARY KEY,
                 value TEXT NOT NULL
             );
+
+            -- Archives that have been fully processed, whether or not they
+            -- contributed any rows to docs. zimgit-water's seven documents are
+            -- all duplicates of copies in the post-disaster archive, so it owns
+            -- no docs rows -- and without this table it looked unprocessed and
+            -- was re-downloaded and re-extracted on every run.
+            CREATE TABLE IF NOT EXISTS books (
+                book       TEXT PRIMARY KEY,
+                indexed_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
             "#,
         )
         .context("creating index schema")?;
         Ok(Self { conn })
     }
 
-    /// Has this archive already been indexed?
+    /// Has this archive already been processed?
     pub fn has_book(&self, book: &str) -> Result<bool> {
         let n: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM docs WHERE book = ?1",
+            "SELECT (SELECT COUNT(*) FROM books WHERE book = ?1)
+                  + (SELECT COUNT(*) FROM docs  WHERE book = ?1)",
             params![book],
             |r| r.get(0),
         )?;
         Ok(n > 0)
+    }
+
+    /// Record that an archive has been fully processed.
+    pub fn mark_book_done(&self, book: &str) -> Result<()> {
+        self.conn.execute(
+            "INSERT OR REPLACE INTO books (book) VALUES (?1)",
+            params![book],
+        )?;
+        Ok(())
     }
 
     pub fn forget_book(&mut self, book: &str) -> Result<()> {
@@ -99,6 +119,7 @@ impl Index {
             params![book],
         )?;
         tx.execute("DELETE FROM docs WHERE book = ?1", params![book])?;
+        tx.execute("DELETE FROM books WHERE book = ?1", params![book])?;
         tx.commit()?;
         Ok(())
     }
@@ -602,6 +623,29 @@ mod tests {
 
         // Short passages are left alone; there is not enough signal to judge.
         assert!(!is_navigation_page("Water 1 2 3"));
+    }
+
+    /// An archive whose documents were all duplicates owns no docs rows, and
+    /// used to look unprocessed forever -- re-downloaded and re-extracted on
+    /// every run. Completion is recorded separately from content.
+    #[test]
+    fn an_all_duplicate_archive_still_counts_as_done() {
+        let dir = std::env::temp_dir().join(format!("museion-done-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut ix = Index::open(&dir.join("t.db")).unwrap();
+
+        let body = doc(&["boil the water for one full minute before drinking it"]);
+        ix.add_document("post-disaster", "a.pdf", "Water", "", "", &body).unwrap();
+        // Same text under another archive: recorded as a duplicate, no docs row.
+        ix.add_document("water", "b.pdf", "Water", "", "", &body).unwrap();
+        assert!(!ix.has_book("water").unwrap(), "no rows, so not done yet");
+
+        ix.mark_book_done("water").unwrap();
+        assert!(ix.has_book("water").unwrap());
+
+        ix.forget_book("water").unwrap();
+        assert!(!ix.has_book("water").unwrap(), "forget must clear the completion mark too");
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     #[test]

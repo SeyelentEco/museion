@@ -6,7 +6,7 @@
 //   node scripts/fetch.js --list
 
 import { join } from 'node:path';
-import { resolveTarget, loadBundles, loadSources, urlsFor, formatBytes } from './lib/catalog.js';
+import { resolveTarget, loadBundles, loadSources, loadModels, urlsFor, formatBytes } from './lib/catalog.js';
 import { downloadVerified, isVerified } from './lib/download.js';
 import { parseArgs, resolveLibraryDir, renderProgress, clearProgress, fail } from './lib/cli.js';
 
@@ -33,6 +33,12 @@ async function list() {
   console.log('\nSources\n');
   for (const s of sources.values()) {
     console.log(`  ${s.id.padEnd(34)} ${formatBytes(s.size_bytes).padStart(9)}  ${s.category.padEnd(9)} ${s.title}`);
+  }
+  const models = await loadModels();
+  console.log('\nModels  (run "museion hardware" to see which tier this machine is)\n');
+  for (const m of models.values()) {
+    const tier = m.tiers?.length ? m.tiers.join('/') : m.role;
+    console.log(`  ${m.id.padEnd(34)} ${formatBytes(m.size_bytes).padStart(9)}  ${tier.padEnd(16)} ${m.title}`);
   }
   console.log('');
 }

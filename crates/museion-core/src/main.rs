@@ -8,11 +8,7 @@
 //!   museion status --db library.db
 
 use anyhow::{bail, Context, Result};
-use museion_core::{
-    index::AddOutcome,
-    kiwix::{book_id_from_filename, ArchiveKind},
-    Asker, Index, Kiwix, Llama, PdfExtractor,
-};
+use museion_core::{Asker, Index, Llama};
 use std::io::Write;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -25,6 +21,7 @@ museion -- offline library index and search
   museion ask    --db <file> <question...> [--llama <url>] [--reranker <url>]
   museion status --db <file>
   museion hardware
+  museion fit    --model <gguf> [--fit-exe <path>] [--ctx N]
 
 Options
   --library <dir>   Directory holding .zim archives
@@ -98,6 +95,7 @@ fn run() -> Result<()> {
         "ask" => cmd_ask(&args),
         "gather" => cmd_gather(&args),
         "hardware" => cmd_hardware(),
+        "fit" => cmd_fit(&args),
         "status" => cmd_status(&args),
         "" | "help" | "-h" => {
             println!("{USAGE}");
@@ -111,128 +109,64 @@ fn run() -> Result<()> {
 }
 
 fn cmd_index(args: &Args) -> Result<()> {
-    let library = args
-        .flags
-        .get("library")
-        .context("--library is required")?
-        .clone();
-    let kiwix_url = args
-        .flags
-        .get("kiwix")
-        .cloned()
-        .unwrap_or_else(|| "http://127.0.0.1:8090".into());
-    let pdfium_dir = args
-        .flags
-        .get("pdfium")
-        .cloned()
-        .unwrap_or_else(|| "bin".into());
-    let force = args.flags.contains_key("force");
-
-    let kiwix = Kiwix::new(&kiwix_url);
-    if !kiwix.is_up() {
-        bail!(
-            "no kiwix-serve at {kiwix_url}\n\n  \
-             Start it with the archives you want indexed, for example:\n  \
-             kiwix-serve --port 8090 <library>/*.zim"
-        );
-    }
-
-    let extractor = PdfExtractor::new(Path::new(&pdfium_dir))?;
+    use museion_core::indexer::Outcome;
+    let library = args.flags.get("library").context("--library is required")?.clone();
+    let kiwix_url = args.flags.get("kiwix").cloned().unwrap_or_else(|| "http://127.0.0.1:8090".into());
+    let pdfium_dir = args.flags.get("pdfium").cloned().unwrap_or_else(|| "bin".into());
     let db = db_path(args)?;
-    let mut index = Index::open(&db)?;
     println!("\nIndex: {}\nKiwix: {kiwix_url}\n", db.display());
 
-    let mut zims: Vec<_> = std::fs::read_dir(&library)
-        .with_context(|| format!("reading library directory {library}"))?
-        .filter_map(|e| e.ok())
-        .map(|e| e.file_name().to_string_lossy().to_string())
-        .filter(|n| n.ends_with(".zim"))
-        .collect();
-    zims.sort();
-
-    if zims.is_empty() {
-        bail!("no .zim archives found in {library}");
-    }
-
-    for filename in zims {
-        let book = book_id_from_filename(&filename)?;
-
-        if index.has_book(&book)? && !force {
-            println!("  skip     {book}  (already indexed; --force to rebuild)");
-            continue;
+    let opts = museion_core::IndexOptions {
+        library: Path::new(&library),
+        db: &db,
+        kiwix_url: &kiwix_url,
+        pdfium_dir: Path::new(&pdfium_dir),
+        force: args.flags.contains_key("force"),
+    };
+    let s = museion_core::index_library(&opts, |p| {
+        use museion_core::Progress::*;
+        match p {
+            Skipped { book } => println!("  skip     {book}  (already indexed; --force to rebuild)"),
+            Native { book } => println!("  native   {book}  (its own full-text index works; nothing to build)"),
+            Archive { book, documents } => println!("  building {book}  ({documents} documents)"),
+            Document { title, outcome, .. } => match outcome {
+                Outcome::ImageOnly => println!("      scan   {title}  (no text layer)"),
+                Outcome::Duplicate => println!("      dup    {title}"),
+                Outcome::Failed => eprintln!("      FAIL   {title}"),
+                Outcome::Indexed => {}
+            },
+            ArchiveDone { indexed, duplicate, image_only, failed, .. } => println!(
+                "           {indexed} indexed, {duplicate} duplicate, {image_only} image-only, {failed} failed"
+            ),
         }
+    })?;
 
-        match kiwix.classify(&book)? {
-            ArchiveKind::FullTextIndexed => {
-                println!("  native   {book}  (its own full-text index works; nothing to build)");
-            }
-            ArchiveKind::PdfCollection(docs) => {
-                if force {
-                    index.forget_book(&book)?;
-                }
-                println!("  building {book}  ({} documents)", docs.len());
-                let (mut ok, mut dup, mut img, mut failed) = (0, 0, 0, 0);
-
-                for d in &docs {
-                    let path = format!("files/{}", d.file);
-                    let bytes = match kiwix.content(&book, &path) {
-                        Ok(b) => b,
-                        Err(e) => {
-                            eprintln!("      FAIL fetch {}: {}", d.file, truncate(&e.to_string()));
-                            failed += 1;
-                            continue;
-                        }
-                    };
-                    let extracted = match extractor.extract(&bytes) {
-                        Ok(x) => x,
-                        Err(e) => {
-                            eprintln!("      FAIL parse {}: {}", d.file, truncate(&e.to_string()));
-                            failed += 1;
-                            continue;
-                        }
-                    };
-                    let title = if d.title.is_empty() {
-                        d.file.clone()
-                    } else {
-                        d.title.clone()
-                    };
-                    match index.add_document(
-                        &book,
-                        &d.file,
-                        &title,
-                        &d.description,
-                        &d.author,
-                        &extracted,
-                    )? {
-                        AddOutcome::Indexed => ok += 1,
-                        AddOutcome::ImageOnly => {
-                            img += 1;
-                            println!(
-                                "      scan   {title}  ({}p, no text layer)",
-                                extracted.page_count
-                            );
-                        }
-                        AddOutcome::Duplicate(of) => {
-                            dup += 1;
-                            println!("      dup    {title}  (same text as \"{of}\")");
-                        }
-                    }
-                }
-                println!(
-                    "           {ok} indexed, {dup} duplicate, {img} image-only, {failed} failed"
-                );
-            }
-        }
-    }
-
-    let s = index.stats()?;
     println!(
         "\n{} documents, {} pages, {} words indexed ({} image-only skipped)\n",
-        s.documents,
-        s.pages,
-        thousands(s.words),
-        s.image_only
+        s.documents, s.pages, thousands(s.words), s.image_only
     );
+    Ok(())
+}
+
+/// Compute the GPU offload split for a model on this machine.
+///
+///   museion fit --model <gguf> --fit-exe <path-to-llama-fit-params> [--ctx 32768]
+fn cmd_fit(args: &Args) -> Result<()> {
+    let model = args.flags.get("model").context("--model <gguf> is required")?;
+    let exe = args
+        .flags
+        .get("fit-exe")
+        .cloned()
+        .unwrap_or_else(|| if cfg!(windows) { "bin/llama-fit-params.exe".into() } else { "bin/llama-fit-params".into() });
+    let ctx: u32 = args.flags.get("ctx").and_then(|c| c.parse().ok()).unwrap_or(32768);
+
+    println!("\nMeasuring {model} against this machine at {ctx} context...");
+    let fit = museion_core::fit_model(Path::new(&exe), Path::new(model), ctx)?;
+    println!(
+        "\n  GPU layers : {}",
+        fit.gpu_layers.map(|n| n.to_string()).unwrap_or_else(|| "all".into())
+    );
+    println!("  Arguments  : {}\n", fit.args.join(" "));
     Ok(())
 }
 
@@ -444,10 +378,6 @@ fn thousands(n: usize) -> String {
         out.push(c);
     }
     out
-}
-
-fn truncate(s: &str) -> String {
-    truncate_to(s, 70)
 }
 
 fn truncate_to(s: &str, n: usize) -> String {

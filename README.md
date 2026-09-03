@@ -75,8 +75,11 @@ carrying a page-level citation into *Purifying Water During an Emergency*.
 
 Asked what caused the Bronze Age collapse, it says the library doesn't cover that.
 
-Not yet built: the setup wizard that runs `llama-fit-params` to compute your GPU offload
-split, and automatic model download. Model paths are set by hand on the Library tab.
+The Library tab builds the index, fits the chat model to your GPU (it runs
+`llama-fit-params` and stores the offload split), and supervises the local services. Model
+manifests for each hardware tier live under `models/` and fetch like content. What's still
+missing is the glue that picks and downloads the model *for* you from the detected tier —
+today you run `museion hardware`, fetch the matching manifest, and point the Library tab at it.
 
 ---
 

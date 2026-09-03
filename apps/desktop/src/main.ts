@@ -291,6 +291,34 @@ $('#stop-services').addEventListener('click', async () => {
 });
 
 void listen<string>('service-progress', (e) => statusMsg(e.payload));
+void listen<string>('index-progress', (e) => statusMsg(e.payload));
+
+$('#build-index').addEventListener('click', async () => {
+  const btn = $('#build-index');
+  btn.setAttribute('disabled', 'true');
+  statusMsg('Building the index…');
+  try {
+    statusMsg(await invoke<string>('build_index', { force: false }));
+    await refreshSetup();
+  } catch (e) {
+    statusMsg(String(e), true);
+  } finally {
+    btn.removeAttribute('disabled');
+  }
+});
+
+$('#fit-model').addEventListener('click', async () => {
+  const btn = $('#fit-model');
+  btn.setAttribute('disabled', 'true');
+  statusMsg('Measuring the model against this GPU — about ten seconds…');
+  try {
+    statusMsg(`Fitted: ${await invoke<string>('fit_chat_model')} Saved.`);
+  } catch (e) {
+    statusMsg(String(e), true);
+  } finally {
+    btn.removeAttribute('disabled');
+  }
+});
 
 /* ------------------------------------------------------------------ status */
 
