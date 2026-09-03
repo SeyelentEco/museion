@@ -287,8 +287,14 @@ $('#start-services').addEventListener('click', async () => {
 });
 
 $('#stop-services').addEventListener('click', async () => {
-  await invoke('stop_services');
-  statusMsg('Stopped. The GPU is free again.');
+  // An unhandled rejection here left the button looking dead with no message
+  // while the model stayed resident on the GPU. Errors must reach the person.
+  try {
+    await invoke('stop_services');
+    statusMsg('Stopped. The GPU is free again.');
+  } catch (e) {
+    statusMsg(`Could not stop services: ${String(e)}`, true);
+  }
   await refreshServiceDots();
 });
 
@@ -425,16 +431,19 @@ $('#wiz-go').addEventListener('click', async () => {
     showProgress(`Fetching ${bundle}…`, 0);
     await invoke('fetch_bundle', { id: bundle });
 
+    // Fit before anything is loaded. The fit measures free GPU memory, and
+    // with the chat model already resident it reads the card as full and
+    // returns a split far more cautious than the machine deserves.
+    if (plan.chat_model && plan.hardware.tier !== 'Modest') {
+      showProgress('Fitting the model to this GPU…', null);
+      await invoke('fit_chat_model');
+    }
+
     showProgress('Starting services…', null);
     await invoke('start_services');
 
     showProgress('Building the index…', null);
     await invoke('build_index', { force: false });
-
-    if (plan.chat_model && plan.hardware.tier !== 'Modest') {
-      showProgress('Fitting the model to this GPU…', null);
-      await invoke('fit_chat_model');
-    }
 
     showProgress('Ready. Ask something.', 1);
     statusMsg('Set-up complete.');

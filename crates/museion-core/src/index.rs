@@ -232,15 +232,32 @@ impl Index {
     /// the book's index page, which contains all three and teaches nothing.
     /// Deciding topic coverage is this gate's job; deciding which passage
     /// answers best is the reranker's.
-    const MIN_TERM_COVERAGE: f64 = 0.5;
+    pub const MIN_TERM_COVERAGE: f64 = 0.5;
 
-    /// Search the local index. Returns page-level hits ranked by BM25 and
-    /// filtered by term coverage.
+    /// Search the local index with the topic gate applied: nothing comes back
+    /// unless the best passage carries enough of the question's information.
+    /// This is the right call when no reranker is available to judge instead.
     pub fn search(&self, query: &str, limit: usize) -> Result<Vec<Hit>> {
+        let (hits, best) = self.search_ungated(query, limit)?;
+        if best + 1e-9 < Self::MIN_TERM_COVERAGE {
+            return Ok(Vec::new());
+        }
+        Ok(hits)
+    }
+
+    /// Search without the topic gate. Returns the hits and the best coverage
+    /// seen, so the caller can decide -- a reranker's score is a far better
+    /// judge of "does this answer the question" than term overlap.
+    ///
+    /// The gate alone was refusing "we have a lot of green beans and no
+    /// fridge, how do I can them so nobody gets botulism": "fridge" and
+    /// "nobody" do not occur in the corpus, so each carried maximum weight and
+    /// sank the score, though the pressure-canning procedure was right there.
+    pub fn search_ungated(&self, query: &str, limit: usize) -> Result<(Vec<Hit>, f64)> {
         let terms = content_terms(query);
         let fts = to_fts_query(query);
         if fts.is_empty() {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), 0.0));
         }
         // The FTS5 match, bm25() and snippet() all happen in a subquery with the
         // table named directly, then docs is joined on the outside. Both
@@ -326,13 +343,7 @@ impl Index {
             }
         }
 
-        // Topic gate: if nothing in the library carries enough of the question's
-        // information, the library does not cover it and the honest answer is
-        // none at all.
         let best = out.iter().map(|h| h.coverage).fold(0.0_f64, f64::max);
-        if best + 1e-9 < Self::MIN_TERM_COVERAGE {
-            return Ok(Vec::new());
-        }
 
         // Contents and index pages list every topic in a book and so match
         // almost any question about it, while containing none of the answer.
@@ -345,7 +356,7 @@ impl Index {
         // 0.03-0.06, real tables reach 0.14 at the 95th percentile, and the
         // contents page measured 0.42.
         out.sort_by_key(|h| is_navigation_page(&h.body));
-        Ok(out)
+        Ok((out, best))
     }
 
     /// Inverse document frequency for each term, measured against this index.
@@ -455,7 +466,10 @@ fn content_terms(input: &str) -> Vec<String> {
     const STOP: &[&str] = &[
         "a", "an", "the", "is", "are", "was", "were", "be", "been", "do", "does", "did", "how",
         "what", "when", "where", "which", "who", "why", "i", "my", "me", "you", "your", "it", "its",
-        "of", "to", "in", "on", "for", "with", "and", "or", "if", "can", "should", "would", "about",
+        // "can" is deliberately not here: as a modal verb it is so common that
+        // IDF weighting already makes it harmless, and as a verb it is the
+        // whole topic of a canning question.
+        "of", "to", "in", "on", "for", "with", "and", "or", "if", "should", "would", "about",
         "from", "that", "this", "there", "without", "any", "some", "not", "no", "get", "make",
         "use", "using", "need", "want", "have", "has",
     ];

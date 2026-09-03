@@ -55,6 +55,16 @@ const CASES = [
       'list of topics.',
   },
   {
+    q: 'we have a lot of green beans and no fridge, how do I can them so nobody gets botulism',
+    expect: ['pressure', 'canner', 'pounds', 'headspace'],
+    needsRerank: true,
+    why:
+      'REGRESSION: the way a person actually phrases it. "fridge" and "nobody" occur nowhere ' +
+      'in the corpus, so IDF-weighted term coverage refused the question outright while the ' +
+      'reranker had the procedure at the top. Coverage must be judged by the reranker when ' +
+      'one is available.',
+  },
+  {
     q: 'delivering a baby without a midwife',
     expect: ['birth', 'labor', 'labour', 'deliver', 'cord'],
     why: 'A Book for Midwives, 544 pages of it',
@@ -69,9 +79,12 @@ const CASES = [
 
 function binary() {
   const exe = process.platform === 'win32' ? 'museion.exe' : 'museion';
-  const p = join(REPO_ROOT, 'crates', 'museion-core', 'target', 'release', exe);
+  // The workspace target, not the crate's own. A stale crate-local target dir
+  // once ran a days-old binary through this harness, and every "regression" it
+  // reported was against code that no longer existed.
+  const p = join(REPO_ROOT, 'target', 'release', exe);
   if (!existsSync(p)) {
-    throw new Error(`museion binary not built.\n  Build it with:\n    cargo build --release --manifest-path crates/museion-core/Cargo.toml`);
+    throw new Error(`museion binary not built.\n  Build it with:\n    cargo build --release -p museion-core`);
   }
   return p;
 }
@@ -88,7 +101,9 @@ function run(bin, db, q, limit, mode) {
       mode === 'gather'
         ? ['gather', '--db', db, q]
         : ['search', '--db', db, '--limit', String(limit), q];
-    return execFileSync(bin, args, { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
+    // stderr is inherited so the child's own notes -- a reranker that fell back, a
+    // debug trace -- reach the terminal instead of being swallowed by the pipe.
+    return execFileSync(bin, args, { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024, stdio: ['pipe', 'pipe', 'inherit'] });
   } catch (err) {
     return `ERROR: ${err.message}`;
   }

@@ -160,6 +160,16 @@ impl Supervisor {
             .spawn()
             .with_context(|| format!("starting {} ({})", role.label(), exe.display()))?;
 
+        // Tie the child's life to ours at the OS level. The exit hooks only
+        // run on a graceful quit; a crash, a kill from Task Manager, or an
+        // out-of-memory abort skips them, and then a chat model sits on the
+        // whole GPU with nothing left to stop it. Measured: force-killing the
+        // app left three sidecars alive holding 11.7 GB. A Job Object with
+        // kill-on-close has no such gap -- when the last handle to the job
+        // goes away with this process, Windows terminates everything in it.
+        #[cfg(windows)]
+        job::assign(&child);
+
         self.running
             .lock()
             .map_err(|_| anyhow::anyhow!("supervisor lock poisoned"))?
@@ -231,6 +241,104 @@ impl Supervisor {
                 let _ = s.child.wait();
             }
             running.clear();
+        }
+    }
+}
+
+/// A single process-wide Job Object with JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE.
+/// Declared directly against kernel32, which std already links, so no crate.
+#[cfg(windows)]
+mod job {
+    use std::os::windows::io::AsRawHandle;
+    use std::process::Child;
+    use std::sync::OnceLock;
+
+    type Handle = *mut std::ffi::c_void;
+
+    #[repr(C)]
+    struct JobObjectBasicLimitInformation {
+        per_process_user_time_limit: i64,
+        per_job_user_time_limit: i64,
+        limit_flags: u32,
+        minimum_working_set_size: usize,
+        maximum_working_set_size: usize,
+        active_process_limit: u32,
+        affinity: usize,
+        priority_class: u32,
+        scheduling_class: u32,
+    }
+
+    #[repr(C)]
+    struct IoCounters {
+        read_operation_count: u64,
+        write_operation_count: u64,
+        other_operation_count: u64,
+        read_transfer_count: u64,
+        write_transfer_count: u64,
+        other_transfer_count: u64,
+    }
+
+    #[repr(C)]
+    struct JobObjectExtendedLimitInformation {
+        basic: JobObjectBasicLimitInformation,
+        io_info: IoCounters,
+        process_memory_limit: usize,
+        job_memory_limit: usize,
+        peak_process_memory_used: usize,
+        peak_job_memory_used: usize,
+    }
+
+    const JOB_OBJECT_EXTENDED_LIMIT_INFORMATION: u32 = 9;
+    const JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE: u32 = 0x2000;
+
+    extern "system" {
+        fn CreateJobObjectW(attrs: *mut std::ffi::c_void, name: *const u16) -> Handle;
+        fn SetInformationJobObject(job: Handle, class: u32, info: *mut std::ffi::c_void, len: u32) -> i32;
+        fn AssignProcessToJobObject(job: Handle, process: Handle) -> i32;
+    }
+
+    struct SendHandle(Handle);
+    // SAFETY: a job handle is a plain kernel handle, usable from any thread.
+    unsafe impl Send for SendHandle {}
+    unsafe impl Sync for SendHandle {}
+
+    static JOB: OnceLock<Option<SendHandle>> = OnceLock::new();
+
+    fn job() -> Option<Handle> {
+        JOB.get_or_init(|| {
+            // SAFETY: plain Win32 calls with valid arguments; the info struct
+            // is repr(C) with the documented layout.
+            unsafe {
+                let h = CreateJobObjectW(std::ptr::null_mut(), std::ptr::null());
+                if h.is_null() {
+                    return None;
+                }
+                let mut info: JobObjectExtendedLimitInformation = std::mem::zeroed();
+                info.basic.limit_flags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+                let ok = SetInformationJobObject(
+                    h,
+                    JOB_OBJECT_EXTENDED_LIMIT_INFORMATION,
+                    &mut info as *mut _ as *mut std::ffi::c_void,
+                    std::mem::size_of::<JobObjectExtendedLimitInformation>() as u32,
+                );
+                if ok == 0 {
+                    return None;
+                }
+                Some(SendHandle(h))
+            }
+        })
+        .as_ref()
+        .map(|h| h.0)
+    }
+
+    /// Best effort: if the job cannot be created the child still runs, and
+    /// the graceful-quit path still stops it.
+    pub fn assign(child: &Child) {
+        if let Some(j) = job() {
+            // SAFETY: both handles are valid for the duration of the call.
+            unsafe {
+                AssignProcessToJobObject(j, child.as_raw_handle() as Handle);
+            }
         }
     }
 }

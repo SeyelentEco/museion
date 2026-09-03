@@ -333,6 +333,15 @@ async fn fit_chat_model(state: State<'_, AppState>) -> UiResult<String> {
         .and_then(|w| w[1].parse().ok())
         .unwrap_or(32768);
 
+    // The fit measures free GPU memory. With the chat model already resident
+    // the card reads as nearly full and the split comes out far too cautious:
+    // measured here, blocks 10-40 offloaded instead of 15-40. So the model is
+    // stopped first, and the person is told to start services again.
+    let was_running = state.supervisor.is_running(Role::Chat);
+    if was_running {
+        state.supervisor.stop(Role::Chat);
+        std::thread::sleep(Duration::from_secs(2));
+    }
     let fit = museion_core::fit_model(&fit_exe, &model, ctx).map_err(ui_err)?;
 
     // Keep any non-fit arguments the user had (like --ctx-size), replace the

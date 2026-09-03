@@ -197,6 +197,48 @@ illustration of the point: **a retrieval filter that looks conservative can be t
 that makes an answer dangerous.** Being unable to answer is safe. Being wrong about the
 reason you cannot answer is not.
 
+## …and the reranker is the better gatekeeper
+
+Driving the built app with the questions a person actually types found the next crack.
+*"We have a lot of green beans and no fridge, how do I can them so nobody gets
+botulism"* was refused — the same canning procedure that the tidier eval phrasing finds.
+
+Two causes. "can" was a stopword, so the topic verb vanished from the query. And *fridge*
+and *nobody* occur nowhere in the corpus (the documents say *refrigerator*), so under IDF
+weighting each carried the maximum weight — the weight meant for a *topic* word like
+*bronze* — and together they sank the coverage score below the bar. Term overlap cannot
+tell an absent topic word from an absent incidental one.
+
+The reranker can. It scores relevant passages near 0.9 and irrelevant ones at 0.0 with a
+wide gap between, so when one is available it now decides coverage: if even its top-scored
+passage reads as irrelevant, the library does not hold the answer. The IDF gate remains
+only as the fallback for machines running without a reranker. Both regression phrasings
+are in the eval set, and *Bronze Age* still refuses under both judges.
+
+## …and even then, the right pages have to be in the pool
+
+Fixing the gate exposed the next layer. With the natural phrasing, the reranker never
+*saw* the pressure-canning procedure: keyword retrieval ranked *Canning Food* pages 17 and
+18 at **252nd and 283rd**, because they never use the word *botulism*, while the book's
+contents page — which does — sat 3rd. No candidate cutoff rescues that.
+
+The plan always called for query expansion, and this is where it earned its place. Before
+retrieval, the chat model rewrites the question into the two or three searches a reference
+librarian would type — for this one it produced *"low acid vegetable canning procedures"*,
+*"botulism prevention pressure canning"*, *"green beans safe preservation methods"* — and
+the candidates from all of them are pooled (133, deduplicated by page) before the reranker
+scores anything. The procedure pages arrive through the rewrites, the reranker puts them in
+the top eight, and the answer comes out right: pressure canner, 240 °F, 10/11 lb by gauge,
+½-inch headspace, altitude-adjusted times.
+
+The rewrite is an aid, not a dependency: if the chat model is unreachable, retrieval runs
+on the question alone, exactly as before.
+
+A note on the harness, because it cost an hour: the evaluation script was pointed at a
+stale, pre-workspace build directory, so every "gather-mode" result it reported for a day
+came from a binary that predated the changes under test. It now uses the workspace target,
+and the stale directory is gone.
+
 ## Contents pages are not answers
 
 Index and contents pages match almost any question about a book, because they list every
