@@ -405,6 +405,14 @@ nav[hidden] { display: none; }
 .card h2 { font-size: 0.95rem; margin: 0 0 0.7rem; }
 
 .row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
+
+.field { margin-bottom: 0.9rem; }
+.field label { display: block; font-weight: 600; margin-bottom: 0.1rem; }
+.field label code { font-weight: 400; font-family: var(--mono); font-size: 0.85em; color: var(--ink-mute); margin-left: 0.35rem; }
+.field .opt { font-weight: 400; color: var(--ink-mute); font-size: 0.8em; margin-left: 0.35rem; }
+.field .what { display: block; color: var(--ink-mute); font-size: 0.85rem; margin-bottom: 0.4rem; }
+.field .what code { font-family: var(--mono); font-size: 0.9em; }
+.field .row { margin-bottom: 0; }
 .hint, .muted { color: var(--ink-mute); font-size: 0.87rem; margin: 0.4rem 0 0; }
 
 dl { display: grid; grid-template-columns: auto 1fr; gap: 0.3rem 1rem; margin: 0; font-size: 0.92rem; }

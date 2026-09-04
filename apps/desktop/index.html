@@ -96,9 +96,13 @@
             <div class="card">
               <h2>Content</h2>
               <p class="muted" id="library-summary">No library configured.</p>
-              <div class="row">
-                <input id="library-dir" type="text" placeholder="Path to your library folder" />
-                <button id="pick-library" type="button">Choose…</button>
+              <div class="field">
+                <label for="library-dir">Library folder</label>
+                <span class="what">Where fetched archives and the search index live.</span>
+                <div class="row">
+                  <input id="library-dir" type="text" placeholder="Path to a folder with room" />
+                  <button id="pick-library" type="button">Choose…</button>
+                </div>
               </div>
               <p class="hint">
                 Museion has no default location: content runs from under a gigabyte to well over
@@ -122,33 +126,45 @@
 
             <div class="card">
               <h2>Models</h2>
-              <div class="row">
-                <input id="chat-model" type="text" placeholder="Chat model (.gguf)" />
-                <button id="pick-chat" type="button">Choose…</button>
+              <div class="field">
+                <label for="chat-model">Chat model</label>
+                <span class="what">Writes the answers. Chosen for your hardware tier; holds most of the GPU while running.</span>
+                <div class="row">
+                  <input id="chat-model" type="text" placeholder="Path to a .gguf file" />
+                  <button id="pick-chat" type="button">Choose…</button>
+                </div>
               </div>
-              <div class="row">
-                <input id="reranker-model" type="text" placeholder="Reranker (.gguf, optional)" />
-                <button id="pick-reranker" type="button">Choose…</button>
+              <div class="field">
+                <label for="reranker-model">Reranker <span class="opt">optional</span></label>
+                <span class="what">Reads each retrieved passage against your question and orders them by relevance. Small; runs on the CPU. Without it, answers still work but are ordered by keyword match alone.</span>
+                <div class="row">
+                  <input id="reranker-model" type="text" placeholder="Path to a .gguf file" />
+                  <button id="pick-reranker" type="button">Choose…</button>
+                </div>
               </div>
-              <p class="hint">
-                The reranker is optional. Without it answers still work, ordered by keyword
-                relevance alone.
-              </p>
             </div>
 
             <div class="card">
               <h2>Helper programs</h2>
-              <div class="row">
-                <input id="kiwix-exe" type="text" placeholder="kiwix-serve" />
-                <button id="pick-kiwix" type="button">Choose…</button>
+              <div class="field">
+                <label for="kiwix-exe">Content server <code>kiwix-serve</code></label>
+                <span class="what">Serves the archives for reading and searching. From the Kiwix project.</span>
+                <div class="row">
+                  <input id="kiwix-exe" type="text" placeholder="Path to kiwix-serve" />
+                  <button id="pick-kiwix" type="button">Choose…</button>
+                </div>
               </div>
-              <div class="row">
-                <input id="llama-exe" type="text" placeholder="llama-server" />
-                <button id="pick-llama" type="button">Choose…</button>
+              <div class="field">
+                <label for="llama-exe">Inference server <code>llama-server</code></label>
+                <span class="what">Runs the chat model and the reranker. From llama.cpp; <code>llama-fit-params</code> is expected beside it.</span>
+                <div class="row">
+                  <input id="llama-exe" type="text" placeholder="Path to llama-server" />
+                  <button id="pick-llama" type="button">Choose…</button>
+                </div>
               </div>
               <p class="hint">
-                Kiwix and llama.cpp are separate projects, so they are pointed at separately —
-                if you already have either installed, use the copy you have.
+                Two separate projects, so they are pointed at separately — if you already have
+                either installed, use the copy you have.
               </p>
             </div>
 
@@ -162,9 +178,22 @@
               Start services when Museion opens
               <span class="hint">The chat model holds most of the GPU while running.</span>
             </label>
-            <div class="actions">
-              <button id="build-index" type="button">Build index</button>
-              <button id="fit-model" type="button" title="Measure the chat model against this GPU and store the offload split">Fit model to this machine</button>
+            <div class="card">
+              <h2>Maintenance</h2>
+              <p class="muted">
+                Fetching content and adding folders already do both of these. They are here for
+                what happens outside the app.
+              </p>
+              <div class="field">
+                <label for="build-index">Build index</label>
+                <span class="what">Indexes anything in your library or extra folders that isn't indexed yet — for archives or PDFs you copied in by hand, or a set-up that stopped before this step. Skips what's already done. Needs the services running.</span>
+                <button id="build-index" type="button">Build index</button>
+              </div>
+              <div class="field">
+                <label for="fit-model">Fit model to this machine</label>
+                <span class="what">Measures the chat model against your GPU and stores the layer split. Set-up did this once; run it again after changing the GPU or the chat model. Stops the chat model to measure, so start services afterwards.</span>
+                <button id="fit-model" type="button">Fit model to this machine</button>
+              </div>
             </div>
             <p id="setup-status" class="status" role="status"></p>
 
