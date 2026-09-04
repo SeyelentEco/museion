@@ -36,6 +36,15 @@ pub struct Config {
     pub kiwix_port: u16,
     pub chat_port: u16,
     pub reranker_port: u16,
+    /// Start the services when the app opens. On by default: a person opening
+    /// Museion wants to ask something. Off for those who would rather the GPU
+    /// stay free until they choose -- the model holds nearly all of it.
+    #[serde(default = "yes")]
+    pub autostart: bool,
+}
+
+fn yes() -> bool {
+    true
 }
 
 impl Config {
@@ -45,6 +54,7 @@ impl Config {
             chat_port: 8080,
             reranker_port: 8081,
             chat_gpu_layers: 999,
+            autostart: true,
             ..Default::default()
         }
     }

@@ -29,6 +29,7 @@
         <!-- Ask -->
         <section id="panel-ask" class="panel active">
           <div id="transcript" class="transcript">
+            <div id="boot-status" class="boot-status" hidden></div>
             <div class="empty" id="ask-empty">
               <h1>Ask the library</h1>
               <p>
@@ -153,6 +154,11 @@
               <button id="start-services" type="button">Start services</button>
               <button id="stop-services" type="button">Stop services</button>
             </div>
+            <label class="check">
+              <input id="autostart" type="checkbox" />
+              Start services when Museion opens
+              <span class="hint">The chat model holds most of the GPU while running.</span>
+            </label>
             <div class="actions">
               <button id="build-index" type="button">Build index</button>
               <button id="fit-model" type="button" title="Measure the chat model against this GPU and store the offload split">Fit model to this machine</button>

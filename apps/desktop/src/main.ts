@@ -33,6 +33,7 @@ interface Hardware {
 }
 
 interface Config {
+  autostart: boolean;
   library_dir: string | null;
   kiwix_exe: string | null;
   llama_exe: string | null;
@@ -75,17 +76,106 @@ document.querySelectorAll('.tab').forEach((t) =>
 let busy = false;
 
 /**
- * Render an answer, turning [1] into a control that reveals the source it
- * points at. Citations are only worth having if following one is easy -- the
- * whole promise is that you can check the answer yourself.
+ * Render an answer as light Markdown, building DOM nodes directly.
+ *
+ * No innerHTML anywhere: the text comes from a language model and is not to
+ * be trusted as markup. Only what is recognised becomes structure; everything
+ * else stays text. Covers what the model actually emits -- paragraphs,
+ * headings, bullet and numbered lists with one level of nesting, bold,
+ * italic, inline code -- and turns [1] into a chip that reveals the source it
+ * points at, because a citation is only worth having if following it is easy.
  */
 function renderAnswer(container: HTMLElement, text: string) {
   container.textContent = '';
-  const parts = text.split(/(\[\d+(?:\]\[\d+)*\]|\[\d+(?:,\s*\d+)*\])/g);
-  for (const part of parts) {
-    const m = part.match(/^\[[\d,\s\]\[]+\]$/);
-    if (m) {
-      for (const num of part.match(/\d+/g) ?? []) {
+  const lines = text.replace(/\r\n?/g, '\n').split('\n');
+
+  let para: string[] = [];
+  let list: { el: HTMLElement; ordered: boolean; sub: HTMLElement | null } | null = null;
+
+  const flushPara = () => {
+    if (para.length) {
+      const p = el('p');
+      inline(p, para.join(' '));
+      container.append(p);
+      para = [];
+    }
+  };
+  const flushList = () => {
+    list = null;
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.replace(/\s+$/, '');
+    const indent = rawLine.match(/^\s*/)![0].length;
+
+    const heading = line.match(/^\s*(#{1,6})\s+(.*)$/);
+    const bullet = line.match(/^\s*(?:[-*•])\s+(.*)$/);
+    const number = line.match(/^\s*\d+[.)]\s+(.*)$/);
+
+    if (!line.trim()) {
+      flushPara();
+      flushList();
+      continue;
+    }
+    if (heading) {
+      flushPara();
+      flushList();
+      const h = el(heading[1].length <= 2 ? 'h3' : 'h4');
+      inline(h, heading[2]);
+      container.append(h);
+      continue;
+    }
+    if (bullet || number) {
+      flushPara();
+      const ordered = Boolean(number);
+      const body = (bullet ?? number)![1];
+      // An indented item nests under the previous top-level item.
+      if (list && indent >= 2 && list.el.lastElementChild) {
+        if (!list.sub) {
+          list.sub = el(ordered ? 'ol' : 'ul');
+          list.el.lastElementChild.append(list.sub);
+        }
+        const li = el('li');
+        inline(li, body);
+        list.sub.append(li);
+        continue;
+      }
+      if (!list || list.ordered !== ordered) {
+        list = { el: el(ordered ? 'ol' : 'ul'), ordered, sub: null };
+        container.append(list.el);
+      }
+      list.sub = null;
+      const li = el('li');
+      inline(li, body);
+      list.el.append(li);
+      continue;
+    }
+    // A continuation line inside a list item belongs to that item.
+    if (list && indent >= 2 && list.el.lastElementChild) {
+      const target = (list.sub?.lastElementChild ?? list.el.lastElementChild) as HTMLElement;
+      target.append(document.createTextNode(' '));
+      inline(target, line.trim());
+      continue;
+    }
+    flushList();
+    para.push(line.trim());
+  }
+  flushPara();
+}
+
+/** Inline markup: **bold**, *italic*, `code`, and [n] citation chips. */
+function inline(target: HTMLElement, text: string) {
+  const tokens = text.split(/(\*\*[^*]+\*\*|`[^`]+`|(?<![*\w])\*[^*\n]+\*(?!\w)|\[\d+(?:\]\s*,?\s*\[\d+)*\]|\[\d+(?:,\s*\d+)*\])/g);
+  for (const t of tokens) {
+    if (!t) continue;
+    if (t.startsWith('**') && t.endsWith('**')) {
+      target.append(el('strong', undefined, t.slice(2, -2)));
+    } else if (t.startsWith('`') && t.endsWith('`')) {
+      target.append(el('code', undefined, t.slice(1, -1)));
+    } else if (t.startsWith('*') && t.endsWith('*') && t.length > 2) {
+      target.append(el('em', undefined, t.slice(1, -1)));
+    } else if (/^\[[\d,\s\]\[]+\]$/.test(t)) {
+      for (const num of t.match(/\d+/g) ?? []) {
         const c = el('span', 'cite', num);
         c.addEventListener('click', () => {
           const row = document.querySelector(`.source[data-n="${num}"]`);
@@ -93,12 +183,26 @@ function renderAnswer(container: HTMLElement, text: string) {
           row?.classList.add('highlight');
           setTimeout(() => row?.classList.remove('highlight'), 1600);
         });
-        container.append(c);
+        target.append(c);
       }
-    } else if (part) {
-      container.append(document.createTextNode(part));
+    } else {
+      target.append(document.createTextNode(t));
     }
   }
+}
+
+/** A notice in the transcript with a link to the Library tab. */
+function serviceNotice(exchange: HTMLElement, text: string) {
+  const n = el('div', 'notice');
+  n.append(document.createTextNode(text + ' '));
+  const link = el('a', 'goto', 'Open the Library tab');
+  link.setAttribute('href', '#');
+  link.addEventListener('click', (e) => {
+    e.preventDefault();
+    showTab('setup');
+  });
+  n.append(link);
+  exchange.append(n);
 }
 
 async function askQuestion(question: string) {
@@ -110,21 +214,48 @@ async function askQuestion(question: string) {
   const transcript = $('#transcript');
   const exchange = el('div', 'exchange');
   exchange.append(el('div', 'question', question));
+  transcript.append(exchange);
+  transcript.scrollTop = transcript.scrollHeight;
+
+  // Check before sending. A question against a model that is not running
+  // should get a plain answer immediately, not a spinner.
+  const blocker = await invoke<Status>('get_status')
+    .then((st) =>
+      !st.configured
+        ? 'Museion is not set up yet.'
+        : !st.chat_running
+          ? 'The chat model is not running, so there is nothing to answer with.'
+          : null,
+    )
+    .catch(() => null); // let the backend report instead
+  if (blocker) {
+    serviceNotice(exchange, blocker);
+    busy = false;
+    $('#ask-send').removeAttribute('disabled');
+    transcript.scrollTop = transcript.scrollHeight;
+    return;
+  }
+
   const answerEl = el('div', 'answer thinking', 'Searching the library…');
   exchange.append(answerEl);
-  transcript.append(exchange);
   transcript.scrollTop = transcript.scrollHeight;
 
   let raw = '';
   let started = false;
+  // If nothing has arrived after a while, say what is being waited on. The
+  // reranker and the model rewrite can take ten seconds; silence reads as a hang.
+  const slow = setTimeout(() => {
+    if (!started) answerEl.textContent = 'Still working — retrieving passages and waiting on the model…';
+  }, 12000);
   const unlisten = await listen<string>('answer-token', (e) => {
     if (!started) {
       started = true;
+      clearTimeout(slow);
       answerEl.classList.remove('thinking');
       answerEl.textContent = '';
     }
     raw += e.payload;
-    answerEl.textContent = raw;
+    renderAnswer(answerEl, raw);
     transcript.scrollTop = transcript.scrollHeight;
   });
 
@@ -150,8 +281,16 @@ async function askQuestion(question: string) {
       exchange.append(box);
     }
   } catch (err) {
-    answerEl.className = 'error';
-    answerEl.textContent = String(err);
+    clearTimeout(slow);
+    const msg = String(err);
+    // Service problems get the notice with the link; anything else is an error.
+    if (/isn't running|still loading|not set up/i.test(msg)) {
+      answerEl.remove();
+      serviceNotice(exchange, msg);
+    } else {
+      answerEl.className = 'error';
+      answerEl.textContent = msg;
+    }
   } finally {
     unlisten();
     busy = false;
@@ -218,6 +357,7 @@ async function refreshSetup() {
   $<HTMLInputElement>('#reranker-model').value = cfg.reranker_model ?? '';
   $<HTMLInputElement>('#kiwix-exe').value = cfg.kiwix_exe ?? '';
   $<HTMLInputElement>('#llama-exe').value = cfg.llama_exe ?? '';
+  $<HTMLInputElement>('#autostart').checked = cfg.autostart;
 
   void loadPlan();
 
@@ -504,6 +644,36 @@ async function refreshServiceDots() {
   }
 }
 
+/**
+ * Bring the services up on launch, narrating in the Ask tab. A person who
+ * opens Museion wants to ask something; making them find a button first is a
+ * step they should not need. The chat model takes from twenty seconds to a
+ * few minutes to load, so the progress is shown where they are looking.
+ */
+async function autostartServices() {
+  const box = $('#boot-status');
+  const say = (text: string, err = false) => {
+    box.hidden = false;
+    box.textContent = text;
+    box.classList.toggle('err', err);
+  };
+  const off = await listen<string>('service-progress', (e) => say(e.payload));
+  setDot('chat', 'busy');
+  try {
+    say('Starting services…');
+    await invoke('start_services');
+    say('Ready.');
+    setTimeout(() => {
+      box.hidden = true;
+    }, 2500);
+  } catch (e) {
+    say(`Could not start services: ${String(e)}`, true);
+  } finally {
+    off();
+    await refreshServiceDots();
+  }
+}
+
 async function boot() {
   await refreshServiceDots();
   const st = await invoke<Status>('get_status');
@@ -511,6 +681,18 @@ async function boot() {
   // rather than showing an ask box that cannot answer.
   showTab(st.configured ? 'ask' : 'setup');
   setInterval(refreshServiceDots, 4000);
+
+  const cfg = await invoke<Config>('get_config').catch(() => null);
+  if (st.configured && cfg?.autostart && !st.chat_running) {
+    void autostartServices();
+  }
 }
+
+$('#autostart').addEventListener('change', async () => {
+  const current = await invoke<Config>('get_config');
+  await invoke('set_config', {
+    config: { ...current, autostart: $<HTMLInputElement>('#autostart').checked },
+  }).catch((e) => statusMsg(String(e), true));
+});
 
 void boot();

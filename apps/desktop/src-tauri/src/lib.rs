@@ -229,6 +229,17 @@ async fn ask(
 
     let chat = Llama::new(&format!("http://127.0.0.1:{}", cfg.chat_port));
     let reranker = Llama::new(&format!("http://127.0.0.1:{}", cfg.reranker_port));
+
+    // Say so at once rather than letting the question wait on a server that
+    // is absent or still loading. The distinction matters to the person: one
+    // means press Start, the other means wait.
+    if !chat.is_up() {
+        return Err(if state.supervisor.is_running(Role::Chat) {
+            "The chat model is still loading. Give it a minute and try again.".into()
+        } else {
+            "The chat model isn't running. Open the Library tab and press Start services.".into()
+        });
+    }
     let use_rerank = reranker.is_up();
 
     let asker = Asker {

@@ -88,12 +88,21 @@ impl Llama {
     }
 
     /// Model id the server reports, or an error if it is not answering.
+    ///
+    /// Uses its own short timeout. The main agent waits up to ten minutes,
+    /// which is right for generating an answer and wrong for asking "are you
+    /// there?" -- a server that has bound its port but is still loading a
+    /// 20 GB model accepts the connection and then says nothing, and the UI
+    /// sat on a spinner for the whole ten minutes.
     pub fn model_id(&self) -> Result<String> {
-        let body: serde_json::Value = self
-            .agent
+        let probe = ureq::AgentBuilder::new()
+            .timeout_connect(Duration::from_secs(2))
+            .timeout(Duration::from_secs(4))
+            .build();
+        let body: serde_json::Value = probe
             .get(&format!("{}/v1/models", self.base))
             .call()
-            .with_context(|| format!("no llama-server at {}", self.base))?
+            .with_context(|| format!("no llama-server answering at {}", self.base))?
             .into_json()?;
         Ok(body["data"][0]["id"]
             .as_str()
