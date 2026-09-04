@@ -252,6 +252,49 @@ often exactly what someone needs. Measured on this corpus, prose runs 0.03–0.0
 token density, real tables reach 0.14 at the 95th percentile, and the contents page that
 prompted this measured 0.42.
 
+## Tools, and knowing where an answer came from
+
+Asked "10×10", the original loop searched the library, found nothing, and refused. The
+grounding rule doing exactly what it was built for, on a question it was never meant for.
+
+Hypatia now has two tools and decides per question:
+
+- **`search_library`** — retrieve and rerank, returning numbered passages. The model may
+  call it more than once with different words; numbering continues across calls so
+  citations stay unambiguous.
+- **`calculate`** — a small expression evaluator written in Rust: arithmetic, a few
+  functions, and unit conversion for the units this library deals in (gallons and
+  teaspoons, pounds and kilograms, °F and °C). Nothing executes. A model that reads
+  "¼ teaspoon per gallon" from a source and multiplies by 55 in its head gets it wrong
+  often enough — it produced 339 ml on the first attempt, against a correct 68 — that
+  the multiplication must not be its job.
+
+Pure arithmetic never reaches the model at all: "what is 12 x 12" is evaluated directly.
+
+**The basis label is decided by which tools ran, not by what the model says.** Every
+answer carries one of: *from your library*, *from your library, with calculation*,
+*computed*, or *general knowledge — not from your library, unverified*. The last is the
+one that must never pass as library material, and the model cannot promote itself into
+a better category by claiming a source it did not retrieve.
+
+On general knowledge: when the library has nothing, Hypatia may answer from training for
+history, science background and the like — prefixed, in its own words, "The library has
+nothing on this, so from general knowledge:" — but not for medical, dosing, chemical,
+electrical or other safety-critical questions, where "the library doesn't cover this"
+remains the complete answer. That is one clause in the system prompt, and it is a policy
+choice rather than a technical one.
+
+**Narration before a tool call is discarded.** The model thinks aloud on its way to
+calling a tool, and that narration streamed straight to the screen — wrong number and
+all — before the calculator returned. Text is still streamed optimistically, but a turn
+that ends in tool calls sends a reset, and only the final turn's text stands.
+
+Why not delegate to a coding harness (opencode and the like)? It would mean shipping
+another agent runtime, giving generated code a way to run on the machine, and inheriting
+a coding agent's failure modes for questions whose answer is "100". The right version of
+that instinct is the other way round: expose the library as an MCP server so any harness
+can use *it*. That is on the list.
+
 ## An open question for M1
 
 Common single words return oddly few hits even on the good archives — "iron" returns 1

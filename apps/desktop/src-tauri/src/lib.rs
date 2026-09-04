@@ -59,6 +59,15 @@ pub struct Source {
     snippet: String,
 }
 
+#[derive(Serialize)]
+pub struct AskResult {
+    sources: Vec<Source>,
+    /// Where the answer came from, judged from which tools actually ran.
+    basis: museion_core::Basis,
+    /// Every calculation actually performed -- shown as ground truth.
+    calculations: Vec<museion_core::Calculation>,
+}
+
 #[tauri::command]
 fn get_hardware() -> UiResult<HardwareInfo> {
     use museion_core::Accelerator;
@@ -222,7 +231,7 @@ async fn ask(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
     question: String,
-) -> UiResult<Vec<Source>> {
+) -> UiResult<AskResult> {
     let cfg = state.config.lock().map_err(ui_err)?.clone();
     let index_path = cfg.index_path().ok_or("no library configured")?;
     let index = Index::open(&index_path).map_err(ui_err)?;
@@ -233,7 +242,8 @@ async fn ask(
     // Say so at once rather than letting the question wait on a server that
     // is absent or still loading. The distinction matters to the person: one
     // means press Start, the other means wait.
-    if !chat.is_up() {
+    // Arithmetic is answered without a model; only insist on one otherwise.
+    if !museion_core::calc::looks_like_arithmetic(&question) && !chat.is_up() {
         return Err(if state.supervisor.is_running(Role::Chat) {
             "The chat model is still loading. Give it a minute and try again.".into()
         } else {
@@ -248,31 +258,45 @@ async fn ask(
         reranker: if use_rerank { Some(&reranker) } else { None },
     };
 
+    let mut streamed = false;
     let answer = asker
-        .ask(&question, |t| {
-            let _ = app.emit("answer-token", t.to_string());
+        .ask(&question, |t| match t {
+            museion_core::Token::Text(s) => {
+                streamed = true;
+                let _ = app.emit("answer-token", s.to_string());
+            }
+            museion_core::Token::Discard => {
+                streamed = false;
+                let _ = app.emit("answer-reset", ());
+            }
         })
         .map_err(ui_err)?;
 
-    // With no sources nothing streamed, and the refusal itself is the answer --
-    // it must still reach the UI.
-    if answer.sources.is_empty() {
+    // Only if nothing reached the UI at all. This used to key on "no sources",
+    // which was right when the only sourceless answer was the refusal and
+    // wrong once computed and general-knowledge answers stream with none --
+    // every one of those arrived twice.
+    if !streamed && !answer.text.is_empty() {
         let _ = app.emit("answer-token", answer.text.clone());
     }
 
-    Ok(answer
-        .sources
-        .iter()
-        .enumerate()
-        .map(|(i, h)| Source {
-            n: i + 1,
-            title: h.doc_title.clone(),
-            author: h.author.clone(),
-            page: h.page,
-            book: h.book.clone(),
-            snippet: h.snippet.clone(),
-        })
-        .collect())
+    Ok(AskResult {
+        sources: answer
+            .sources
+            .iter()
+            .enumerate()
+            .map(|(i, h)| Source {
+                n: i + 1,
+                title: h.doc_title.clone(),
+                author: h.author.clone(),
+                page: h.page,
+                book: h.book.clone(),
+                snippet: h.snippet.clone(),
+            })
+            .collect(),
+        basis: answer.basis,
+        calculations: answer.calculations,
+    })
 }
 
 /// Build the search index over the library. Needs the content server running,

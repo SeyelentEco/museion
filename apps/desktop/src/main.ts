@@ -11,6 +11,14 @@ interface Source {
   snippet: string;
 }
 
+type Basis = 'library' | 'library_and_calculation' | 'computed' | 'general_knowledge';
+
+interface AskResult {
+  sources: Source[];
+  basis: Basis;
+  calculations: { expression: string; result: string }[];
+}
+
 interface Status {
   configured: boolean;
   library_dir: string | null;
@@ -258,11 +266,50 @@ async function askQuestion(question: string) {
     renderAnswer(answerEl, raw);
     transcript.scrollTop = transcript.scrollHeight;
   });
+  // The model narrated its way to a tool call; that narration is not the
+  // answer and may contain numbers it guessed. Clear it and say what is
+  // happening, so a person sees "checking" rather than a wrong figure.
+  const unlistenReset = await listen('answer-reset', () => {
+    raw = '';
+    started = false;
+    answerEl.className = 'answer thinking';
+    answerEl.textContent = 'Checking the library and working it out…';
+  });
 
   try {
-    const sources = await invoke<Source[]>('ask', { question });
+    const { sources, basis, calculations } = await invoke<AskResult>('ask', { question });
     renderAnswer(answerEl, raw);
     answerEl.classList.remove('thinking');
+
+    // The calculator's actual outputs, verbatim. If the prose above says
+    // something different, the prose is wrong -- and now that is visible.
+    if (calculations.length) {
+      const box = el('div', 'calcs');
+      box.append(el('h3', undefined, 'Calculations performed'));
+      for (const c of calculations) {
+        const row = el('div', 'calc');
+        row.append(el('code', undefined, c.expression));
+        row.append(el('span', 'eq', ' = '));
+        row.append(el('strong', undefined, c.result));
+        box.append(row);
+      }
+      exchange.append(box);
+    }
+
+    // Say where the answer came from, judged by the tools that ran -- not
+    // by anything the model claimed. The unverified case is the one that
+    // must never pass as library material.
+    const labels: Record<Basis, [string, string]> = {
+      library: ['From your library', ''],
+      library_and_calculation: ['From your library, with calculation', ''],
+      computed: ['Computed', ''],
+      general_knowledge: ['General knowledge — not from your library. Unverified.', 'warn'],
+    };
+    const [labelText, cls] = labels[basis] ?? ['', ''];
+    if (labelText) {
+      const b = el('div', `basis ${cls}`.trim(), labelText);
+      exchange.insertBefore(b, answerEl);
+    }
 
     if (sources.length) {
       const box = el('div', 'sources');
@@ -293,6 +340,7 @@ async function askQuestion(question: string) {
     }
   } finally {
     unlisten();
+    unlistenReset();
     busy = false;
     $('#ask-send').removeAttribute('disabled');
     transcript.scrollTop = transcript.scrollHeight;

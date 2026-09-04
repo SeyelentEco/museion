@@ -73,7 +73,16 @@ notes the 16-drops alternative [4][5], and warns to use only unscented bleach, t
 cloudy water first, and that bleach will not remove chemical pollutants — every claim
 carrying a page-level citation into *Purifying Water During an Emergency*.
 
-Asked what caused the Bronze Age collapse, it says the library doesn't cover that.
+Asked for a 55-gallon drum instead, it searches, reads the dose, and hands the arithmetic
+to a calculator — `convert(55 * 0.25, tsp, ml) = 67.77` — then shows that calculation
+under the answer as ground truth. A language model multiplying in its head got that one
+wrong by a factor of five before the calculator existed.
+
+Every answer is labelled by what actually produced it: *from your library*, *from your
+library, with calculation*, *computed*, or *general knowledge — not from your library,
+unverified*. Asked what caused the Bronze Age collapse, it answers from general
+knowledge under that last label; asked anything medical or safety-critical the library
+doesn't hold, it says so and stops. See [docs/retrieval.md](docs/retrieval.md).
 
 The Library tab has a first-run flow: it detects your hardware, shows exactly what it
 would fetch and how large each piece is — helper programs, the reranker, the chat model

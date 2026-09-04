@@ -315,7 +315,7 @@ fn cmd_ask(args: &Args) -> Result<()> {
         .cloned()
         .unwrap_or_else(|| "http://127.0.0.1:8080".into());
     let chat = Llama::new(&chat_url);
-    if !chat.is_up() {
+    if !museion_core::calc::looks_like_arithmetic(&question) && !chat.is_up() {
         bail!(
             "no chat model at {chat_url}\n\n  \
              Start llama-server with a chat model, then try again."
@@ -341,10 +341,21 @@ fn cmd_ask(args: &Args) -> Result<()> {
 
     println!();
     let mut streamed = false;
-    let answer = asker.ask(&question, |t| {
-        streamed = true;
-        print!("{t}");
-        let _ = std::io::stdout().flush();
+    let answer = asker.ask(&question, |t| match t {
+        museion_core::Token::Text(s) => {
+            streamed = true;
+            print!("{s}");
+            let _ = std::io::stdout().flush();
+        }
+        // A terminal cannot unprint; mark where the model started over.
+        museion_core::Token::Discard => {
+            if streamed {
+                println!("
+  -- consulted a tool; the answer restarts below --
+");
+                streamed = false;
+            }
+        }
     })?;
     // Nothing streams when retrieval found nothing, and that answer -- the
     // library saying it does not cover this -- is the one that must not be
@@ -354,6 +365,21 @@ fn cmd_ask(args: &Args) -> Result<()> {
     }
     println!("\n");
 
+    println!(
+        "Basis: {}",
+        match answer.basis {
+            museion_core::Basis::Library => "from the library",
+            museion_core::Basis::LibraryAndCalculation => "from the library, with calculation",
+            museion_core::Basis::Computed => "computed",
+            museion_core::Basis::GeneralKnowledge => "GENERAL KNOWLEDGE -- not from the library, unverified",
+        }
+    );
+    if !answer.calculations.is_empty() {
+        println!("Calculations performed (ground truth):");
+        for c in &answer.calculations {
+            println!("  {} = {}", c.expression, c.result);
+        }
+    }
     if !answer.sources.is_empty() {
         println!("Sources{}:", if answer.reranked { " (reranked)" } else { "" });
         for (i, h) in answer.sources.iter().enumerate() {

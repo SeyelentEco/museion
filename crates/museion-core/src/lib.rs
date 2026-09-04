@@ -13,6 +13,7 @@
 //! See docs/retrieval.md for the measurements this design came out of.
 
 pub mod ask;
+pub mod calc;
 pub mod catalog;
 pub mod download;
 pub mod fit;
@@ -24,7 +25,7 @@ pub mod llama;
 pub mod pdf;
 pub mod tools;
 
-pub use ask::{Answer, Asker};
+pub use ask::{Answer, Asker, Basis, Calculation, Token};
 pub use fit::{fit_model, Fit};
 pub use indexer::{index_library, IndexOptions, Progress};
 pub use hardware::{detect as detect_hardware, Accelerator, Hardware, Tier};

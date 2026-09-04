@@ -1,19 +1,28 @@
 //! Asking Hypatia a question.
 //!
-//! Retrieve, rerank, then answer strictly from what came back. The order
-//! matters and so does the strictness: this tool gets consulted exactly when
-//! its answer cannot be checked against anything else, so an answer that drifts
-//! off its sources is worse than no answer at all.
+//! The model decides, per question, whether to search the library, calculate,
+//! both, or neither -- through two tools and nothing else. What it may *say*
+//! is still governed by where the material came from, and that is judged from
+//! which tools actually ran, not from what the model claims.
+//!
+//! Pure arithmetic never reaches the model at all.
 
-use crate::{index::Hit, llama::{Llama, Message}, Index};
+use crate::{
+    calc,
+    index::Hit,
+    llama::{Llama, Message, Tool, ToolCall},
+    Index,
+};
 use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 /// How many passages to retrieve before reranking. Generous, because keyword
 /// search is good at recall and bad at ordering -- which is precisely what the
 /// reranker is there to fix.
 const RETRIEVE: usize = 40;
 
-/// How many survive into the prompt.
+/// How many survive into the prompt per search.
 const KEEP: usize = 8;
 
 /// Characters of a page passed to the reranker. Cross-encoders have a short
@@ -23,48 +32,150 @@ const RERANK_CHARS: usize = 1200;
 /// Characters of a page quoted to the chat model.
 const CONTEXT_CHARS: usize = 2400;
 
+/// Tool rounds before the model must answer with what it has.
+const MAX_ROUNDS: usize = 4;
+
 pub struct Asker<'a> {
     pub index: &'a Index,
     pub chat: &'a Llama,
     pub reranker: Option<&'a Llama>,
 }
 
+/// Where an answer's substance came from -- decided by the tools that ran.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Basis {
+    /// Built on passages from the library.
+    Library,
+    /// Library passages plus arithmetic from the calculator.
+    LibraryAndCalculation,
+    /// The calculator alone.
+    Computed,
+    /// The library had nothing and no calculation was involved: whatever the
+    /// model said came from its own training. Shown as unverified.
+    GeneralKnowledge,
+}
+
 pub struct Answer {
     pub text: String,
     pub sources: Vec<Hit>,
     pub reranked: bool,
+    pub basis: Basis,
+    /// Every calculation actually performed, verbatim. Shown to the reader as
+    /// ground truth: the model once reported 343.75 ml for a dose the
+    /// calculator had correctly returned as 67.8, by relabelling the result
+    /// and multiplying again in prose. The log makes that contradiction
+    /// visible instead of trusting the retelling.
+    pub calculations: Vec<Calculation>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Calculation {
+    pub expression: String,
+    pub result: String,
+}
+
+/// What the streaming callback receives.
+///
+/// The model narrates before it calls a tool -- "55 × 0.25 teaspoons is 339
+/// millilitres… let me check" -- and that narration went straight to the
+/// screen, wrong number and all, before the calculator returned 68. Text is
+/// streamed optimistically, and if the turn turns out to end in tool calls the
+/// caller is told to discard it. Only the final turn's text stands.
+#[derive(Debug, Clone, Copy)]
+pub enum Token<'a> {
+    Text(&'a str),
+    /// Throw away everything streamed so far for this answer; the model is
+    /// consulting a tool and will write again.
+    Discard,
 }
 
 /// Hypatia's standing instructions.
 ///
-/// Every clause is load-bearing. The refusal clause especially: a model asked
-/// to be helpful will fill a gap in its sources with plausible general
-/// knowledge, and plausible general knowledge about wound care or water
-/// treatment, delivered to someone with no way to check it, is the failure this
-/// whole design exists to prevent.
+/// Every clause is load-bearing. A model asked to be helpful will fill a gap
+/// in its sources with plausible general knowledge, and plausible general
+/// knowledge about wound care or water treatment, delivered to someone with
+/// no way to check it, is the failure this whole design exists to prevent.
 const SYSTEM: &str = "\
 You are Hypatia, the librarian of an offline reference library. The person \
 asking you has no internet and may have no other source of help.
 
-Answer ONLY from the sources given to you below. Follow these rules exactly:
+You have two tools:
+- search_library: finds passages in the library. Use it for any question of \
+fact, method, or safety -- what to do, how to do it, how much of something. \
+Search before answering such questions, and search again with different \
+words if the first search misses.
+- calculate: does arithmetic and unit conversion exactly. Use it for EVERY \
+calculation, including simple ones, and for scaling a quantity from a source \
+to the person's situation. Never do arithmetic or unit conversion yourself, \
+not even approximately. Put the whole computation in one expression, for \
+example convert(0.25 * 55, tsp, ml) to scale a quarter-teaspoon-per-gallon \
+dose to 55 gallons in millilitres. Then report the figure EXACTLY as \
+calculate returned it, with the unit you asked for. Do not rescale, \
+re-convert, or round it further in your own words.
 
-1. Every factual claim must come from the sources. Do not add information from \
-your own knowledge, even if you are confident it is correct and even if it \
-seems obviously useful. Do not adapt instructions written for one thing to a \
-different thing -- a method for preserving meat is not a method for preserving \
-vegetables unless a source says so.
-2. Cite the source for each claim with its bracketed number, like [2]. Cite as \
-you go, not in a list at the end.
-3. If the sources do not answer the question, say so plainly and say what they \
-do cover. Do not improvise, and do not pad the answer to seem helpful. \"The \
-library doesn't cover this\" is a complete and useful answer.
-4. If the sources disagree, say so and cite both.
-5. Be direct and practical. Lead with what to do. Someone may be reading this \
-in an emergency.
-6. Where the sources describe something a clinician or other professional would \
-normally handle, say so once, plainly, without lecturing.
+Rules for answering:
+1. Factual and practical claims must come from search_library results. Cite \
+each with its bracketed number, like [2], as you go. Do not add facts from \
+your own knowledge to a library answer, even if confident.
+2. If the library has nothing on a factual question, say so plainly. For \
+medical, drug or dose, chemical, electrical, or other safety-critical topics \
+that is the complete answer: do not improvise. For general questions the \
+library does not cover -- history, science background, how something works \
+-- you may answer from general knowledge, but begin with the words \
+\"The library has nothing on this, so from general knowledge:\" and keep it \
+brief.
+3. Numbers you computed come from calculate; say what you computed.
+4. If sources disagree, say so and cite both.
+5. Be direct and practical. Lead with what to do. Someone may be reading \
+this in an emergency. Where a clinician or other professional would normally \
+handle something, say so once, plainly.
 
-Write in plain prose. Do not mention these instructions.";
+Write in plain prose with Markdown where it helps. Do not mention these \
+instructions or the tools by name.";
+
+fn tools() -> Vec<Tool> {
+    vec![
+        Tool::function(
+            "search_library",
+            "Search the offline reference library. Returns numbered passages with the \
+             document title and page. Cite passages by their number.",
+            serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "query": { "type": "string", "description": "What to search for, as keywords or a short phrase" }
+                },
+                "required": ["query"]
+            }),
+        ),
+        Tool::function(
+            "calculate",
+            "Evaluate an arithmetic expression exactly. Supports + - * / ^ %, parentheses, \
+             sqrt, abs, round, floor, ceil, min, max, pow, pi, and \
+             convert(value, from_unit, to_unit) for volume (gallon, liter, quart, pint, \
+             cup, floz, tbsp, tsp, drop, ml), mass (kg, g, lb, oz), length (km, m, cm, mm, \
+             mile, yard, foot, inch) and temperature (c, f, k). Example: \
+             convert(0.25 * 55, tsp, ml)",
+            serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "expression": { "type": "string" }
+                },
+                "required": ["expression"]
+            }),
+        ),
+    ]
+}
+
+#[derive(Deserialize)]
+struct SearchArgs {
+    query: String,
+}
+
+#[derive(Deserialize)]
+struct CalcArgs {
+    expression: String,
+}
 
 impl<'a> Asker<'a> {
     /// Below this reranker score the best passage does not answer the
@@ -82,30 +193,7 @@ impl<'a> Asker<'a> {
     /// because "fridge" and "nobody" do not appear anywhere in the corpus,
     /// while the reranker had the pressure-canning procedure scored at the top.
     pub fn gather(&self, question: &str) -> Result<(Vec<Hit>, bool)> {
-        // Keyword retrieval finds the pages that use the question's words. A
-        // question phrased the way people speak often does not: "how do I can
-        // them so nobody gets botulism" ranked the actual pressure-canning
-        // procedure at 252nd and 283rd, because those pages never say
-        // "botulism" -- while the book's contents page, which does, sat 3rd.
-        // So the chat model first rewrites the question into the searches a
-        // librarian would type, and the candidates from all of them are
-        // pooled before the reranker sees any.
-        let mut candidates: Vec<Hit> = Vec::new();
-        let mut best_coverage = 0.0_f64;
-        let mut seen = std::collections::HashSet::new();
-        let queries = self.expand(question);
-        if std::env::var_os("MUSEION_DEBUG").is_some() {
-            eprintln!("  [debug] queries: {queries:?}");
-        }
-        for q in queries {
-            let (hits, best) = self.index.search_ungated(&q, RETRIEVE)?;
-            best_coverage = best_coverage.max(best);
-            for h in hits {
-                if seen.insert((h.book.clone(), h.file.clone(), h.page)) {
-                    candidates.push(h);
-                }
-            }
-        }
+        let (candidates, best_coverage) = self.index.search_ungated(question, RETRIEVE)?;
         if candidates.is_empty() {
             return Ok((Vec::new(), false));
         }
@@ -124,14 +212,6 @@ impl<'a> Asker<'a> {
 
         match reranker.rerank(question, &docs) {
             Ok(scored) => {
-                if std::env::var_os("MUSEION_DEBUG").is_some() {
-                    let top: Vec<String> = scored
-                        .iter()
-                        .take(5)
-                        .map(|(i, s)| format!("{s:.3}:{}p{}", candidates[*i].doc_title.chars().take(24).collect::<String>(), candidates[*i].page))
-                        .collect();
-                    eprintln!("  [debug] {} candidates, best coverage {best_coverage:.2}, top rerank: {}", candidates.len(), top.join(" | "));
-                }
                 // The reranker's verdict on coverage: if even its best passage
                 // scores as irrelevant, the library does not hold the answer.
                 if scored.first().map_or(true, |(_, s)| *s < Self::MIN_RERANK_SCORE) {
@@ -163,84 +243,137 @@ impl<'a> Asker<'a> {
         }
     }
 
-    /// The question itself plus up to three keyword rewrites of it. Falls back
-    /// to the question alone when the chat model is unreachable or unhelpful,
-    /// so retrieval never depends on the rewrite succeeding.
-    fn expand(&self, question: &str) -> Vec<String> {
-        let mut out = vec![question.to_string()];
-        if !self.chat.is_up() {
-            return out;
+    /// Answer the question, streaming to `on_token` as it arrives.
+    pub fn ask(&self, question: &str, mut on_token: impl FnMut(Token)) -> Result<Answer> {
+        // Arithmetic never reaches the model. "10*10" is not a library question
+        // and a language model is the wrong instrument for it anyway.
+        if calc::looks_like_arithmetic(question) {
+            let expr = calc::normalise(question);
+            let text = match calc::evaluate(&expr) {
+                Ok(v) => format!("{expr} = **{}**", calc::format(v)),
+                Err(e) => format!("Could not evaluate `{expr}`: {e}"),
+            };
+            on_token(Token::Text(&text));
+            let calculations = calc::evaluate(&expr)
+                .ok()
+                .map(|v| vec![Calculation { expression: expr.clone(), result: calc::format(v) }])
+                .unwrap_or_default();
+            return Ok(Answer { text, sources: Vec::new(), reranked: false, basis: Basis::Computed, calculations });
         }
-        let messages = vec![
-            Message::system(
-                "You turn a question into the short keyword searches a reference librarian \
-                 would type to find the answer in a library of practical manuals. Reply with \
-                 two or three searches, one per line, three to six words each, no numbering, \
-                 no commentary. Use the technical terms a manual would use rather than the \
-                 words in the question.",
-            ),
-            Message::user(question.to_string()),
-        ];
-        if let Ok(text) = self.chat.chat(&messages, 80) {
-            for line in text.lines() {
-                let l = line.trim().trim_start_matches(['-', '*', '•']).trim();
-                let l = l.trim_start_matches(|c: char| c.is_ascii_digit() || c == '.' || c == ')').trim();
-                if l.split_whitespace().count() >= 2 && l.len() < 80 && !out.iter().any(|o| o.eq_ignore_ascii_case(l)) {
-                    out.push(l.to_string());
-                }
-                if out.len() == 4 {
-                    break;
-                }
+
+        let tools = tools();
+        let mut messages = vec![Message::system(SYSTEM), Message::user(question.to_string())];
+        let mut sources: Vec<Hit> = Vec::new();
+        let mut seen: HashSet<(String, usize)> = HashSet::new();
+        let mut reranked = false;
+        let mut searched = false;
+        let mut calculations: Vec<Calculation> = Vec::new();
+
+        for round in 0..=MAX_ROUNDS {
+            // On the last round the tools are withheld so the model must answer.
+            let offered = if round < MAX_ROUNDS { Some(tools.as_slice()) } else { None };
+            let turn = self
+                .chat
+                .turn(&messages, offered, 900, |t| on_token(Token::Text(t)))
+                .context("generating the answer")?;
+
+            if !turn.tool_calls.is_empty() {
+                // Whatever it narrated on the way to the tool call is not the
+                // answer, and may contain numbers it made up. Take it back.
+                on_token(Token::Discard);
+            }
+
+            if turn.tool_calls.is_empty() {
+                let calculated = !calculations.is_empty();
+                let basis = match (searched && !sources.is_empty(), calculated) {
+                    (true, true) => Basis::LibraryAndCalculation,
+                    (true, false) => Basis::Library,
+                    (false, true) => Basis::Computed,
+                    (false, false) => Basis::GeneralKnowledge,
+                };
+                return Ok(Answer { text: turn.text, sources, reranked, basis, calculations });
+            }
+
+            // Replay the model's request, then answer each call.
+            messages.push(Message::assistant_calls(turn.text.clone(), turn.tool_calls.clone()));
+            for call in &turn.tool_calls {
+                let result = match call.function.name.as_str() {
+                    "search_library" => {
+                        searched = true;
+                        let q = serde_json::from_str::<SearchArgs>(&call.function.arguments)
+                            .map(|a| a.query)
+                            .unwrap_or_else(|_| call.function.arguments.clone());
+                        let (hits, rr) = self.gather(&q)?;
+                        reranked |= rr;
+                        self.render_search(&hits, &mut sources, &mut seen)
+                    }
+                    "calculate" => {
+                        let expr = serde_json::from_str::<CalcArgs>(&call.function.arguments)
+                            .map(|a| a.expression)
+                            .unwrap_or_else(|_| call.function.arguments.clone());
+                        match calc::evaluate(&expr) {
+                            Ok(v) => {
+                                let result = calc::format(v);
+                                calculations.push(Calculation { expression: expr.clone(), result: result.clone() });
+                                format!("{expr} = {result}. Report this figure exactly; do not convert or rescale it.")
+                            }
+                            Err(e) => format!("Could not evaluate `{expr}`: {e}. Rewrite it using only numbers, operators, and the listed functions."),
+                        }
+                    }
+                    other => format!("Unknown tool {other}."),
+                };
+                messages.push(Message::tool_result(call.id.clone(), result));
             }
         }
-        out
+
+        unreachable!("the final round withholds tools, so it always returns")
     }
 
-    /// Answer the question, streaming tokens to `on_token` as they arrive.
-    pub fn ask(&self, question: &str, on_token: impl FnMut(&str)) -> Result<Answer> {
-        let (sources, reranked) = self.gather(question)?;
-
-        if sources.is_empty() {
-            return Ok(Answer {
-                text: "The library doesn't contain anything on that. Try rephrasing, or \
-                       check what is installed with \"museion status\"."
-                    .to_string(),
-                sources,
-                reranked,
-            });
+    /// Format search hits for the model, numbering them continuously across
+    /// searches so citations stay unambiguous, and skipping passages already
+    /// shown.
+    fn render_search(
+        &self,
+        hits: &[Hit],
+        sources: &mut Vec<Hit>,
+        seen: &mut HashSet<(String, usize)>,
+    ) -> String {
+        if hits.is_empty() {
+            return "No passages in the library match that. Try different words, or if the \
+                    question is factual and nothing matches after another try, say the \
+                    library does not cover it."
+                .to_string();
         }
-
-        let mut block = String::new();
-        for (i, h) in sources.iter().enumerate() {
-            let who = if h.author.is_empty() {
-                String::new()
+        let mut out = String::new();
+        for h in hits {
+            let key = (h.book.clone(), h.page);
+            let n = if let Some(i) = sources.iter().position(|s| s.book == h.book && s.page == h.page) {
+                i + 1
             } else {
-                format!(", {}", h.author)
+                seen.insert(key);
+                sources.push(h.clone());
+                sources.len()
             };
-            block.push_str(&format!(
-                "[{}] {}{} (page {})\n{}\n\n",
-                i + 1,
+            let who = if h.author.is_empty() { String::new() } else { format!(", {}", h.author) };
+            out.push_str(&format!(
+                "[{n}] {}{who} (page {})\n{}\n\n",
                 h.doc_title,
-                who,
                 h.page,
                 truncate_chars(&h.body, CONTEXT_CHARS)
             ));
         }
-
-        let messages = vec![
-            Message::system(SYSTEM),
-            Message::user(format!(
-                "Sources:\n\n{block}---\n\nQuestion: {question}"
-            )),
-        ];
-
-        let text = self
-            .chat
-            .chat_stream(&messages, 900, on_token)
-            .context("generating the answer")?;
-
-        Ok(Answer { text, sources, reranked })
+        out
     }
+}
+
+/// Kept for callers that want the legacy single-shot path.
+#[allow(dead_code)]
+fn legacy_prompt(sources: &[Hit], question: &str) -> Vec<Message> {
+    let mut block = String::new();
+    for (i, h) in sources.iter().enumerate() {
+        block.push_str(&format!("[{}] {} (page {})\n{}\n\n", i + 1, h.doc_title, h.page, truncate_chars(&h.body, CONTEXT_CHARS)));
+    }
+    vec![Message::system(SYSTEM), Message::user(format!("Sources:\n\n{block}---\n\nQuestion: {question}"))]
 }
 
 fn truncate_chars(s: &str, n: usize) -> String {
@@ -251,22 +384,33 @@ fn truncate_chars(s: &str, n: usize) -> String {
     }
 }
 
+#[allow(dead_code)]
+fn describe_calls(calls: &[ToolCall]) -> String {
+    calls.iter().map(|c| c.function.name.clone()).collect::<Vec<_>>().join(", ")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn truncation_is_char_safe_on_multibyte_text() {
-        // Byte slicing here would panic; the corpus contains accented text.
         let s = "évacuation immédiate";
         assert_eq!(truncate_chars(s, 5).chars().count(), 5);
         assert_eq!(truncate_chars(s, 500), s);
     }
 
     #[test]
-    fn the_system_prompt_keeps_its_refusal_clause() {
-        // Reworded freely, but the permission to refuse must survive edits.
-        assert!(SYSTEM.contains("do not answer") || SYSTEM.contains("does not cover") || SYSTEM.contains("do not cover"));
-        assert!(SYSTEM.contains("Answer ONLY from the sources"));
+    fn the_system_prompt_keeps_its_safety_clauses() {
+        assert!(SYSTEM.contains("do not improvise"));
+        assert!(SYSTEM.contains("Never do arithmetic or unit conversion yourself"));
+        assert!(SYSTEM.contains("EXACTLY as \\\ncalculate returned it") || SYSTEM.contains("EXACTLY as calculate returned it"));
+        assert!(SYSTEM.contains("The library has nothing on this, so from general knowledge:"));
+    }
+
+    #[test]
+    fn tools_are_exactly_the_two_intended() {
+        let names: Vec<String> = tools().into_iter().map(|t| t.function.name).collect();
+        assert_eq!(names, vec!["search_library", "calculate"]);
     }
 }

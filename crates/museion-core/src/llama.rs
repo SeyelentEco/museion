@@ -17,15 +17,82 @@ pub struct Llama {
 pub struct Message {
     pub role: String,
     pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<Vec<ToolCall>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_call_id: Option<String>,
 }
 
 impl Message {
     pub fn system(c: impl Into<String>) -> Self {
-        Self { role: "system".into(), content: c.into() }
+        Self { role: "system".into(), content: c.into(), tool_calls: None, tool_call_id: None }
     }
     pub fn user(c: impl Into<String>) -> Self {
-        Self { role: "user".into(), content: c.into() }
+        Self { role: "user".into(), content: c.into(), tool_calls: None, tool_call_id: None }
     }
+    /// The assistant turn that asked for tools, replayed so the model sees
+    /// its own request before the results.
+    pub fn assistant_calls(content: String, calls: Vec<ToolCall>) -> Self {
+        Self { role: "assistant".into(), content, tool_calls: Some(calls), tool_call_id: None }
+    }
+    /// A tool's answer to one call.
+    pub fn tool_result(call_id: impl Into<String>, content: impl Into<String>) -> Self {
+        Self {
+            role: "tool".into(),
+            content: content.into(),
+            tool_calls: None,
+            tool_call_id: Some(call_id.into()),
+        }
+    }
+}
+
+/// A tool the model may call, in the OpenAI function shape llama-server speaks.
+#[derive(Debug, Clone, Serialize)]
+pub struct Tool {
+    pub r#type: String,
+    pub function: ToolFunction,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ToolFunction {
+    pub name: String,
+    pub description: String,
+    pub parameters: serde_json::Value,
+}
+
+impl Tool {
+    pub fn function(name: &str, description: &str, parameters: serde_json::Value) -> Self {
+        Self {
+            r#type: "function".into(),
+            function: ToolFunction {
+                name: name.into(),
+                description: description.into(),
+                parameters,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ToolCall {
+    pub id: String,
+    pub r#type: String,
+    pub function: ToolCallFunction,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ToolCallFunction {
+    pub name: String,
+    /// JSON text, as the model wrote it.
+    pub arguments: String,
+}
+
+/// What one model turn produced: streamed text, and/or tool calls.
+#[derive(Debug, Default)]
+pub struct Turn {
+    pub text: String,
+    pub tool_calls: Vec<ToolCall>,
+    pub hit_token_limit: bool,
 }
 
 #[derive(Serialize)]
@@ -34,6 +101,8 @@ struct ChatRequest<'a> {
     temperature: f32,
     max_tokens: u32,
     stream: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tools: Option<&'a [Tool]>,
     /// Reasoning is suppressed by default. It costs several times the
     /// wall-clock and an order of magnitude more output tokens, and has a nasty
     /// failure mode: when it consumes the whole token budget the server returns
@@ -57,6 +126,47 @@ struct Choice {
 #[derive(Deserialize)]
 struct ResponseMessage {
     content: Option<String>,
+    #[serde(default)]
+    tool_calls: Vec<ToolCallDelta>,
+}
+
+/// Streamed tool calls arrive in fragments keyed by index: the name in one
+/// chunk, the arguments spread across many. They are stitched back together.
+#[derive(Deserialize)]
+struct ToolCallDelta {
+    #[serde(default)]
+    index: usize,
+    id: Option<String>,
+    function: Option<ToolCallFunctionDelta>,
+}
+
+#[derive(Deserialize)]
+struct ToolCallFunctionDelta {
+    name: Option<String>,
+    arguments: Option<String>,
+}
+
+/// Fold a streamed fragment into the accumulating call list.
+fn absorb(calls: &mut Vec<ToolCall>, d: ToolCallDelta) {
+    while calls.len() <= d.index {
+        calls.push(ToolCall { r#type: "function".into(), ..Default::default() });
+    }
+    let c = &mut calls[d.index];
+    if let Some(id) = d.id {
+        if !id.is_empty() {
+            c.id = id;
+        }
+    }
+    if let Some(f) = d.function {
+        if let Some(n) = f.name {
+            if !n.is_empty() {
+                c.function.name = n;
+            }
+        }
+        if let Some(a) = f.arguments {
+            c.function.arguments.push_str(&a);
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -114,19 +224,26 @@ impl Llama {
         self.model_id().is_ok()
     }
 
-    /// Stream a chat completion, handing each token fragment to `on_token`.
-    /// Returns the full text.
-    pub fn chat_stream(
+    /// One model turn, streamed. Text fragments go to `on_token` as they
+    /// arrive; tool calls are stitched from their fragments and returned.
+    /// A turn may contain either, or both.
+    pub fn turn(
         &self,
         messages: &[Message],
+        tools: Option<&[Tool]>,
         max_tokens: u32,
         mut on_token: impl FnMut(&str),
-    ) -> Result<String> {
+    ) -> Result<Turn> {
+        // Greedy when tools are in play. Sampling is for prose; a turn that is
+        // deciding whether to compute, and how to report the result, should
+        // not roll dice -- the same question returned 68 ml once and 343.75 ml
+        // the next time at 0.2.
         let req = ChatRequest {
             messages,
-            temperature: 0.2,
+            temperature: if tools.is_some() { 0.0 } else { 0.2 },
             max_tokens,
             stream: true,
+            tools,
             chat_template_kwargs: serde_json::json!({ "enable_thinking": false }),
         };
 
@@ -136,7 +253,7 @@ impl Llama {
             .send_json(&req)
             .context("chat completion request failed")?;
 
-        let mut full = String::new();
+        let mut out = Turn::default();
         let reader = BufReader::new(res.into_reader());
         for line in reader.lines() {
             let line = line?;
@@ -149,25 +266,36 @@ impl Llama {
             let Ok(chunk) = serde_json::from_str::<ChatResponse>(data) else {
                 continue;
             };
-            for c in &chunk.choices {
+            for c in chunk.choices {
                 // Streaming puts fragments in `delta`, but some servers deliver
                 // the tail in `message` on the final chunk. Accept either.
-                let text = c
-                    .delta
-                    .as_ref()
-                    .and_then(|d| d.content.as_deref())
-                    .or_else(|| c.message.as_ref().and_then(|m| m.content.as_deref()));
-                if let Some(text) = text {
-                    full.push_str(text);
-                    on_token(text);
+                let msg = c.delta.or(c.message);
+                if let Some(m) = msg {
+                    if let Some(text) = m.content.as_deref() {
+                        if !text.is_empty() {
+                            out.text.push_str(text);
+                            on_token(text);
+                        }
+                    }
+                    for d in m.tool_calls {
+                        absorb(&mut out.tool_calls, d);
+                    }
                 }
                 if c.finish_reason.as_deref() == Some("length") {
-                    eprintln!("\n  (answer stopped at the token limit)");
+                    out.hit_token_limit = true;
                 }
             }
         }
 
-        if full.trim().is_empty() {
+        // Drop any call the stream never finished naming.
+        out.tool_calls.retain(|c| !c.function.name.is_empty());
+        for (i, c) in out.tool_calls.iter_mut().enumerate() {
+            if c.id.is_empty() {
+                c.id = format!("call_{i}");
+            }
+        }
+
+        if out.text.trim().is_empty() && out.tool_calls.is_empty() {
             bail!(
                 "the model returned nothing. If reasoning is enabled server-side it can \
                  consume the whole token budget and return an empty message; Museion \
@@ -175,7 +303,21 @@ impl Llama {
                  template will override that."
             );
         }
-        Ok(full)
+        Ok(out)
+    }
+
+    /// Stream a plain chat completion with no tools. Returns the full text.
+    pub fn chat_stream(
+        &self,
+        messages: &[Message],
+        max_tokens: u32,
+        on_token: impl FnMut(&str),
+    ) -> Result<String> {
+        let t = self.turn(messages, None, max_tokens, on_token)?;
+        if t.hit_token_limit {
+            eprintln!("\n  (answer stopped at the token limit)");
+        }
+        Ok(t.text)
     }
 
     pub fn chat(&self, messages: &[Message], max_tokens: u32) -> Result<String> {
