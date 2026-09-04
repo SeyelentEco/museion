@@ -252,10 +252,32 @@ async fn ask(
     }
     let use_rerank = reranker.is_up();
 
+    // Archives the local index does not hold are searched through
+    // kiwix-serve's own index -- that is how Wikipedia becomes askable.
+    let kiwix = museion_core::Kiwix::new(&format!("http://127.0.0.1:{}", cfg.kiwix_port));
+    let kiwix_up = state.supervisor.is_running(Role::Kiwix) && kiwix.is_up();
+    let native_books: Vec<String> = if kiwix_up {
+        let processed = index.processed_books().unwrap_or_default();
+        cfg.library_dir
+            .as_ref()
+            .and_then(|d| std::fs::read_dir(d).ok())
+            .map(|rd| {
+                rd.flatten()
+                    .filter_map(|e| e.file_name().to_string_lossy().strip_suffix(".zim").map(str::to_string))
+                    .filter(|b| !processed.iter().any(|p| p == b))
+                    .collect()
+            })
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+
     let asker = Asker {
         index: &index,
         chat: &chat,
         reranker: if use_rerank { Some(&reranker) } else { None },
+        kiwix: if kiwix_up { Some(&kiwix) } else { None },
+        native_books,
     };
 
     let mut streamed = false;
@@ -622,6 +644,151 @@ async fn fetch_bundle(app: tauri::AppHandle, state: State<'_, AppState>, id: Str
     Ok(format!("{n} archive(s) downloaded into {}", library.display()))
 }
 
+// ------------------------------------------------------------- catalogue
+
+#[derive(Serialize)]
+pub struct ContentItem {
+    id: String,
+    title: String,
+    description: String,
+    category: String,
+    size_bytes: u64,
+    /// Present in the library at the right size. A full hash is deferred to
+    /// verify; this is a fast answer to "do I have it".
+    installed: bool,
+    /// Which bundles include it, for context.
+    bundles: Vec<String>,
+}
+
+#[derive(Serialize)]
+pub struct Catalogue {
+    items: Vec<ContentItem>,
+    library_dir: Option<String>,
+}
+
+/// Everything that can be fetched, with what is already here.
+#[tauri::command]
+fn list_content(state: State<AppState>) -> UiResult<Catalogue> {
+    use museion_core::catalog;
+    let cfg = state.config.lock().map_err(ui_err)?.clone();
+    let bundles = catalog::bundles().map_err(ui_err)?;
+    let mut items = Vec::new();
+    for s in catalog::sources().map_err(ui_err)? {
+        let installed = cfg
+            .library_dir
+            .as_ref()
+            .and_then(|d| std::fs::metadata(d.join(&s.filename)).ok())
+            .is_some_and(|m| m.len() == s.size_bytes);
+        let in_bundles = bundles
+            .iter()
+            .filter(|b| b.sources.iter().any(|x| x == &s.id))
+            .map(|b| b.title.clone())
+            .collect();
+        items.push(ContentItem {
+            id: s.id.clone(),
+            title: s.title.clone(),
+            description: s.description.clone(),
+            category: s.category.clone(),
+            size_bytes: s.size_bytes,
+            installed,
+            bundles: in_bundles,
+        });
+    }
+    // Survival first, then medicine, making, reference; smallest first within.
+    let rank = |c: &str| match c {
+        "survival" => 0,
+        "medicine" => 1,
+        "making" => 2,
+        _ => 3,
+    };
+    items.sort_by(|a, b| rank(&a.category).cmp(&rank(&b.category)).then(a.size_bytes.cmp(&b.size_bytes)));
+    Ok(Catalogue {
+        items,
+        library_dir: cfg.library_dir.as_ref().map(|p| p.display().to_string()),
+    })
+}
+
+/// Fetch one archive, then make it askable: the content server is restarted
+/// so it serves the new file, and the index is brought up to date. Progress
+/// goes out on the same events the wizard uses.
+#[tauri::command]
+async fn fetch_source(app: tauri::AppHandle, state: State<'_, AppState>, id: String) -> UiResult<String> {
+    use museion_core::{catalog, download::{self, Spec}};
+    let cfg = state.config.lock().map_err(ui_err)?.clone();
+    let library = cfg.library_dir.clone().ok_or("choose a library folder first")?;
+    let s = catalog::sources()
+        .map_err(ui_err)?
+        .into_iter()
+        .find(|s| s.id == id)
+        .ok_or_else(|| format!("no archive {id:?} in the catalogue"))?;
+
+    let target = library.join(&s.filename);
+    let app2 = app.clone();
+    let s2 = s.clone();
+    let t2 = target.clone();
+    let lib2 = library.clone();
+    tauri::async_runtime::spawn_blocking(move || -> anyhow::Result<()> {
+        if download::is_verified(&t2, s2.size_bytes, &s2.sha256)? {
+            emit_progress(&app2, &s2.id, s2.size_bytes, s2.size_bytes, "already present");
+            return Ok(());
+        }
+        let urls = s2.all_urls();
+        let r = download::download_verified(
+            &Spec { urls: &urls, dest: &t2, size_bytes: s2.size_bytes, sha256: &s2.sha256 },
+            |p| emit_progress(&app2, &s2.id, p.received, p.total, if p.resuming { "resuming" } else { "" }),
+        );
+        if let Err(e) = r {
+            let mut msg = format!("{e:#}");
+            if s2.torrent.is_some() || s2.magnet.is_some() {
+                msg.push_str("\n\nEvery web source failed. This archive is also on BitTorrent:");
+                if let Some(t) = &s2.torrent {
+                    msg.push_str(&format!("\n  torrent: {t}"));
+                }
+                if let Some(m) = s2.short_magnet() {
+                    msg.push_str(&format!("\n  magnet:  {m}"));
+                }
+                msg.push_str(&format!(
+                    "\nDownload it with your own client, put {} in {}, and press Fetch again.",
+                    s2.filename,
+                    lib2.display()
+                ));
+            }
+            anyhow::bail!(msg);
+        }
+        Ok(())
+    })
+    .await
+    .map_err(ui_err)?
+    .map_err(ui_err)?;
+
+    // Make it askable. kiwix-serve only knows the files it was started with.
+    let mut note = String::new();
+    if state.supervisor.is_running(Role::Kiwix) {
+        if let Some(exe) = &cfg.kiwix_exe {
+            emit_progress(&app, &s.id, 1, 1, "restarting the content server");
+            state.supervisor.stop(Role::Kiwix);
+            state
+                .supervisor
+                .start_kiwix(exe, &library, cfg.kiwix_port)
+                .map_err(ui_err)?;
+            state
+                .supervisor
+                .wait_ready(
+                    Role::Kiwix,
+                    &format!("http://127.0.0.1:{}/catalog/v2/entries", cfg.kiwix_port),
+                    Duration::from_secs(60),
+                )
+                .map_err(ui_err)?;
+            emit_progress(&app, &s.id, 1, 1, "indexing");
+            let summary = build_index(app.clone(), state.clone(), false).await?;
+            note = format!(" Indexed: {summary}");
+        }
+    } else {
+        note = " Start services to browse and ask it.".into();
+    }
+    Ok(format!("{} is in your library.{note}", s.title))
+}
+
 #[tauri::command]
 fn kiwix_url(state: State<AppState>) -> UiResult<String> {
     let cfg = state.config.lock().map_err(ui_err)?;
@@ -658,6 +825,8 @@ pub fn run() {
             fetch_tools,
             fetch_model,
             fetch_bundle,
+            list_content,
+            fetch_source,
             kiwix_url,
         ])
         .build(tauri::generate_context!())

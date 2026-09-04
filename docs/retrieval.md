@@ -252,6 +252,22 @@ often exactly what someone needs. Measured on this corpus, prose runs 0.03–0.0
 token density, real tables reach 0.14 at the 95th percentile, and the contents page that
 prompted this measured 0.42.
 
+## Native archives are searched too
+
+For a while the "two retrieval paths" above were one and a half: the local index was
+searched, and archives with a working index of their own — Wikipedia, Appropedia, iFixit,
+most of the catalogue by volume — were browsable but never *asked*. Adding a Catalogue that
+promised "askable straight away" made that untenable.
+
+Now every archive the local index does not hold is searched through kiwix-serve's own
+full-text index. The top articles are read, reduced to prose (scripts, navigation and
+tables stripped), and cut to the stretch around the question's most distinctive term
+rather than just the lead section. They join the local candidates and go through the same
+reranker, so a Wikipedia article competes on equal terms with a page of a PDF. Asked how
+lye is made from wood ash, the answer is built from the chemistry archive's *Wood ash*,
+*Potash* and *Soap* articles with the same page-level discipline — articles cite by archive
+rather than page, since they have none.
+
 ## Tools, and knowing where an answer came from
 
 Asked "10×10", the original loop searched the library, found nothing, and refused. The

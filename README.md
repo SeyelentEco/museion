@@ -155,8 +155,10 @@ producing a corrupt double-length file.
 | Homestead | ~60 GB | + Wikipedia (no images), iFixit, Appropedia, wikiHow, Wikibooks *(planned)* |
 | Library | ~250 GB+ | + full Wikipedia, Gutenberg, Wikiversity, Stack Exchange, maps *(planned)* |
 
-Adding your own sources is a YAML file and one command — see
-[docs/adding-content.md](docs/adding-content.md).
+In the app, the Library tab's **Catalogue** lists all of these with size and description,
+shows which you already have, and fetches any one of them on a button — verified, served,
+and indexed, so it's askable straight away. Adding your own sources is a YAML file and
+one command — see [docs/adding-content.md](docs/adding-content.md).
 
 Museion ships no content itself. Everything it fetches is freely licensed, mostly CC BY-SA;
 each manifest records the license and attribution, and the app surfaces them with every

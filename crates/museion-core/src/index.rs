@@ -103,6 +103,18 @@ impl Index {
         Ok(n > 0)
     }
 
+    /// Archives this index holds content for. Anything else in the library
+    /// is served by kiwix-serve's own index and searched there.
+    pub fn processed_books(&self) -> Result<Vec<String>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT book FROM books UNION SELECT DISTINCT book FROM docs ORDER BY 1",
+        )?;
+        let rows = stmt
+            .query_map([], |r| r.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
     /// Record that an archive has been fully processed.
     pub fn mark_book_done(&self, book: &str) -> Result<()> {
         self.conn.execute(

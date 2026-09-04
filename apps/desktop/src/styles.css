@@ -361,6 +361,30 @@ select {
   font: inherit;
 }
 
+.catalogue h3 {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--ink-mute);
+  margin: 0.9rem 0 0.35rem;
+  font-weight: 600;
+}
+.catalogue h3:first-child { margin-top: 0.25rem; }
+.item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.25rem 0.9rem;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--line-soft, var(--line));
+}
+.item .t { color: var(--ink); }
+.item .d { grid-column: 1 / -1; color: var(--ink-mute); font-size: 0.85rem; margin-top: -0.15rem; }
+.item .size { color: var(--ink-mute); font-family: var(--mono); font-size: 0.85rem; white-space: nowrap; }
+.item .have { color: var(--good); font-size: 0.85rem; white-space: nowrap; }
+.item button { padding: 0.3rem 0.7rem; font-size: 0.88rem; }
+.item.busy { opacity: 0.7; }
+
 .wizard { border-color: var(--accent-dim); }
 .wizard dl { margin: 0.75rem 0; }
 

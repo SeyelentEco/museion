@@ -72,7 +72,10 @@ function showTab(name: string) {
   document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
   $(`#panel-${name}`).classList.add('active');
   if (name === 'browse') void refreshBrowse();
-  if (name === 'setup') void refreshSetup();
+  if (name === 'setup') {
+    void refreshSetup();
+    void refreshCatalogue();
+  }
 }
 
 document.querySelectorAll('.tab').forEach((t) =>
@@ -320,7 +323,8 @@ async function askQuestion(question: string) {
         row.append(el('span', 'n', String(s.n)));
         const body = el('div');
         body.append(el('div', 't', s.title));
-        const meta = [s.author, `page ${s.page}`].filter(Boolean).join(' — ');
+        // Articles from Wikipedia-style archives have no page; name the archive.
+        const meta = [s.author, s.page > 0 ? `page ${s.page}` : s.book].filter(Boolean).join(' — ');
         body.append(el('div', 'meta', meta));
         row.append(body);
         box.append(row);
@@ -488,6 +492,107 @@ $('#stop-services').addEventListener('click', async () => {
 
 void listen<string>('service-progress', (e) => statusMsg(e.payload));
 void listen<string>('index-progress', (e) => statusMsg(e.payload));
+
+/* --------------------------------------------------------------- catalogue */
+
+interface ContentItem {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  size_bytes: number;
+  installed: boolean;
+  bundles: string[];
+}
+interface Catalogue {
+  items: ContentItem[];
+  library_dir: string | null;
+}
+
+const CATEGORY_NAMES: Record<string, string> = {
+  survival: 'Survival and post-disaster',
+  medicine: 'Medicine',
+  making: 'Making, growing and repairing',
+  reference: 'Reference',
+};
+
+let fetchingId: string | null = null;
+
+async function refreshCatalogue() {
+  const box = $('#catalogue');
+  let cat: Catalogue;
+  try {
+    cat = await invoke<Catalogue>('list_content');
+  } catch (e) {
+    box.textContent = String(e);
+    return;
+  }
+  box.textContent = '';
+  if (!cat.library_dir) {
+    box.append(el('p', 'muted', 'Choose a library folder above first — items are fetched into it.'));
+  }
+  let lastCategory = '';
+  for (const it of cat.items) {
+    if (it.category !== lastCategory) {
+      box.append(el('h3', undefined, CATEGORY_NAMES[it.category] ?? it.category));
+      lastCategory = it.category;
+    }
+    const row = el('div', 'item');
+    row.setAttribute('data-id', it.id);
+    row.append(el('span', 't', it.title));
+    row.append(el('span', 'size', gb(it.size_bytes)));
+    if (it.installed) {
+      row.append(el('span', 'have', 'In your library'));
+    } else {
+      const b = el('button', undefined, 'Fetch') as HTMLButtonElement;
+      b.type = 'button';
+      b.disabled = !cat.library_dir || fetchingId !== null;
+      b.addEventListener('click', () => void fetchOne(it));
+      row.append(b);
+    }
+    const bits = [it.description, it.bundles.length ? `In: ${it.bundles.join(', ')}` : ''].filter(Boolean);
+    if (bits.length) row.append(el('span', 'd', bits.join(' — ')));
+    box.append(row);
+  }
+}
+
+async function fetchOne(it: ContentItem) {
+  if (fetchingId) return;
+  fetchingId = it.id;
+  document.querySelectorAll('.item button').forEach((b) => b.setAttribute('disabled', 'true'));
+  document.querySelector(`.item[data-id="${it.id}"]`)?.classList.add('busy');
+  const prog = $('#cat-progress');
+  prog.hidden = false;
+  $('#cat-label').textContent = `Fetching ${it.title}…`;
+  $<HTMLElement>('#cat-fill').style.width = '0%';
+  try {
+    const msg = await invoke<string>('fetch_source', { id: it.id });
+    $('#cat-label').textContent = msg;
+    $<HTMLElement>('#cat-fill').style.width = '100%';
+    statusMsg(msg);
+  } catch (e) {
+    $('#cat-label').textContent = `Stopped: ${String(e)}`;
+    statusMsg(String(e), true);
+  } finally {
+    fetchingId = null;
+    await refreshCatalogue();
+    await refreshSetup();
+  }
+}
+
+// The catalogue shares the wizard's progress events; route them to whichever
+// panel is active.
+void listen<FetchProgress>('fetch-progress', (e) => {
+  if (!fetchingId) return;
+  const p = e.payload;
+  const frac = p.total > 0 ? p.received / p.total : null;
+  const size = p.total > 1 ? ` ${gb(p.received)} / ${gb(p.total)}` : '';
+  $('#cat-label').textContent = `${p.item}${p.note ? ` — ${p.note}` : ''}${size}`;
+  $<HTMLElement>('#cat-fill').style.width = frac === null ? '100%' : `${Math.round(frac * 100)}%`;
+});
+void listen<string>('index-progress', (e) => {
+  if (fetchingId) $('#cat-label').textContent = e.payload;
+});
 
 /* ------------------------------------------------------------------ wizard */
 

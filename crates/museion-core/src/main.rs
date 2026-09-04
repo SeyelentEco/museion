@@ -213,6 +213,34 @@ Into: {dest}");
     Ok(())
 }
 
+
+/// Which archives in the library are served by kiwix-serve's own index
+/// rather than the local one, so retrieval can search them too.
+fn native_books(index: &Index, kiwix: &Llama, args: &Args) -> (Option<museion_core::Kiwix>, Vec<String>) {
+    let _ = kiwix;
+    let url = args.flags.get("kiwix").cloned().unwrap_or_else(|| "http://127.0.0.1:8090".into());
+    let k = museion_core::Kiwix::new(&url);
+    if !k.is_up() {
+        return (None, Vec::new());
+    }
+    let processed = index.processed_books().unwrap_or_default();
+    let library = args.flags.get("library").cloned();
+    let mut books = Vec::new();
+    if let Some(dir) = library.or_else(|| args.flags.get("db").and_then(|d| Path::new(d).parent().map(|p| p.display().to_string()))) {
+        if let Ok(rd) = std::fs::read_dir(&dir) {
+            for e in rd.flatten() {
+                let name = e.file_name().to_string_lossy().to_string();
+                if let Some(stem) = name.strip_suffix(".zim") {
+                    if !processed.iter().any(|b| b == stem) {
+                        books.push(stem.to_string());
+                    }
+                }
+            }
+        }
+    }
+    (Some(k), books)
+}
+
 fn cmd_search(args: &Args) -> Result<()> {
     let query = args.rest.join(" ");
     if query.trim().is_empty() {
@@ -270,10 +298,13 @@ fn cmd_gather(args: &Args) -> Result<()> {
     // A chat model is not needed to gather, but Asker wants one; it is never
     // called on this path.
     let chat = Llama::new("http://127.0.0.1:8080");
+    let (kiwix, native) = native_books(&index, &chat, args);
     let asker = Asker {
         index: &index,
         chat: &chat,
         reranker: if use_rerank { Some(&reranker) } else { None },
+        kiwix: kiwix.as_ref(),
+        native_books: native,
     };
 
     let (hits, reranked) = asker.gather(&question)?;
@@ -288,7 +319,11 @@ fn cmd_gather(args: &Args) -> Result<()> {
         if reranked { ", reranked" } else { ", keyword ranking only" }
     );
     for (i, h) in hits.iter().enumerate() {
-        println!("{:>2}. {} -- page {}", i + 1, h.doc_title, h.page);
+        if h.page > 0 {
+            println!("{:>2}. {} -- page {}", i + 1, h.doc_title, h.page);
+        } else {
+            println!("{:>2}. {} -- {}", i + 1, h.doc_title, h.book);
+        }
         println!("    {}", truncate_to(&h.body, 220));
         println!();
     }
@@ -333,10 +368,13 @@ fn cmd_ask(args: &Args) -> Result<()> {
         eprintln!("  (no reranker at {rerank_url}; falling back to keyword ranking)");
     }
 
+    let (kiwix, native) = native_books(&index, &chat, args);
     let asker = Asker {
         index: &index,
         chat: &chat,
         reranker: if use_rerank { Some(&reranker) } else { None },
+        kiwix: kiwix.as_ref(),
+        native_books: native,
     };
 
     println!();
@@ -388,7 +426,11 @@ fn cmd_ask(args: &Args) -> Result<()> {
             } else {
                 format!(", {}", h.author)
             };
-            println!("  [{}] {}{} -- page {}", i + 1, h.doc_title, who, h.page);
+            if h.page > 0 {
+                println!("  [{}] {}{} -- page {}", i + 1, h.doc_title, who, h.page);
+            } else {
+                println!("  [{}] {}{} -- {}", i + 1, h.doc_title, who, h.book);
+            }
         }
         println!();
     }

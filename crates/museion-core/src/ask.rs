@@ -39,7 +39,16 @@ pub struct Asker<'a> {
     pub index: &'a Index,
     pub chat: &'a Llama,
     pub reranker: Option<&'a Llama>,
+    /// The content server, for archives whose own full-text index works.
+    /// Without it only the locally indexed PDF collections are searched --
+    /// Wikipedia and the like would be browsable but not askable.
+    pub kiwix: Option<&'a crate::Kiwix>,
+    /// Book ids served by kiwix-serve that the local index does not hold.
+    pub native_books: Vec<String>,
 }
+
+/// Articles fetched per native archive per search.
+const NATIVE_PER_BOOK: usize = 4;
 
 /// Where an answer's substance came from -- decided by the tools that ran.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -193,7 +202,8 @@ impl<'a> Asker<'a> {
     /// because "fridge" and "nobody" do not appear anywhere in the corpus,
     /// while the reranker had the pressure-canning procedure scored at the top.
     pub fn gather(&self, question: &str) -> Result<(Vec<Hit>, bool)> {
-        let (candidates, best_coverage) = self.index.search_ungated(question, RETRIEVE)?;
+        let (mut candidates, best_coverage) = self.index.search_ungated(question, RETRIEVE)?;
+        candidates.extend(self.native_hits(question));
         if candidates.is_empty() {
             return Ok((Vec::new(), false));
         }
@@ -241,6 +251,43 @@ impl<'a> Asker<'a> {
                 Ok((candidates.into_iter().take(KEEP).collect(), false))
             }
         }
+    }
+
+    /// Search the archives that carry their own index, through kiwix-serve,
+    /// and read the matching articles. They join the local candidates and go
+    /// through the same reranker, so a Wikipedia article competes on equal
+    /// terms with a page of a PDF.
+    fn native_hits(&self, question: &str) -> Vec<Hit> {
+        let Some(kiwix) = self.kiwix else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        for book in &self.native_books {
+            let hits = match kiwix.search(book, question, NATIVE_PER_BOOK) {
+                Ok(h) => h,
+                Err(_) => continue,
+            };
+            for h in hits {
+                let Some(path) = h.path() else { continue };
+                let Ok(text) = kiwix.article_text(book, &path) else { continue };
+                if text.split_whitespace().count() < 30 {
+                    continue;
+                }
+                out.push(Hit {
+                    doc_title: h.title.clone(),
+                    author: String::new(),
+                    book: book.clone(),
+                    file: path,
+                    // Articles have no page; 0 means "the article itself".
+                    page: 0,
+                    snippet: h.snippet.clone(),
+                    rank: 0.0,
+                    coverage: 1.0,
+                    body: focus(&text, question, CONTEXT_CHARS * 2),
+                });
+            }
+        }
+        out
     }
 
     /// Answer the question, streaming to `on_token` as it arrives.
@@ -355,10 +402,10 @@ impl<'a> Asker<'a> {
                 sources.len()
             };
             let who = if h.author.is_empty() { String::new() } else { format!(", {}", h.author) };
+            let loc = if h.page > 0 { format!(" (page {})", h.page) } else { format!(" ({})", h.book) };
             out.push_str(&format!(
-                "[{n}] {}{who} (page {})\n{}\n\n",
+                "[{n}] {}{who}{loc}\n{}\n\n",
                 h.doc_title,
-                h.page,
                 truncate_chars(&h.body, CONTEXT_CHARS)
             ));
         }
@@ -374,6 +421,25 @@ fn legacy_prompt(sources: &[Hit], question: &str) -> Vec<Message> {
         block.push_str(&format!("[{}] {} (page {})\n{}\n\n", i + 1, h.doc_title, h.page, truncate_chars(&h.body, CONTEXT_CHARS)));
     }
     vec![Message::system(SYSTEM), Message::user(format!("Sources:\n\n{block}---\n\nQuestion: {question}"))]
+}
+
+/// The stretch of an article most likely to answer the question: a window
+/// around the first occurrence of its most distinctive term, or the opening
+/// if nothing matches. Long articles would otherwise contribute only their
+/// lead section.
+fn focus(text: &str, question: &str, chars: usize) -> String {
+    let lower = text.to_lowercase();
+    let terms: Vec<String> = question
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| w.len() > 3)
+        .map(|w| w.to_lowercase())
+        .collect();
+    // Longest term first: the more specific word is the better anchor.
+    let mut sorted = terms.clone();
+    sorted.sort_by_key(|t| std::cmp::Reverse(t.len()));
+    let anchor = sorted.iter().find_map(|t| lower.find(t.as_str())).unwrap_or(0);
+    let start_char = lower[..anchor].chars().count().saturating_sub(chars / 4);
+    text.chars().skip(start_char).take(chars).collect()
 }
 
 fn truncate_chars(s: &str, n: usize) -> String {

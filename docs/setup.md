@@ -8,6 +8,13 @@ below for you, shows what it will download and how large it is before it starts,
 resumes if interrupted. The rest of this page is the same thing by hand, which is also
 how you'd prepare a drive on one machine to carry to another.
 
+**Adding more later:** the **Catalogue** on the same tab lists every archive Museion knows
+how to fetch, by category, with its size, what it is, which bundles include it, and
+whether you already have it. Press **Fetch** on any item. It is verified against its
+publisher's checksum, the content server is restarted to serve it, and it is indexed —
+so it is askable the moment the progress bar finishes. The same list from the command
+line is `node scripts/fetch.js --list`.
+
 Budget: about ten minutes of your attention and, on a normal connection, half an hour of
 downloading for the Go Bag plus a 4B model, or a few hours if you take the 35B MoE.
 
