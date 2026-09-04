@@ -16,6 +16,52 @@ pub struct AppState {
     config: Mutex<Config>,
     config_path: PathBuf,
     supervisor: Supervisor,
+    /// Detected once. Detection shells out to nvidia-smi, and doing that on
+    /// the main thread every time the Library tab opened is what made the
+    /// page scroll like it was wading.
+    hardware: std::sync::OnceLock<museion_core::Hardware>,
+    /// Index totals, cached. Opening SQLite and summing every four seconds for
+    /// three numbers in the header was the other half of the jank.
+    stats: Mutex<Option<(std::time::Instant, (usize, usize, usize))>>,
+}
+
+impl AppState {
+    fn hardware(&self) -> Result<museion_core::Hardware, String> {
+        if let Some(h) = self.hardware.get() {
+            return Ok(h.clone());
+        }
+        let h = museion_core::detect_hardware().map_err(ui_err)?;
+        let _ = self.hardware.set(h.clone());
+        Ok(h)
+    }
+
+    /// (documents, pages, words), refreshed at most every 30 s or when told.
+    fn index_stats(&self, cfg: &Config) -> (usize, usize, usize) {
+        if let Ok(guard) = self.stats.lock() {
+            if let Some((at, v)) = *guard {
+                if at.elapsed() < Duration::from_secs(30) {
+                    return v;
+                }
+            }
+        }
+        let v = match cfg.index_path() {
+            Some(p) if p.exists() => Index::open(&p)
+                .and_then(|i| i.stats())
+                .map(|s| (s.documents, s.pages, s.words))
+                .unwrap_or((0, 0, 0)),
+            _ => (0, 0, 0),
+        };
+        if let Ok(mut guard) = self.stats.lock() {
+            *guard = Some((std::time::Instant::now(), v));
+        }
+        v
+    }
+
+    fn forget_stats(&self) {
+        if let Ok(mut guard) = self.stats.lock() {
+            *guard = None;
+        }
+    }
 }
 
 /// Errors cross the boundary to the UI as strings; anyhow's chain is preserved
@@ -71,35 +117,50 @@ pub struct AskResult {
     calculations: Vec<museion_core::Calculation>,
 }
 
-#[tauri::command]
-fn get_hardware() -> UiResult<HardwareInfo> {
+fn describe_hardware(hw: &museion_core::Hardware) -> HardwareInfo {
     use museion_core::Accelerator;
-    let hw = museion_core::detect_hardware().map_err(ui_err)?;
     let (accelerator, memory_mb) = match &hw.accelerator {
         Accelerator::Cuda { name, vram_mb } => (format!("{name} (CUDA)"), *vram_mb),
         Accelerator::Metal { name, unified_mb } => (format!("{name} (Metal)"), *unified_mb),
         Accelerator::Vulkan { name, vram_mb } => (format!("{name} (Vulkan)"), *vram_mb),
         Accelerator::Cpu => ("No usable GPU — CPU only".into(), 0),
     };
-    Ok(HardwareInfo {
+    HardwareInfo {
         accelerator,
         memory_mb,
         system_ram_mb: hw.system_ram_mb,
         tier: format!("{:?}", hw.tier),
         tier_detail: hw.tier.describe().to_string(),
+    }
+}
+
+#[tauri::command]
+async fn get_hardware(state: State<'_, AppState>) -> UiResult<HardwareInfo> {
+    Ok(describe_hardware(&state.hardware()?))
+}
+
+/// Just the service flags, for the header dots. Cheap enough to poll: it
+/// touches the supervisor's process list and nothing else.
+#[derive(Serialize)]
+pub struct ServiceState {
+    kiwix_running: bool,
+    chat_running: bool,
+    reranker_running: bool,
+}
+
+#[tauri::command]
+fn service_state(state: State<AppState>) -> UiResult<ServiceState> {
+    Ok(ServiceState {
+        kiwix_running: state.supervisor.is_running(Role::Kiwix),
+        chat_running: state.supervisor.is_running(Role::Chat),
+        reranker_running: state.supervisor.is_running(Role::Reranker),
     })
 }
 
 #[tauri::command]
-fn get_status(state: State<AppState>) -> UiResult<Status> {
+async fn get_status(state: State<'_, AppState>) -> UiResult<Status> {
     let cfg = state.config.lock().map_err(ui_err)?.clone();
-    let (documents, pages, words) = match cfg.index_path() {
-        Some(p) if p.exists() => Index::open(&p)
-            .and_then(|i| i.stats())
-            .map(|s| (s.documents, s.pages, s.words))
-            .unwrap_or((0, 0, 0)),
-        _ => (0, 0, 0),
-    };
+    let (documents, pages, words) = state.index_stats(&cfg);
     Ok(Status {
         configured: cfg.is_ready(),
         library_dir: cfg.library_dir.as_ref().map(|p| p.display().to_string()),
@@ -368,6 +429,7 @@ async fn build_index(app: tauri::AppHandle, state: State<'_, AppState>, force: b
     })
     .map_err(ui_err)?;
 
+    state.forget_stats();
     Ok(format!(
         "{} documents, {} pages, {} words indexed.",
         stats.documents, stats.pages, stats.words
@@ -472,10 +534,10 @@ pub struct SetupPlan {
 /// What a first run on this machine would fetch, and how big it is, so the
 /// person can decide before anything downloads.
 #[tauri::command]
-fn setup_plan() -> UiResult<SetupPlan> {
+async fn setup_plan(state: State<'_, AppState>) -> UiResult<SetupPlan> {
     use museion_core::catalog;
-    let hw = museion_core::detect_hardware().map_err(ui_err)?;
-    let hardware = get_hardware()?;
+    let hw = state.hardware()?;
+    let hardware = describe_hardware(&hw);
     let chat_model = catalog::chat_model_for(hw.tier, hw.system_ram_mb)
         .map_err(ui_err)?
         .map(|m| PlanItem { id: m.id, title: m.title, size_bytes: m.size_bytes });
@@ -518,7 +580,7 @@ fn emit_progress(app: &tauri::AppHandle, item: &str, received: u64, total: u64, 
 #[tauri::command]
 async fn fetch_tools(app: tauri::AppHandle, state: State<'_, AppState>, dest: String) -> UiResult<String> {
     use museion_core::tools::{self, Step};
-    let hw = museion_core::detect_hardware().map_err(ui_err)?;
+    let hw = state.hardware()?;
     let dest = PathBuf::from(dest);
     let app2 = app.clone();
     let installed = tauri::async_runtime::spawn_blocking(move || {
@@ -672,7 +734,7 @@ pub struct Catalogue {
 
 /// Everything that can be fetched, with what is already here.
 #[tauri::command]
-fn list_content(state: State<AppState>) -> UiResult<Catalogue> {
+async fn list_content(state: State<'_, AppState>) -> UiResult<Catalogue> {
     use museion_core::catalog;
     let cfg = state.config.lock().map_err(ui_err)?.clone();
     let bundles = catalog::bundles().map_err(ui_err)?;
@@ -812,12 +874,15 @@ pub fn run() {
                 config: Mutex::new(config),
                 config_path,
                 supervisor: Supervisor::new(),
+                hardware: std::sync::OnceLock::new(),
+                stats: Mutex::new(None),
             });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             get_hardware,
             get_status,
+            service_state,
             get_config,
             set_config,
             start_services,

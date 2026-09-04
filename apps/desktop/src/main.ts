@@ -832,7 +832,11 @@ function setDot(svc: string, state: 'on' | 'off' | 'busy') {
 
 async function refreshServiceDots() {
   try {
-    const s = await invoke<Status>('get_status');
+    // The cheap call: process flags only. Polling the full status opened the
+    // index on the main thread every few seconds and made scrolling stutter.
+    const s = await invoke<{ kiwix_running: boolean; chat_running: boolean; reranker_running: boolean }>(
+      'service_state',
+    );
     setDot('kiwix', s.kiwix_running ? 'on' : 'off');
     setDot('chat', s.chat_running ? 'on' : 'off');
     setDot('rerank', s.reranker_running ? 'on' : 'off');
@@ -877,7 +881,7 @@ async function boot() {
   // Send someone straight to the Library tab when there is nothing to ask yet,
   // rather than showing an ask box that cannot answer.
   showTab(st.configured ? 'ask' : 'setup');
-  setInterval(refreshServiceDots, 4000);
+  setInterval(refreshServiceDots, 6000);
 
   const cfg = await invoke<Config>('get_config').catch(() => null);
   if (st.configured && cfg?.autostart && !st.chat_running) {
