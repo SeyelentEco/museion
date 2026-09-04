@@ -300,6 +300,14 @@ electrical or other safety-critical questions, where "the library doesn't cover 
 remains the complete answer. That is one clause in the system prompt, and it is a policy
 choice rather than a technical one.
 
+**The library is always searched first.** The first benchmark run caught a regression the
+tool loop had introduced: given the choice, the model skipped `search_library` on three
+factual questions — a bleeding wound among them — and answered from general knowledge,
+where the old retrieval-first loop had cited *Where There Is No Doctor* every time. So the
+search is now run before the model's first turn and handed to it as if it had asked;
+tools remain for calculation and follow-up searches. Whether to consult the library is not
+the model's decision. Only how to use what it finds is.
+
 **Narration before a tool call is discarded.** The model thinks aloud on its way to
 calling a tool, and that narration streamed straight to the screen — wrong number and
 all — before the calculator returned. Text is still streamed optimistically, but a turn

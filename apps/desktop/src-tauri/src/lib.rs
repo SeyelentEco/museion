@@ -1011,6 +1011,99 @@ fn open_path(app: tauri::AppHandle, path: String) -> UiResult<()> {
     app.shell().open(path, None).map_err(ui_err)
 }
 
+// ------------------------------------------------------------------ evals
+
+/// Build an Asker from the running services, the way `ask` does.
+fn build_asker_parts(state: &AppState) -> UiResult<(Config, Index, Llama, Llama, bool, museion_core::Kiwix, bool, Vec<String>)> {
+    let cfg = state.config.lock().map_err(ui_err)?.clone();
+    let index_path = cfg.index_path().ok_or("no library configured")?;
+    let index = Index::open(&index_path).map_err(ui_err)?;
+    let chat = Llama::new(&format!("http://127.0.0.1:{}", cfg.chat_port));
+    if !chat.is_up() {
+        return Err("The chat model isn't running. Start services first.".into());
+    }
+    let reranker = Llama::new(&format!("http://127.0.0.1:{}", cfg.reranker_port));
+    let use_rerank = reranker.is_up();
+    let kiwix = museion_core::Kiwix::new(&format!("http://127.0.0.1:{}", cfg.kiwix_port));
+    let kiwix_up = state.supervisor.is_running(Role::Kiwix) && kiwix.is_up();
+    let native_books: Vec<String> = if kiwix_up {
+        let processed = index.processed_books().unwrap_or_default();
+        cfg.content_dirs()
+            .iter()
+            .filter_map(|d| std::fs::read_dir(d).ok())
+            .flat_map(|rd| {
+                rd.flatten()
+                    .filter_map(|e| e.file_name().to_string_lossy().strip_suffix(".zim").map(str::to_string))
+                    .collect::<Vec<_>>()
+            })
+            .filter(|b| !processed.iter().any(|p| p == b))
+            .collect()
+    } else {
+        Vec::new()
+    };
+    Ok((cfg, index, chat, reranker, use_rerank, kiwix, kiwix_up, native_books))
+}
+
+#[derive(Serialize, Clone)]
+struct EvalProgress {
+    index: usize,
+    total: usize,
+    id: String,
+    passed: Option<bool>,
+}
+
+/// Run the benchmark against the running services; save and return the run.
+#[tauri::command]
+async fn run_evals(app: tauri::AppHandle, state: State<'_, AppState>, label: String, only: Option<String>) -> UiResult<museion_core::evals::Run> {
+    use museion_core::evals::{self, Progress};
+    let (cfg, index, chat, reranker, use_rerank, kiwix, kiwix_up, native_books) = build_asker_parts(&state)?;
+    let mut cases = evals::load_cases(evals::BUILTIN).map_err(ui_err)?;
+    if let Some(o) = only.filter(|o| !o.is_empty()) {
+        cases.retain(|c| c.capability == o || c.horizon == o || c.id == o);
+    }
+    if cases.is_empty() {
+        return Err("no cases match".into());
+    }
+    let dir = cfg.library_dir.clone().ok_or("no library configured")?.join("evals");
+    let app2 = app.clone();
+    let run = tauri::async_runtime::spawn_blocking(move || -> anyhow::Result<evals::Run> {
+        let asker = Asker {
+            index: &index,
+            chat: &chat,
+            reranker: if use_rerank { Some(&reranker) } else { None },
+            kiwix: if kiwix_up { Some(&kiwix) } else { None },
+            native_books,
+        };
+        let run = evals::run(&asker, &cases, &label, |p| {
+            let ev = match p {
+                Progress::Case { index, total, id } => EvalProgress { index, total, id, passed: None },
+                Progress::Done { index, total, id, passed } => EvalProgress { index, total, id, passed: Some(passed) },
+            };
+            let _ = app2.emit("eval-progress", ev);
+        })?;
+        evals::save_run(&dir, &run)?;
+        Ok(run)
+    })
+    .await
+    .map_err(ui_err)?
+    .map_err(ui_err)?;
+    Ok(run)
+}
+
+#[tauri::command]
+async fn list_eval_runs(state: State<'_, AppState>) -> UiResult<Vec<museion_core::evals::Run>> {
+    let cfg = state.config.lock().map_err(ui_err)?.clone();
+    let Some(lib) = cfg.library_dir else { return Ok(Vec::new()) };
+    Ok(tauri::async_runtime::spawn_blocking(move || museion_core::evals::list_runs(&lib.join("evals")))
+        .await
+        .map_err(ui_err)?)
+}
+
+#[tauri::command]
+fn eval_cases() -> UiResult<Vec<museion_core::evals::Case>> {
+    museion_core::evals::load_cases(museion_core::evals::BUILTIN).map_err(ui_err)
+}
+
 #[tauri::command]
 fn kiwix_url(state: State<AppState>) -> UiResult<String> {
     let cfg = state.config.lock().map_err(ui_err)?;
@@ -1056,6 +1149,9 @@ pub fn run() {
             add_content_dir,
             remove_content_dir,
             open_path,
+            run_evals,
+            list_eval_runs,
+            eval_cases,
             kiwix_url,
         ])
         .build(tauri::generate_context!())

@@ -16,6 +16,7 @@
         <nav>
           <button class="tab" data-tab="ask" aria-current="true">Ask</button>
           <button class="tab" data-tab="library">Library</button>
+          <button class="tab" data-tab="evals">Evals</button>
           <button class="tab" data-tab="setup">Settings</button>
         </nav>
         <div id="service-state" class="service-state" title="Local services">
@@ -80,6 +81,62 @@
                 <p>The content server isn't running yet. Start the services from Settings.</p>
               </div>
               <iframe id="browse-frame" title="Library" hidden></iframe>
+            </div>
+          </div>
+        </section>
+
+        <!-- Evals -->
+        <section id="panel-evals" class="panel">
+          <div class="setup evals">
+            <h1>Evals</h1>
+            <p class="lede">
+              A fixed set of questions people would put to this library — by what they test and
+              by when after a disaster they come up — scored by machine against the basis, the
+              sources and the calculator's log. Run it to compare models and settings.
+            </p>
+
+            <div class="card">
+              <h2>Run the benchmark</h2>
+              <div class="row">
+                <input id="eval-label" type="text" placeholder="Label for this run (e.g. the model and settings)" />
+                <select id="eval-only" aria-label="Subset">
+                  <option value="">All cases</option>
+                  <optgroup label="Capability">
+                    <option value="retrieve_pdf">Retrieve from PDFs</option>
+                    <option value="retrieve_article">Retrieve from articles</option>
+                    <option value="calculate">Calculate</option>
+                    <option value="reason">Reason</option>
+                    <option value="plan">Plan</option>
+                    <option value="refuse">Refuse / label</option>
+                  </optgroup>
+                  <optgroup label="Horizon">
+                    <option value="month">First month</option>
+                    <option value="six_months">Six months</option>
+                    <option value="year">A year</option>
+                    <option value="five_years">Five years</option>
+                  </optgroup>
+                </select>
+                <button id="eval-run" type="button" class="primary">Run</button>
+              </div>
+              <div class="progress" id="eval-progress" hidden>
+                <div class="bar"><div class="fill" id="eval-fill"></div></div>
+                <div class="label" id="eval-status"></div>
+              </div>
+              <p class="hint" id="eval-hint">Each case is a full question to the model; a complete run takes several minutes.</p>
+            </div>
+
+            <div class="card">
+              <h2>Runs</h2>
+              <div class="row">
+                <select id="eval-a" aria-label="Run A"></select>
+                <select id="eval-b" aria-label="Compare with"></select>
+              </div>
+              <div id="eval-summary"></div>
+            </div>
+
+            <div class="card" id="eval-detail-card" hidden>
+              <h2 id="eval-detail-title"></h2>
+              <div id="eval-detail"></div>
             </div>
           </div>
         </section>

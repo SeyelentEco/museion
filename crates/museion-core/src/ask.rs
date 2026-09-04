@@ -313,8 +313,31 @@ impl<'a> Asker<'a> {
         let mut sources: Vec<Hit> = Vec::new();
         let mut seen: HashSet<(String, usize)> = HashSet::new();
         let mut reranked = false;
-        let mut searched = false;
         let mut calculations: Vec<Calculation> = Vec::new();
+
+        // The library is searched before the model says a word. Left to
+        // decide for itself, it skipped the search on three factual questions
+        // in one benchmark run -- a bleeding wound among them -- and answered
+        // from general knowledge, when the same question had cited Where
+        // There Is No Doctor every time under the old retrieval-first loop.
+        // Whether to consult the library is not the model's call; only how to
+        // use what it finds is. The seeded search is replayed as a tool
+        // exchange so the model sees it exactly as it would its own.
+        {
+            let (hits, rr) = self.gather(question)?;
+            reranked |= rr;
+            let call = ToolCall {
+                id: "seed_search".into(),
+                r#type: "function".into(),
+                function: crate::llama::ToolCallFunction {
+                    name: "search_library".into(),
+                    arguments: serde_json::json!({ "query": question }).to_string(),
+                },
+            };
+            let result = self.render_search(&hits, &mut sources, &mut seen);
+            messages.push(Message::assistant_calls(String::new(), vec![call]));
+            messages.push(Message::tool_result("seed_search", result));
+        }
 
         for round in 0..=MAX_ROUNDS {
             // On the last round the tools are withheld so the model must answer.
@@ -332,7 +355,8 @@ impl<'a> Asker<'a> {
 
             if turn.tool_calls.is_empty() {
                 let calculated = !calculations.is_empty();
-                let basis = match (searched && !sources.is_empty(), calculated) {
+                // Searched is always true now; what matters is whether it found anything.
+                let basis = match (!sources.is_empty(), calculated) {
                     (true, true) => Basis::LibraryAndCalculation,
                     (true, false) => Basis::Library,
                     (false, true) => Basis::Computed,
@@ -346,7 +370,6 @@ impl<'a> Asker<'a> {
             for call in &turn.tool_calls {
                 let result = match call.function.name.as_str() {
                     "search_library" => {
-                        searched = true;
                         let q = serde_json::from_str::<SearchArgs>(&call.function.arguments)
                             .map(|a| a.query)
                             .unwrap_or_else(|_| call.function.arguments.clone());

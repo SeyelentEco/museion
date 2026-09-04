@@ -167,6 +167,15 @@ Museion ships no content itself. Everything it fetches is freely licensed, mostl
 each manifest records the license and attribution, and the app surfaces them with every
 citation.
 
+## Evals
+
+The Evals tab (or `museion eval`) runs a fixed benchmark — questions grouped by what they
+test (retrieval from PDFs and articles, calculation, reasoning, planning, refusing) and by
+when after a disaster they come up (the first month, six months, a year, five years) —
+scored by machine against the basis label, the cited sources and the calculator's log.
+Runs are saved and can be compared side by side, so a new model or setting is judged
+against the last one. See [docs/evals.md](docs/evals.md).
+
 ## License
 
 MIT for the code. The content it fetches carries its own licenses.

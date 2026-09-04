@@ -21,6 +21,7 @@ museion -- offline library index and search
   museion ask    --db <file> <question...> [--llama <url>] [--reranker <url>]
   museion status --db <file>
   museion hardware
+  museion eval   --db <file> [--label <name>] [--only <capability|horizon|id>]
   museion fit    --model <gguf> [--fit-exe <path>] [--ctx N]
   museion tools  --dest <dir> [--cpu]
 
@@ -96,6 +97,7 @@ fn run() -> Result<()> {
         "ask" => cmd_ask(&args),
         "gather" => cmd_gather(&args),
         "hardware" => cmd_hardware(),
+        "eval" => cmd_eval(&args),
         "fit" => cmd_fit(&args),
         "tools" => cmd_tools(&args),
         "status" => cmd_status(&args),
@@ -442,6 +444,80 @@ fn cmd_ask(args: &Args) -> Result<()> {
         }
         println!();
     }
+    Ok(())
+}
+
+/// Run the benchmark against the running servers and save the run.
+///
+///   museion eval --db <file> --label "qwen3.6-35b q4, reranker"
+///   museion eval --db <file> --only calculate
+fn cmd_eval(args: &Args) -> Result<()> {
+    use museion_core::evals::{self, Progress};
+    let index = Index::open(&db_path(args)?)?;
+    let chat_url = args.flags.get("llama").cloned().unwrap_or_else(|| "http://127.0.0.1:8080".into());
+    let chat = Llama::new(&chat_url);
+    if !chat.is_up() {
+        bail!("no chat model at {chat_url}");
+    }
+    let rerank_url = args.flags.get("reranker").cloned().unwrap_or_else(|| "http://127.0.0.1:8081".into());
+    let reranker = Llama::new(&rerank_url);
+    let use_rerank = !args.flags.contains_key("no-rerank") && reranker.is_up();
+    let (kiwix, native) = native_books(&index, &chat, args);
+    let asker = Asker {
+        index: &index,
+        chat: &chat,
+        reranker: if use_rerank { Some(&reranker) } else { None },
+        kiwix: kiwix.as_ref(),
+        native_books: native,
+    };
+
+    let mut cases = evals::load_cases(evals::BUILTIN)?;
+    if let Some(only) = args.flags.get("only") {
+        cases.retain(|c| c.capability == *only || c.horizon == *only || c.id == *only);
+        if cases.is_empty() {
+            bail!("--only {only:?} matches no case, capability or horizon");
+        }
+    }
+    let label = args.flags.get("label").cloned().unwrap_or_else(|| "cli".into());
+
+    println!("
+Running {} case(s) against {}{}
+", cases.len(), chat.model_id().unwrap_or_default(),
+        if use_rerank { " with reranker" } else { " (no reranker)" });
+    let run = evals::run(&asker, &cases, &label, |p| match p {
+        Progress::Case { index, total, id } => {
+            print!("  [{index:>2}/{total}] {id:<22} ");
+            let _ = std::io::stdout().flush();
+        }
+        Progress::Done { passed, .. } => println!("{}", if passed { "pass" } else { "FAIL" }),
+    })?;
+
+    println!("
+{}/{} passed in {:.0}s
+", run.passed, run.total, run.seconds);
+    println!("By capability:");
+    for (k, p, t) in &run.by_capability {
+        println!("  {k:<18} {p}/{t}");
+    }
+    println!("By horizon:");
+    for (k, p, t) in &run.by_horizon {
+        println!("  {k:<18} {p}/{t}");
+    }
+    let failed: Vec<&museion_core::evals::CaseResult> = run.cases.iter().filter(|c| !c.passed).collect();
+    if !failed.is_empty() {
+        println!("
+Failures:");
+        for c in failed {
+            for ch in c.checks.iter().filter(|ch| !ch.passed) {
+                println!("  {:<22} {:<16} {}", c.id, ch.check, truncate_to(&ch.detail, 90));
+            }
+        }
+    }
+    let dir = db_path(args)?.parent().map(|p| p.join("evals")).context("db has no parent")?;
+    let path = evals::save_run(&dir, &run)?;
+    println!("
+Saved {}
+", path.display());
     Ok(())
 }
 
