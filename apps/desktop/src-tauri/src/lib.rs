@@ -56,6 +56,9 @@ pub struct Source {
     author: String,
     page: usize,
     book: String,
+    /// PDF filename for a page source; article path for a native archive.
+    /// What the Browse tab needs to open the thing itself.
+    file: String,
     snippet: String,
 }
 
@@ -313,6 +316,7 @@ async fn ask(
                 author: h.author.clone(),
                 page: h.page,
                 book: h.book.clone(),
+                file: h.file.clone(),
                 snippet: h.snippet.clone(),
             })
             .collect(),

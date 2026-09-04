@@ -8,6 +8,8 @@ interface Source {
   author: string;
   page: number;
   book: string;
+  /** PDF filename for a page source; article path for a native archive. */
+  file: string;
   snippet: string;
 }
 
@@ -320,9 +322,13 @@ async function askQuestion(question: string) {
       for (const s of sources) {
         const row = el('div', 'source');
         row.setAttribute('data-n', String(s.n));
+        row.title = s.page > 0 ? `Open the PDF at page ${s.page}` : 'Open the article';
+        row.addEventListener('click', () => void openSource(s));
         row.append(el('span', 'n', String(s.n)));
         const body = el('div');
-        body.append(el('div', 't', s.title));
+        const t = el('div', 't', s.title);
+        t.append(el('span', 'open', '↗'));
+        body.append(t);
         // Articles from Wikipedia-style archives have no page; name the archive.
         const meta = [s.author, s.page > 0 ? `page ${s.page}` : s.book].filter(Boolean).join(' — ');
         body.append(el('div', 'meta', meta));
@@ -365,20 +371,58 @@ document.querySelectorAll('#examples li').forEach((li) =>
 
 /* ------------------------------------------------------------------ browse */
 
+/**
+ * The content server's URL for a source: the article itself, or the PDF
+ * opened at the cited page. Citations are only worth having if following one
+ * is easy, and "page 129 of Where There Is No Doctor" should be one click.
+ */
+async function sourceUrl(s: Source): Promise<string> {
+  const base = await invoke<string>('kiwix_url');
+  const enc = (p: string) => p.split('/').map(encodeURIComponent).join('/');
+  return s.page > 0
+    ? `${base}/content/${enc(s.book)}/files/${enc(s.file)}#page=${s.page}`
+    : `${base}/content/${enc(s.book)}/${enc(s.file)}`;
+}
+
+async function openSource(s: Source) {
+  const status = await invoke<Status>('get_status');
+  if (!status.kiwix_running) {
+    statusMsg('The content server is not running; start services to open sources.', true);
+    showTab('setup');
+    return;
+  }
+  const frame = $<HTMLIFrameElement>('#browse-frame');
+  frame.src = await sourceUrl(s);
+  $('#browse-where').textContent = s.page > 0 ? `${s.title} — page ${s.page}` : s.title;
+  showTab('browse');
+}
+
 async function refreshBrowse() {
   const status = await invoke<Status>('get_status');
   const frame = $<HTMLIFrameElement>('#browse-frame');
   const notice = $('#browse-unavailable');
+  const bar = $('#browse-bar');
   if (status.kiwix_running) {
-    const url = await invoke<string>('kiwix_url');
-    if (frame.src !== url + '/') frame.src = url;
+    // Only land on the library's front page when nothing is open yet; a
+    // source someone just clicked must not be replaced by it.
+    if (!frame.src || frame.src === 'about:blank') {
+      frame.src = await invoke<string>('kiwix_url');
+      $('#browse-where').textContent = '';
+    }
     frame.hidden = false;
+    bar.hidden = false;
     notice.style.display = 'none';
   } else {
     frame.hidden = true;
+    bar.hidden = true;
     notice.style.display = '';
   }
 }
+
+$('#browse-home').addEventListener('click', async () => {
+  $<HTMLIFrameElement>('#browse-frame').src = await invoke<string>('kiwix_url');
+  $('#browse-where').textContent = '';
+});
 
 /* ------------------------------------------------------------------ setup */
 
