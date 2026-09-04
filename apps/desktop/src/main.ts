@@ -500,10 +500,12 @@ async function refreshSetup() {
   void loadPlan();
 
   const st = await invoke<Status>('get_status');
+  const sp = await invoke<Space | null>('library_space').catch(() => null);
+  const spaceLine = sp ? ` ${gb(sp.library_bytes)} on disk, ${gb(sp.free_bytes)} free on ${sp.volume}.` : '';
   $('#library-summary').textContent = st.documents
-    ? `${fmt(st.documents)} documents, ${fmt(st.pages)} pages, ${fmt(st.words)} words indexed.`
+    ? `${fmt(st.documents)} documents, ${fmt(st.pages)} pages, ${fmt(st.words)} words indexed.${spaceLine}`
     : st.library_dir
-      ? 'Library folder set, but nothing is indexed yet.'
+      ? `Library folder set, but nothing is indexed yet.${spaceLine}`
       : 'No library configured.';
 }
 
@@ -592,9 +594,44 @@ interface ContentItem {
   /** The kiwix book id: the archive filename without .zim. */
   filename?: string;
 }
+interface Space {
+  library_bytes: number;
+  extra_bytes: number;
+  free_bytes: number;
+  volume: string;
+}
 interface Catalogue {
   items: ContentItem[];
   library_dir: string | null;
+  space: Space | null;
+}
+
+/** "Library 1.3 GB · 2.8 TB free on E:" with a fill meter. */
+function renderSpace(target: HTMLElement, sp: Space | null) {
+  target.textContent = '';
+  if (!sp) {
+    target.hidden = true;
+    return;
+  }
+  target.hidden = false;
+  const used = sp.library_bytes + sp.extra_bytes;
+  const total = used + sp.free_bytes;
+  const low = sp.free_bytes < 2 * 1073741824;
+  target.classList.toggle('low', low);
+  const line = el('div');
+  line.append(el('strong', undefined, gb(sp.library_bytes)));
+  line.append(document.createTextNode(' in your library'));
+  if (sp.extra_bytes > 0) line.append(document.createTextNode(` · ${gb(sp.extra_bytes)} in extra folders`));
+  target.append(line);
+  const free = el('div');
+  free.append(el('strong', undefined, gb(sp.free_bytes)));
+  free.append(document.createTextNode(` free on ${sp.volume}${low ? ' — getting tight' : ''}`));
+  target.append(free);
+  const meter = el('div', 'meter');
+  const fill = el('div');
+  fill.style.width = total > 0 ? `${Math.min(100, Math.round((used / total) * 100))}%` : '0%';
+  meter.append(fill);
+  target.append(meter);
 }
 
 const CATEGORY_NAMES: Record<string, string> = {
@@ -622,6 +659,8 @@ async function refreshCatalogue() {
   }
   have.textContent = '';
   get.textContent = '';
+  renderSpace($('#shelf-space'), cat.space);
+  const free = cat.space?.free_bytes ?? Infinity;
 
   const render = (target: HTMLElement, items: ContentItem[], installed: boolean) => {
     let lastCategory = '';
@@ -637,6 +676,11 @@ async function refreshCatalogue() {
       row.append(el('span', 'size', gb(it.size_bytes)));
       if (installed) {
         row.addEventListener('click', () => void openBook(it.filename ?? it.id, it.title));
+      } else if (it.size_bytes > free) {
+        // Say so here, where the decision is made, not at 98% of a download.
+        row.append(el('span', 'nofit', `needs ${gb(it.size_bytes - free)} more`));
+        row.classList.add('nofit');
+        row.title = `Not enough free space on ${cat.space?.volume ?? 'the drive'} for this.`;
       } else {
         row.append(el('span', 'get', 'Fetch'));
         if (!cat.library_dir || fetchingId !== null) row.classList.add('busy');
@@ -768,6 +812,7 @@ interface FetchProgress {
 // line never quote two different sizes for the same file.
 function gb(n: number) {
   const g = n / 1073741824;
+  if (g >= 1000) return `${(g / 1024).toFixed(1)} TB`;
   return g >= 1 ? `${g.toFixed(g >= 10 ? 0 : 1)} GB` : `${Math.round(n / 1048576)} MB`;
 }
 

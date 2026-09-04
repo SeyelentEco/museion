@@ -175,6 +175,15 @@ async fn get_status(state: State<'_, AppState>) -> UiResult<Status> {
     })
 }
 
+fn human(bytes: u64) -> String {
+    let g = bytes as f64 / 1_073_741_824.0;
+    if g >= 1.0 {
+        format!("{:.1} GB", g)
+    } else {
+        format!("{} MB", bytes / 1_048_576)
+    }
+}
+
 fn file_name(p: &std::path::Path) -> String {
     p.file_name()
         .map(|n| n.to_string_lossy().to_string())
@@ -734,6 +743,39 @@ pub struct ContentItem {
 pub struct Catalogue {
     items: Vec<ContentItem>,
     library_dir: Option<String>,
+    space: Option<Space>,
+}
+
+#[derive(Serialize, Clone)]
+pub struct Space {
+    /// Bytes used by the library folder (archives plus index).
+    library_bytes: u64,
+    /// Bytes used by the extra content folders.
+    extra_bytes: u64,
+    /// Bytes free on the library's volume.
+    free_bytes: u64,
+    /// "E:" or "/".
+    volume: String,
+}
+
+fn measure_space(cfg: &Config) -> Option<Space> {
+    use museion_core::disk;
+    let lib = cfg.library_dir.as_ref()?;
+    Some(Space {
+        library_bytes: disk::dir_size(lib),
+        extra_bytes: cfg.extra_dirs.iter().map(|d| disk::dir_size(d)).sum(),
+        free_bytes: disk::free_space(lib).ok()?,
+        volume: disk::volume_name(lib),
+    })
+}
+
+/// Room on the library's drive, and what the library is using.
+#[tauri::command]
+async fn library_space(state: State<'_, AppState>) -> UiResult<Option<Space>> {
+    let cfg = state.config.lock().map_err(ui_err)?.clone();
+    Ok(tauri::async_runtime::spawn_blocking(move || measure_space(&cfg))
+        .await
+        .map_err(ui_err)?)
 }
 
 /// Everything that can be fetched, with what is already here.
@@ -776,6 +818,7 @@ async fn list_content(state: State<'_, AppState>) -> UiResult<Catalogue> {
     Ok(Catalogue {
         items,
         library_dir: cfg.library_dir.as_ref().map(|p| p.display().to_string()),
+        space: measure_space(&cfg),
     })
 }
 
@@ -794,6 +837,25 @@ async fn fetch_source(app: tauri::AppHandle, state: State<'_, AppState>, id: Str
         .ok_or_else(|| format!("no archive {id:?} in the catalogue"))?;
 
     let target = library.join(&s.filename);
+
+    // Refuse up front rather than failing at 98%. The partial file would be
+    // resumable, but a drive that is already full has nowhere to resume to.
+    if !download::is_verified(&target, s.size_bytes, &s.sha256).unwrap_or(false) {
+        if let Ok(free) = museion_core::disk::free_space(&library) {
+            let have = std::fs::metadata(format!("{}.part", target.display())).map(|m| m.len()).unwrap_or(0);
+            let need = s.size_bytes.saturating_sub(have);
+            if need > free {
+                return Err(format!(
+                    "Not enough space: {} needs {} more and {} has {} free.",
+                    s.title,
+                    human(need),
+                    museion_core::disk::volume_name(&library),
+                    human(free)
+                ));
+            }
+        }
+    }
+
     let app2 = app.clone();
     let s2 = s.clone();
     let t2 = target.clone();
@@ -989,6 +1051,7 @@ pub fn run() {
             fetch_model,
             fetch_bundle,
             list_content,
+            library_space,
             fetch_source,
             add_content_dir,
             remove_content_dir,

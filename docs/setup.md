@@ -11,6 +11,10 @@ finishes it gets out of the way — Ask, Browse and Library are what you see fro
 rest of this page is the same thing by hand, which is also how you'd prepare a drive on
 one machine to carry to another.
 
+**Room:** the top of the Library shelf shows what the library takes on disk and what is
+free on its drive. Anything that would not fit is marked with how much more it needs, and
+cannot be started — Museion refuses before the first byte rather than failing at 98%.
+
 **Adding more later:** the **Library** tab has two shelves. *In your library* is what you
 have — click anything to read it. *Available to fetch* is everything else in the
 catalogue, by category with sizes — click to fetch. Each is verified against its

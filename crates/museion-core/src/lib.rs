@@ -15,6 +15,7 @@
 pub mod ask;
 pub mod calc;
 pub mod catalog;
+pub mod disk;
 pub mod download;
 pub mod fit;
 pub mod hardware;
