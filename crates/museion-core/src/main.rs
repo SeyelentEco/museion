@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 const USAGE: &str = "\
 museion -- offline library index and search
 
-  museion index  --library <dir> [--db <file>] [--kiwix <url>] [--force]
+  museion index  --library <dir> [--extra <dir>]... [--db <file>] [--kiwix <url>] [--force]
   museion search --db <file> <query...> [--limit N]
   museion ask    --db <file> <question...> [--llama <url>] [--reranker <url>]
   museion status --db <file>
@@ -118,8 +118,16 @@ fn cmd_index(args: &Args) -> Result<()> {
     let db = db_path(args)?;
     println!("\nIndex: {}\nKiwix: {kiwix_url}\n", db.display());
 
+    // Extra folders: --extra <dir> may be given more than once.
+    let extras: Vec<PathBuf> = std::env::args()
+        .collect::<Vec<_>>()
+        .windows(2)
+        .filter(|w| w[0] == "--extra")
+        .map(|w| PathBuf::from(&w[1]))
+        .collect();
     let opts = museion_core::IndexOptions {
         library: Path::new(&library),
+        extra_dirs: &extras,
         db: &db,
         kiwix_url: &kiwix_url,
         pdfium_dir: Path::new(&pdfium_dir),

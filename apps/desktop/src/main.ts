@@ -73,10 +73,13 @@ function showTab(name: string) {
   );
   document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
   $(`#panel-${name}`).classList.add('active');
-  if (name === 'browse') void refreshBrowse();
+  if (name === 'library') {
+    void refreshBrowse();
+    void refreshCatalogue();
+  }
   if (name === 'setup') {
     void refreshSetup();
-    void refreshCatalogue();
+    void refreshExtraDirs();
   }
   if (name === 'welcome') void loadPlan();
 }
@@ -401,6 +404,16 @@ async function sourceUrl(s: Source): Promise<string> {
 }
 
 async function openSource(s: Source) {
+  // A PDF found in a folder is not served by the content server; hand it to
+  // whatever the system opens PDFs with.
+  if (s.book.startsWith('folder:')) {
+    try {
+      await invoke('open_path', { path: s.file });
+    } catch (e) {
+      statusMsg(String(e), true);
+    }
+    return;
+  }
   const status = await invoke<Status>('get_status');
   if (!status.kiwix_running) {
     statusMsg('The content server is not running; start services to open sources.', true);
@@ -410,7 +423,20 @@ async function openSource(s: Source) {
   const frame = $<HTMLIFrameElement>('#browse-frame');
   frame.src = await sourceUrl(s);
   $('#browse-where').textContent = s.page > 0 ? `${s.title} — page ${s.page}` : s.title;
-  showTab('browse');
+  showTab('library');
+}
+
+/** Open an archive's front page in the reader. */
+async function openBook(id: string, title: string) {
+  const status = await invoke<Status>('get_status');
+  if (!status.kiwix_running) {
+    statusMsg('The content server is not running; start services to read.', true);
+    return;
+  }
+  const base = await invoke<string>('kiwix_url');
+  $<HTMLIFrameElement>('#browse-frame').src = `${base}/content/${encodeURIComponent(id)}/`;
+  $('#browse-where').textContent = title;
+  document.querySelectorAll('.book').forEach((b) => b.classList.toggle('active', (b as HTMLElement).dataset.id === id));
 }
 
 async function refreshBrowse() {
@@ -563,6 +589,8 @@ interface ContentItem {
   size_bytes: number;
   installed: boolean;
   bundles: string[];
+  /** The kiwix book id: the archive filename without .zim. */
+  filename?: string;
 }
 interface Catalogue {
   items: ContentItem[];
@@ -578,49 +606,62 @@ const CATEGORY_NAMES: Record<string, string> = {
 
 let fetchingId: string | null = null;
 
+/**
+ * The two shelves of the Library tab: what is here (click to read) and what
+ * could be (click to fetch). Grouped by category within each.
+ */
 async function refreshCatalogue() {
-  const box = $('#catalogue');
+  const have = $('#shelf-have');
+  const get = $('#shelf-get');
   let cat: Catalogue;
   try {
     cat = await invoke<Catalogue>('list_content');
   } catch (e) {
-    box.textContent = String(e);
+    have.textContent = String(e);
     return;
   }
-  box.textContent = '';
+  have.textContent = '';
+  get.textContent = '';
+
+  const render = (target: HTMLElement, items: ContentItem[], installed: boolean) => {
+    let lastCategory = '';
+    for (const it of items) {
+      if (it.category !== lastCategory) {
+        target.append(el('div', 'cat', CATEGORY_NAMES[it.category] ?? it.category));
+        lastCategory = it.category;
+      }
+      const row = el('div', 'book');
+      row.dataset.id = it.filename ?? it.id;
+      row.title = it.description ? `${it.description}${it.bundles.length ? ` — in ${it.bundles.join(', ')}` : ''}` : '';
+      row.append(el('span', 't', it.title));
+      row.append(el('span', 'size', gb(it.size_bytes)));
+      if (installed) {
+        row.addEventListener('click', () => void openBook(it.filename ?? it.id, it.title));
+      } else {
+        row.append(el('span', 'get', 'Fetch'));
+        if (!cat.library_dir || fetchingId !== null) row.classList.add('busy');
+        else row.addEventListener('click', () => void fetchOne(it));
+      }
+      target.append(row);
+    }
+  };
+
+  const mine = cat.items.filter((i) => i.installed);
+  const rest = cat.items.filter((i) => !i.installed);
   if (!cat.library_dir) {
-    box.append(el('p', 'muted', 'Choose a library folder above first — items are fetched into it.'));
+    have.append(el('p', 'empty-note', 'Choose a library folder in Settings first.'));
+  } else if (!mine.length) {
+    have.append(el('p', 'empty-note', 'Nothing yet. Fetch something below.'));
   }
-  let lastCategory = '';
-  for (const it of cat.items) {
-    if (it.category !== lastCategory) {
-      box.append(el('h3', undefined, CATEGORY_NAMES[it.category] ?? it.category));
-      lastCategory = it.category;
-    }
-    const row = el('div', 'item');
-    row.setAttribute('data-id', it.id);
-    row.append(el('span', 't', it.title));
-    row.append(el('span', 'size', gb(it.size_bytes)));
-    if (it.installed) {
-      row.append(el('span', 'have', 'In your library'));
-    } else {
-      const b = el('button', undefined, 'Fetch') as HTMLButtonElement;
-      b.type = 'button';
-      b.disabled = !cat.library_dir || fetchingId !== null;
-      b.addEventListener('click', () => void fetchOne(it));
-      row.append(b);
-    }
-    const bits = [it.description, it.bundles.length ? `In: ${it.bundles.join(', ')}` : ''].filter(Boolean);
-    if (bits.length) row.append(el('span', 'd', bits.join(' — ')));
-    box.append(row);
-  }
+  render(have, mine, true);
+  if (!rest.length) get.append(el('p', 'empty-note', 'You have everything in the catalogue.'));
+  render(get, rest, false);
 }
 
 async function fetchOne(it: ContentItem) {
   if (fetchingId) return;
   fetchingId = it.id;
-  document.querySelectorAll('.item button').forEach((b) => b.setAttribute('disabled', 'true'));
-  document.querySelector(`.item[data-id="${it.id}"]`)?.classList.add('busy');
+  document.querySelectorAll('#shelf-get .book').forEach((b) => b.classList.add('busy'));
   const prog = $('#cat-progress');
   prog.hidden = false;
   $('#cat-label').textContent = `Fetching ${it.title}…`;
@@ -652,6 +693,54 @@ void listen<FetchProgress>('fetch-progress', (e) => {
 });
 void listen<string>('index-progress', (e) => {
   if (fetchingId) $('#cat-label').textContent = e.payload;
+});
+
+/* ----------------------------------------------------------- extra folders */
+
+async function refreshExtraDirs() {
+  const box = $('#extra-dirs');
+  const cfg = await invoke<Config & { extra_dirs?: string[] }>('get_config').catch(() => null);
+  box.textContent = '';
+  const dirs = cfg?.extra_dirs ?? [];
+  if (!dirs.length) {
+    box.append(el('p', 'hint', 'No extra folders yet.'));
+    return;
+  }
+  for (const d of dirs) {
+    const row = el('div', 'item');
+    row.append(el('span', 'path', d));
+    const rm = el('button', undefined, 'Remove') as HTMLButtonElement;
+    rm.type = 'button';
+    rm.addEventListener('click', async () => {
+      rm.disabled = true;
+      try {
+        statusMsg(await invoke<string>('remove_content_dir', { path: d }));
+      } catch (e) {
+        statusMsg(String(e), true);
+      }
+      await refreshExtraDirs();
+      await refreshSetup();
+    });
+    row.append(rm);
+    box.append(row);
+  }
+}
+
+$('#add-dir').addEventListener('click', async () => {
+  const chosen = await open({ directory: true, multiple: false, title: 'Add a folder of content' });
+  if (typeof chosen !== 'string') return;
+  const btn = $('#add-dir');
+  btn.setAttribute('disabled', 'true');
+  statusMsg(`Adding ${chosen}…`);
+  try {
+    statusMsg(await invoke<string>('add_content_dir', { path: chosen }));
+  } catch (e) {
+    statusMsg(String(e), true);
+  } finally {
+    btn.removeAttribute('disabled');
+    await refreshExtraDirs();
+    await refreshSetup();
+  }
 });
 
 /* ------------------------------------------------------------------ wizard */

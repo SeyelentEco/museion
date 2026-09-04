@@ -14,6 +14,10 @@ use std::path::{Path, PathBuf};
 pub struct Config {
     /// Directory holding .zim archives and the search index.
     pub library_dir: Option<PathBuf>,
+    /// Other folders of content someone has found: .zim archives are served
+    /// and indexed like catalogue ones, loose PDFs are indexed by page. The
+    /// catalogue is a starting point, not a boundary.
+    pub extra_dirs: Vec<PathBuf>,
     /// The kiwix-serve binary. A full path rather than a directory, because
     /// kiwix-tools and llama.cpp come from different upstreams and many people
     /// already have one or both installed somewhere of their own choosing.
@@ -87,6 +91,13 @@ impl Config {
         std::fs::write(path, serde_json::to_string_pretty(self)?)
             .with_context(|| format!("writing {}", path.display()))?;
         Ok(())
+    }
+
+    /// Every folder content is read from: the library first, then extras.
+    pub fn content_dirs(&self) -> Vec<PathBuf> {
+        let mut v: Vec<PathBuf> = self.library_dir.iter().cloned().collect();
+        v.extend(self.extra_dirs.iter().cloned());
+        v
     }
 
     pub fn index_path(&self) -> Option<PathBuf> {

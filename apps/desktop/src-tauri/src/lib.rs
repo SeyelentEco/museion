@@ -207,10 +207,11 @@ async fn start_services(app: tauri::AppHandle, state: State<'_, AppState>) -> Ui
         let _ = app.emit("service-progress", msg.to_string());
     };
 
+    let _ = &library;
     say("Starting the content server…");
     state
         .supervisor
-        .start_kiwix(&kiwix_exe, &library, cfg.kiwix_port)
+        .start_kiwix(&kiwix_exe, &cfg.content_dirs(), cfg.kiwix_port)
         .map_err(ui_err)?;
     state
         .supervisor
@@ -322,16 +323,16 @@ async fn ask(
     let kiwix_up = state.supervisor.is_running(Role::Kiwix) && kiwix.is_up();
     let native_books: Vec<String> = if kiwix_up {
         let processed = index.processed_books().unwrap_or_default();
-        cfg.library_dir
-            .as_ref()
-            .and_then(|d| std::fs::read_dir(d).ok())
-            .map(|rd| {
+        cfg.content_dirs()
+            .iter()
+            .filter_map(|d| std::fs::read_dir(d).ok())
+            .flat_map(|rd| {
                 rd.flatten()
                     .filter_map(|e| e.file_name().to_string_lossy().strip_suffix(".zim").map(str::to_string))
-                    .filter(|b| !processed.iter().any(|p| p == b))
-                    .collect()
+                    .collect::<Vec<_>>()
             })
-            .unwrap_or_default()
+            .filter(|b| !processed.iter().any(|p| p == b))
+            .collect()
     } else {
         Vec::new()
     };
@@ -411,6 +412,7 @@ async fn build_index(app: tauri::AppHandle, state: State<'_, AppState>, force: b
     };
     let opts = museion_core::IndexOptions {
         library: &library,
+        extra_dirs: &cfg.extra_dirs,
         db: &db,
         kiwix_url: &kiwix_url,
         pdfium_dir: &pdfium,
@@ -724,6 +726,8 @@ pub struct ContentItem {
     installed: bool,
     /// Which bundles include it, for context.
     bundles: Vec<String>,
+    /// The kiwix book id (archive filename without .zim), for opening it.
+    filename: String,
 }
 
 #[derive(Serialize)]
@@ -758,6 +762,7 @@ async fn list_content(state: State<'_, AppState>) -> UiResult<Catalogue> {
             size_bytes: s.size_bytes,
             installed,
             bundles: in_bundles,
+            filename: s.filename.trim_end_matches(".zim").to_string(),
         });
     }
     // Survival first, then medicine, making, reference; smallest first within.
@@ -835,7 +840,7 @@ async fn fetch_source(app: tauri::AppHandle, state: State<'_, AppState>, id: Str
             state.supervisor.stop(Role::Kiwix);
             state
                 .supervisor
-                .start_kiwix(exe, &library, cfg.kiwix_port)
+                .start_kiwix(exe, &cfg.content_dirs(), cfg.kiwix_port)
                 .map_err(ui_err)?;
             state
                 .supervisor
@@ -853,6 +858,95 @@ async fn fetch_source(app: tauri::AppHandle, state: State<'_, AppState>, id: Str
         note = " Start services to browse and ask it.".into();
     }
     Ok(format!("{} is in your library.{note}", s.title))
+}
+
+// ------------------------------------------------------- content folders
+
+/// Add a folder of found content. Its archives are served and its PDFs are
+/// indexed, right away if the services are up.
+#[tauri::command]
+async fn add_content_dir(app: tauri::AppHandle, state: State<'_, AppState>, path: String) -> UiResult<String> {
+    let dir = PathBuf::from(&path);
+    if !dir.is_dir() {
+        return Err(format!("{path} is not a folder"));
+    }
+    let mut cfg = state.config.lock().map_err(ui_err)?.clone();
+    if cfg.library_dir.as_ref() == Some(&dir) || cfg.extra_dirs.contains(&dir) {
+        return Err("that folder is already part of the library".into());
+    }
+    cfg.extra_dirs.push(dir);
+    cfg.save(&state.config_path).map_err(ui_err)?;
+    *state.config.lock().map_err(ui_err)? = cfg.clone();
+
+    if !state.supervisor.is_running(Role::Kiwix) {
+        return Ok("Folder added. Start services to serve and index it.".into());
+    }
+    let exe = cfg.kiwix_exe.clone().ok_or("kiwix-serve path not configured")?;
+    state.supervisor.stop(Role::Kiwix);
+    state
+        .supervisor
+        .start_kiwix(&exe, &cfg.content_dirs(), cfg.kiwix_port)
+        .map_err(ui_err)?;
+    state
+        .supervisor
+        .wait_ready(
+            Role::Kiwix,
+            &format!("http://127.0.0.1:{}/catalog/v2/entries", cfg.kiwix_port),
+            Duration::from_secs(60),
+        )
+        .map_err(ui_err)?;
+    let summary = build_index(app, state, false).await?;
+    Ok(format!("Folder added and indexed. {summary}"))
+}
+
+/// Remove a folder. Its content leaves the index and the content server.
+#[tauri::command]
+async fn remove_content_dir(state: State<'_, AppState>, path: String) -> UiResult<String> {
+    let dir = PathBuf::from(&path);
+    let mut cfg = state.config.lock().map_err(ui_err)?.clone();
+    cfg.extra_dirs.retain(|d| d != &dir);
+    cfg.save(&state.config_path).map_err(ui_err)?;
+    *state.config.lock().map_err(ui_err)? = cfg.clone();
+
+    // Forget what came from it: the folder's loose PDFs, and any archives
+    // that lived there.
+    if let Some(db) = cfg.index_path() {
+        if let Ok(mut index) = Index::open(&db) {
+            let _ = index.forget_book(&museion_core::indexer::folder_book_id(&dir));
+            if let Ok(rd) = std::fs::read_dir(&dir) {
+                for e in rd.flatten() {
+                    if let Some(b) = e.file_name().to_string_lossy().strip_suffix(".zim") {
+                        let _ = index.forget_book(b);
+                    }
+                }
+            }
+        }
+    }
+    state.forget_stats();
+
+    if state.supervisor.is_running(Role::Kiwix) {
+        if let Some(exe) = &cfg.kiwix_exe {
+            state.supervisor.stop(Role::Kiwix);
+            state
+                .supervisor
+                .start_kiwix(exe, &cfg.content_dirs(), cfg.kiwix_port)
+                .map_err(ui_err)?;
+        }
+    }
+    Ok("Folder removed.".into())
+}
+
+/// Open a file with whatever the system uses for it. For PDFs found in a
+/// folder, which the content server cannot serve.
+#[tauri::command]
+fn open_path(app: tauri::AppHandle, path: String) -> UiResult<()> {
+    use tauri_plugin_shell::ShellExt;
+    // The shell plugin's open() is deprecated in favour of a separate opener
+    // plugin. It still works, and it is already bundled and permitted; one
+    // call does not justify another plugin, another permission, and another
+    // dependency to pin.
+    #[allow(deprecated)]
+    app.shell().open(path, None).map_err(ui_err)
 }
 
 #[tauri::command]
@@ -896,6 +990,9 @@ pub fn run() {
             fetch_bundle,
             list_content,
             fetch_source,
+            add_content_dir,
+            remove_content_dir,
+            open_path,
             kiwix_url,
         ])
         .build(tauri::generate_context!())

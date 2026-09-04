@@ -11,12 +11,17 @@ finishes it gets out of the way — Ask, Browse and Library are what you see fro
 rest of this page is the same thing by hand, which is also how you'd prepare a drive on
 one machine to carry to another.
 
-**Adding more later:** the **Catalogue** on the same tab lists every archive Museion knows
-how to fetch, by category, with its size, what it is, which bundles include it, and
-whether you already have it. Press **Fetch** on any item. It is verified against its
-publisher's checksum, the content server is restarted to serve it, and it is indexed —
-so it is askable the moment the progress bar finishes. The same list from the command
-line is `node scripts/fetch.js --list`.
+**Adding more later:** the **Library** tab has two shelves. *In your library* is what you
+have — click anything to read it. *Available to fetch* is everything else in the
+catalogue, by category with sizes — click to fetch. Each is verified against its
+publisher's checksum, the content server is restarted to serve it, and it is indexed, so
+it is askable the moment the progress bar finishes. The same list from the command line
+is `node scripts/fetch.js --list`.
+
+**Content that isn't in the catalogue:** under **Settings → Other content folders**, add
+any folder. `.zim` archives in it are served and searched like catalogue ones; loose PDFs
+are indexed by page, cited like everything else, and open in your system's PDF viewer.
+The catalogue is a starting point, not a boundary.
 
 Budget: about ten minutes of your attention and, on a normal connection, half an hour of
 downloading for the Go Bag plus a 4B model, or a few hours if you take the 35B MoE.

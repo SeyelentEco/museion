@@ -15,8 +15,8 @@
         </div>
         <nav>
           <button class="tab" data-tab="ask" aria-current="true">Ask</button>
-          <button class="tab" data-tab="browse">Browse</button>
-          <button class="tab" data-tab="setup">Library</button>
+          <button class="tab" data-tab="library">Library</button>
+          <button class="tab" data-tab="setup">Settings</button>
         </nav>
         <div id="service-state" class="service-state" title="Local services">
           <span class="dot" data-svc="kiwix"></span>
@@ -56,37 +56,37 @@
           </form>
         </section>
 
-        <!-- Browse -->
-        <section id="panel-browse" class="panel">
-          <div class="browse-bar" id="browse-bar" hidden>
-            <button id="browse-home" type="button">Library home</button>
-            <span id="browse-where" class="muted"></span>
-          </div>
-          <div id="browse-unavailable" class="empty">
-            <h1>Browse the archives</h1>
-            <p>The content server isn't running yet. Start the services from the Library tab.</p>
-          </div>
-          <iframe id="browse-frame" title="Library" hidden></iframe>
-        </section>
-
-        <!-- Library -->
-        <section id="panel-setup" class="panel">
-          <div class="setup">
-            <h1>Library</h1>
-
-            <div class="card" id="card-catalogue">
-              <h2>Catalogue</h2>
-              <p class="muted">
-                Everything Museion knows how to fetch, and what you already have. Each item is
-                verified against its publisher's checksum, and becomes askable as soon as it
-                lands.
-              </p>
-              <div id="catalogue" class="catalogue"><p class="muted">Loading…</p></div>
+        <!-- Library: what you have, what you could have, and the reader -->
+        <section id="panel-library" class="panel">
+          <div class="library">
+            <aside class="shelf">
+              <h2>In your library</h2>
+              <div id="shelf-have"><p class="empty-note">Loading…</p></div>
+              <h2>Available to fetch</h2>
+              <div id="shelf-get"></div>
               <div class="progress" id="cat-progress" hidden>
                 <div class="bar"><div class="fill" id="cat-fill"></div></div>
                 <div class="label" id="cat-label"></div>
               </div>
+            </aside>
+            <div class="reader">
+              <div class="browse-bar" id="browse-bar" hidden>
+                <button id="browse-home" type="button">Library home</button>
+                <span id="browse-where" class="muted"></span>
+              </div>
+              <div id="browse-unavailable" class="empty">
+                <h1>Read the archives</h1>
+                <p>The content server isn't running yet. Start the services from Settings.</p>
+              </div>
+              <iframe id="browse-frame" title="Library" hidden></iframe>
             </div>
+          </div>
+        </section>
+
+        <!-- Settings -->
+        <section id="panel-setup" class="panel">
+          <div class="setup">
+            <h1>Settings</h1>
 
             <div class="card" id="card-hardware">
               <h2>This machine</h2>
@@ -104,6 +104,20 @@
                 Museion has no default location: content runs from under a gigabyte to well over
                 250&nbsp;GB, so where it lives is your choice.
               </p>
+            </div>
+
+            <div class="card folders">
+              <h2>Other content folders</h2>
+              <p class="muted">
+                Found something that isn't in the catalogue? Add the folder it's in. Archives
+                (<code>.zim</code>) in it are served and searched like everything else; PDFs in
+                it are indexed by page and cited like the rest. The catalogue is a starting
+                point, not a boundary.
+              </p>
+              <div id="extra-dirs"></div>
+              <div class="actions">
+                <button id="add-dir" type="button">Add folder…</button>
+              </div>
             </div>
 
             <div class="card">

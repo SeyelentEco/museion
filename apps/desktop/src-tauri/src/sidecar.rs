@@ -96,16 +96,21 @@ impl Supervisor {
             .map(|s| s.port)
     }
 
-    /// Start kiwix-serve over every archive in the library.
-    pub fn start_kiwix(&self, exe: &Path, library: &Path, port: u16) -> Result<()> {
+    /// Start kiwix-serve over every archive in the given folders.
+    pub fn start_kiwix(&self, exe: &Path, dirs: &[PathBuf], port: u16) -> Result<()> {
         if self.is_running(Role::Kiwix) {
             return Ok(());
         }
-        let zims = list_zims(library)?;
+        let mut zims = Vec::new();
+        for d in dirs {
+            if let Ok(found) = list_zims(d) {
+                zims.extend(found);
+            }
+        }
         if zims.is_empty() {
             bail!(
                 "no .zim archives in {}. Fetch some content first.",
-                library.display()
+                dirs.iter().map(|d| d.display().to_string()).collect::<Vec<_>>().join(", ")
             );
         }
         let mut cmd = Command::new(exe);
