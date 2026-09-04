@@ -2,11 +2,14 @@
 
 Everything below needs internet. Once it is done, nothing does. Do it *before* you need it.
 
-**The short way:** install the app, open the Library tab, choose three folders (library,
-models, helper programs), pick a bundle, and press **Fetch everything**. It does steps 2–6
-below for you, shows what it will download and how large it is before it starts, and
-resumes if interrupted. The rest of this page is the same thing by hand, which is also
-how you'd prepare a drive on one machine to carry to another.
+**The short way:** install the app and open it. On a machine that isn't set up it shows
+only a welcome screen: choose three folders (library, models, helper programs), pick a
+bundle, and press **Set up this machine**. It does steps 2–6 below for you, shows what it
+will download and how large it is before it starts, and resumes if interrupted. When it
+finishes it gets out of the way — Ask, Browse and Library are what you see from then on.
+(*Run first-time set-up again* on the Library tab brings it back for a new machine.) The
+rest of this page is the same thing by hand, which is also how you'd prepare a drive on
+one machine to carry to another.
 
 **Adding more later:** the **Catalogue** on the same tab lists every archive Museion knows
 how to fetch, by category, with its size, what it is, which bundles include it, and

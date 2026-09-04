@@ -84,12 +84,13 @@ unverified*. Asked what caused the Bronze Age collapse, it answers from general
 knowledge under that last label; asked anything medical or safety-critical the library
 doesn't hold, it says so and stops. See [docs/retrieval.md](docs/retrieval.md).
 
-The Library tab has a first-run flow: it detects your hardware, shows exactly what it
-would fetch and how large each piece is — helper programs, the reranker, the chat model
-for your tier, the content bundle you pick — then downloads it all (resumable, verified),
-starts the services, builds the index, and fits the model to your GPU. The catalogue is
-compiled into the app, so an installed copy knows where everything comes from without
-the repo. Everything the flow does, `museion` does from the command line too.
+On a machine that isn't set up, the app opens to a welcome screen and nothing else: it
+detects your hardware, shows exactly what it would fetch and how large each piece is —
+helper programs, the reranker, the chat model for your tier, the content bundle you pick
+— then downloads it all (resumable, verified), fits the model to your GPU, starts the
+services and builds the index. Then it gets out of the way. The catalogue is compiled
+into the app, so an installed copy knows where everything comes from without the repo.
+Everything the flow does, `museion` does from the command line too.
 
 ---
 

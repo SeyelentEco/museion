@@ -78,6 +78,22 @@ function showTab(name: string) {
     void refreshSetup();
     void refreshCatalogue();
   }
+  if (name === 'welcome') void loadPlan();
+}
+
+/**
+ * First-run set-up is its own screen, shown when there is nothing else to
+ * show. Once the machine is set up it goes away; a link on the Library tab
+ * brings it back for a new machine or a fresh start.
+ */
+function showWelcome() {
+  $('header nav').setAttribute('hidden', '');
+  showTab('welcome');
+}
+
+function leaveWelcome(to: string) {
+  $('header nav').removeAttribute('hidden');
+  showTab(to);
 }
 
 document.querySelectorAll('.tab').forEach((t) =>
@@ -786,6 +802,8 @@ $('#wiz-go').addEventListener('click', async () => {
     statusMsg('Set-up complete.');
     await refreshSetup();
     await refreshServiceDots();
+    // Done: the set-up screen has served its purpose.
+    setTimeout(() => leaveWelcome('ask'), 1200);
   } catch (e) {
     showProgress(`Stopped: ${String(e)}`, null);
     statusMsg(String(e), true);
@@ -878,9 +896,13 @@ async function autostartServices() {
 async function boot() {
   await refreshServiceDots();
   const st = await invoke<Status>('get_status');
-  // Send someone straight to the Library tab when there is nothing to ask yet,
-  // rather than showing an ask box that cannot answer.
-  showTab(st.configured ? 'ask' : 'setup');
+  // A machine that is not set up gets the set-up screen and nothing else;
+  // an ask box that cannot answer is not a welcome.
+  if (st.configured) {
+    showTab('ask');
+  } else {
+    showWelcome();
+  }
   setInterval(refreshServiceDots, 6000);
 
   const cfg = await invoke<Config>('get_config').catch(() => null);
@@ -888,6 +910,15 @@ async function boot() {
     void autostartServices();
   }
 }
+
+$('#rerun-setup').addEventListener('click', (e) => {
+  e.preventDefault();
+  showWelcome();
+});
+$('#welcome-skip').addEventListener('click', (e) => {
+  e.preventDefault();
+  leaveWelcome('setup');
+});
 
 $('#autostart').addEventListener('change', async () => {
   const current = await invoke<Config>('get_config');
