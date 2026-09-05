@@ -462,6 +462,14 @@ async function refreshBrowse() {
   }
 }
 
+// The reader's own history: a PDF opened from an archive's list goes back
+// to the list. The frame is another origin, so its address cannot be read
+// to relabel the bar; the label is cleared rather than left wrong.
+$('#browse-back').addEventListener('click', () => {
+  history.back();
+  $('#browse-where').textContent = '';
+});
+
 $('#browse-home').addEventListener('click', async () => {
   $<HTMLIFrameElement>('#browse-frame').src = await invoke<string>('kiwix_url');
   $('#browse-where').textContent = '';
