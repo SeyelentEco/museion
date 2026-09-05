@@ -890,8 +890,14 @@ function renderEvalSummary() {
     }
     return t;
   };
-  grid.append(table('Capability', A.by_capability, B?.by_capability, CAP_NAMES));
-  grid.append(table('Horizon', A.by_horizon, B?.by_horizon, HORIZON_NAMES));
+  for (const t of [
+    table('Capability', A.by_capability, B?.by_capability, CAP_NAMES),
+    table('Horizon', A.by_horizon, B?.by_horizon, HORIZON_NAMES),
+  ]) {
+    const w = el('div', 'tablewrap');
+    w.append(t);
+    grid.append(w);
+  }
   box.append(grid);
 
   // Every case, with the comparison column; click a row for the answer.
@@ -930,7 +936,11 @@ function renderEvalSummary() {
     r.addEventListener('click', () => showEvalCase(c, B?.cases.find((x) => x.id === c.id)));
     t.append(r);
   }
-  box.append(t);
+  // The case table is the wide one; it scrolls inside its own box rather
+  // than dragging the whole page sideways.
+  const wrap = el('div', 'tablewrap');
+  wrap.append(t);
+  box.append(wrap);
 }
 
 function showEvalCase(c: CaseResult, other?: CaseResult) {

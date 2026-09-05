@@ -471,8 +471,14 @@ select {
 .item button { padding: 0.3rem 0.7rem; font-size: 0.88rem; }
 .item.busy { opacity: 0.7; }
 
-/* Evals */
+/* Evals: full width, and nothing ever scrolls the page sideways -- a wide
+   table scrolls inside its own box instead. */
+.setup { overflow-x: hidden; }
+.setup.evals { max-width: none; }
+.evals .card { min-width: 0; }
+.evals .tablewrap { overflow-x: auto; max-width: 100%; }
 .evals table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-top: 0.5rem; }
+.evals td { overflow-wrap: anywhere; }
 .evals th, .evals td { text-align: left; padding: 0.35rem 0.5rem; border-top: 1px solid var(--line-soft, var(--line)); vertical-align: top; }
 .evals th { color: var(--ink-mute); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; border-top: none; }
 .evals td.num { font-family: var(--mono); white-space: nowrap; }
@@ -484,7 +490,8 @@ select {
 .evals tr.case:hover td { background: var(--surface-2); }
 .evals .headline { font-size: 1.4rem; font-weight: 600; margin: 0.4rem 0 0.2rem; }
 .evals .sub { color: var(--ink-mute); font-size: 0.85rem; margin-bottom: 0.6rem; }
-.evals .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.evals .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr)); gap: 1rem; min-width: 0; }
+.evals .grid > * { min-width: 0; }
 .evals .check { font-family: var(--mono); font-size: 0.82rem; margin: 0.15rem 0; }
 .evals .answer-box { white-space: pre-wrap; background: var(--surface-2); border-radius: 7px; padding: 0.7rem 0.85rem; font-size: 0.9rem; max-height: 22rem; overflow: auto; margin-top: 0.5rem; }
 .evals ul.plain { margin: 0.3rem 0; padding-left: 1.2rem; font-size: 0.85rem; color: var(--ink-mid); }
