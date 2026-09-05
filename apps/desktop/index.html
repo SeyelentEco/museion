@@ -19,10 +19,10 @@
           <button class="tab" data-tab="evals">Evals</button>
           <button class="tab" data-tab="setup">Settings</button>
         </nav>
-        <div id="service-state" class="service-state" title="Local services">
-          <span class="dot" data-svc="kiwix"></span>
-          <span class="dot" data-svc="chat"></span>
-          <span class="dot" data-svc="rerank"></span>
+        <div id="service-state" class="service-state" title="Local services — green running, amber starting, grey stopped">
+          <span class="dot" data-svc="kiwix" title="Content server (kiwix-serve): stopped"></span>
+          <span class="dot" data-svc="chat" title="Chat model (llama-server): stopped"></span>
+          <span class="dot" data-svc="rerank" title="Reranker (llama-server): stopped"></span>
         </div>
       </header>
 
@@ -97,8 +97,16 @@
 
             <div class="card">
               <h2>Run the benchmark</h2>
+              <div class="field">
+                <label for="eval-model">Chat model to test</label>
+                <span class="what">Your configured model, or any other <code>.gguf</code>. A different model is fitted to the GPU, swapped in for the run, and your configured model put back afterwards.</span>
+                <div class="row">
+                  <select id="eval-model" aria-label="Chat model"></select>
+                  <button id="eval-pick-model" type="button">Choose…</button>
+                </div>
+              </div>
               <div class="row">
-                <input id="eval-label" type="text" placeholder="Label for this run (e.g. the model and settings)" />
+                <input id="eval-label" type="text" placeholder="Label for this run (defaults to the model's name)" />
                 <select id="eval-only" aria-label="Subset">
                   <option value="">All cases</option>
                   <optgroup label="Capability">

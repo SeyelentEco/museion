@@ -794,6 +794,44 @@ const HORIZON_NAMES: Record<string, string> = {
 let evalRuns: EvalRun[] = [];
 let evalRunning = false;
 
+interface ModelFile {
+  path: string;
+  name: string;
+  size_bytes: number;
+  current: boolean;
+}
+
+/** Fill the model picker: the models folder's GGUFs, current one first. */
+async function refreshEvalModels(extra?: string) {
+  const sel = $<HTMLSelectElement>('#eval-model');
+  const keep = extra ?? sel.value;
+  let models: ModelFile[] = [];
+  try {
+    models = await invoke<ModelFile[]>('list_models');
+  } catch {
+    /* no models folder yet */
+  }
+  sel.textContent = '';
+  for (const m of models) {
+    const o = document.createElement('option');
+    o.value = m.path;
+    o.textContent = `${m.name} (${gb(m.size_bytes)})${m.current ? ' — configured' : ''}`;
+    sel.append(o);
+  }
+  if (extra && !models.some((m) => m.path === extra)) {
+    const o = document.createElement('option');
+    o.value = extra;
+    o.textContent = extra.replace(/^.*[\\/]/, '');
+    sel.append(o);
+  }
+  if (keep && [...sel.options].some((o) => o.value === keep)) sel.value = keep;
+}
+
+$('#eval-pick-model').addEventListener('click', async () => {
+  const chosen = await open({ directory: false, multiple: false, title: 'Choose a chat model (.gguf)' });
+  if (typeof chosen === 'string') await refreshEvalModels(chosen);
+});
+
 function runName(r: EvalRun) {
   const d = new Date(Number(r.id) * 1000);
   const when = isNaN(d.getTime()) ? r.id : d.toLocaleString();
@@ -801,6 +839,7 @@ function runName(r: EvalRun) {
 }
 
 async function refreshEvals() {
+  void refreshEvalModels();
   try {
     evalRuns = await invoke<EvalRun[]>('list_eval_runs');
   } catch (e) {
@@ -1000,10 +1039,16 @@ $('#eval-run').addEventListener('click', async () => {
   prog.hidden = false;
   $('#eval-status').textContent = 'Starting…';
   $<HTMLElement>('#eval-fill').style.width = '0%';
+  // Model swaps narrate through the same channel the services use.
+  const offProgress = await listen<string>('service-progress', (e) => {
+    $('#eval-status').textContent = e.payload;
+  });
   try {
-    const label = $<HTMLInputElement>('#eval-label').value.trim();
+    const model = $<HTMLSelectElement>('#eval-model').value;
+    const modelName = model.replace(/^.*[\\/]/, '').replace(/\.gguf$/i, '');
+    const label = $<HTMLInputElement>('#eval-label').value.trim() || modelName;
     const only = $<HTMLSelectElement>('#eval-only').value;
-    const run = await invoke<EvalRun>('run_evals', { label, only });
+    const run = await invoke<EvalRun>('run_evals', { label, only, model });
     $('#eval-status').textContent = `Done: ${run.passed}/${run.total} passed in ${Math.round(run.seconds)}s.`;
     $<HTMLElement>('#eval-fill').style.width = '100%';
     await refreshEvals();
@@ -1012,8 +1057,10 @@ $('#eval-run').addEventListener('click', async () => {
   } catch (e) {
     $('#eval-status').textContent = `Stopped: ${String(e)}`;
   } finally {
+    offProgress();
     evalRunning = false;
     btn.removeAttribute('disabled');
+    await refreshServiceDots();
   }
 });
 
@@ -1253,11 +1300,19 @@ $('#fit-model').addEventListener('click', async () => {
 
 /* ------------------------------------------------------------------ status */
 
+const DOT_NAMES: Record<string, string> = {
+  kiwix: 'Content server (kiwix-serve)',
+  chat: 'Chat model (llama-server)',
+  rerank: 'Reranker (llama-server)',
+};
+
 function setDot(svc: string, state: 'on' | 'off' | 'busy') {
-  const d = document.querySelector(`.dot[data-svc="${svc}"]`);
+  const d = document.querySelector(`.dot[data-svc="${svc}"]`) as HTMLElement | null;
   if (!d) return;
   d.classList.toggle('on', state === 'on');
   d.classList.toggle('busy', state === 'busy');
+  const word = state === 'on' ? 'running' : state === 'busy' ? 'starting' : 'stopped';
+  d.title = `${DOT_NAMES[svc] ?? svc}: ${word}`;
 }
 
 async function refreshServiceDots() {

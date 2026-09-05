@@ -263,21 +263,24 @@ async fn start_services(app: tauri::AppHandle, state: State<'_, AppState>) -> Ui
 
     let model = cfg.chat_model.clone().ok_or("no chat model configured")?;
     say("Loading the chat model — this can take a few minutes…");
-    let mut args = cfg.chat_args.clone();
+    start_chat(&state, &cfg, &model, &cfg.chat_args, cfg.chat_gpu_layers)?;
+
+    say("Ready.");
+    Ok(())
+}
+
+/// Start the chat model with Museion's non-negotiable flags on top of the
+/// given ones, and wait for it.
+fn start_chat(state: &AppState, cfg: &Config, model: &std::path::Path, extra: &[String], gpu_layers: u32) -> UiResult<()> {
+    let llama_exe = cfg.llama_exe.clone().ok_or("llama-server path not configured")?;
+    let mut args = extra.to_vec();
     for a in ["--flash-attn", "on", "--jinja", "--parallel", "1",
               "--cache-type-k", "q8_0", "--cache-type-v", "q8_0"] {
         args.push(a.to_string());
     }
     state
         .supervisor
-        .start_llama(
-            Role::Chat,
-            &llama_exe,
-            &model,
-            cfg.chat_port,
-            cfg.chat_gpu_layers,
-            &args,
-        )
+        .start_llama(Role::Chat, &llama_exe, model, cfg.chat_port, gpu_layers, &args)
         .map_err(ui_err)?;
     state
         .supervisor
@@ -286,10 +289,91 @@ async fn start_services(app: tauri::AppHandle, state: State<'_, AppState>) -> Ui
             &format!("http://127.0.0.1:{}/v1/models", cfg.chat_port),
             Duration::from_secs(600),
         )
-        .map_err(ui_err)?;
+        .map_err(ui_err)
+}
 
-    say("Ready.");
-    Ok(())
+/// Swap the running chat model for another -- fitted to the GPU first --
+/// for the duration of a benchmark. Returns what to restore afterwards.
+fn swap_chat_model(app: &tauri::AppHandle, state: &AppState, cfg: &Config, candidate: &std::path::Path) -> UiResult<()> {
+    let say = |m: String| {
+        let _ = app.emit("service-progress", m);
+    };
+    let llama = cfg.llama_exe.clone().ok_or("llama-server path not configured")?;
+    let fit_exe = llama
+        .parent()
+        .map(|d| d.join(if cfg!(windows) { "llama-fit-params.exe" } else { "llama-fit-params" }))
+        .ok_or("cannot locate llama-fit-params")?;
+
+    say(format!("Stopping the current chat model…"));
+    state.supervisor.stop(Role::Chat);
+    std::thread::sleep(Duration::from_secs(2));
+
+    // Fit the candidate the way set-up fits the configured model. A dense
+    // model that fits entirely gets "-ngl all"; a MoE gets its split.
+    say(format!("Fitting {} to this GPU…", file_name(candidate)));
+    let (args, layers) = match museion_core::fit_model(&fit_exe, candidate, 32768) {
+        Ok(fit) => {
+            let mut a: Vec<String> = Vec::new();
+            let mut i = 0;
+            while i < fit.args.len() {
+                if fit.args[i] == "-ngl" || fit.args[i] == "--n-gpu-layers" {
+                    i += 2;
+                    continue;
+                }
+                a.push(fit.args[i].clone());
+                i += 1;
+            }
+            (a, fit.gpu_layers.unwrap_or(999))
+        }
+        Err(e) => {
+            say(format!("Fit failed ({e}); trying with everything on the GPU."));
+            (vec!["--ctx-size".into(), "16384".into()], 999)
+        }
+    };
+
+    say(format!("Loading {}…", file_name(candidate)));
+    start_chat(state, cfg, candidate, &args, layers)
+}
+
+/// GGUF files a benchmark could be run against: the models folder, wherever
+/// the configured chat model lives, and anything already chosen.
+#[derive(Serialize)]
+pub struct ModelFile {
+    path: String,
+    name: String,
+    size_bytes: u64,
+    current: bool,
+}
+
+#[tauri::command]
+async fn list_models(state: State<'_, AppState>) -> UiResult<Vec<ModelFile>> {
+    let cfg = state.config.lock().map_err(ui_err)?.clone();
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    if let Some(d) = &cfg.models_dir {
+        dirs.push(d.clone());
+    }
+    if let Some(p) = cfg.chat_model.as_ref().and_then(|p| p.parent()) {
+        if !dirs.contains(&p.to_path_buf()) {
+            dirs.push(p.to_path_buf());
+        }
+    }
+    let current = cfg.chat_model.clone();
+    let reranker = cfg.reranker_model.clone();
+    let mut out: Vec<ModelFile> = Vec::new();
+    for d in dirs {
+        let Ok(rd) = std::fs::read_dir(&d) else { continue };
+        for e in rd.flatten() {
+            let p = e.path();
+            let name = e.file_name().to_string_lossy().to_string();
+            if !name.to_lowercase().ends_with(".gguf") || reranker.as_ref() == Some(&p) || name.to_lowercase().contains("rerank") {
+                continue;
+            }
+            let size = e.metadata().map(|m| m.len()).unwrap_or(0);
+            out.push(ModelFile { path: p.display().to_string(), name, size_bytes: size, current: current.as_ref() == Some(&p) });
+        }
+    }
+    out.sort_by(|a, b| b.current.cmp(&a.current).then(a.name.cmp(&b.name)));
+    Ok(out)
 }
 
 #[tauri::command]
@@ -1052,11 +1136,49 @@ struct EvalProgress {
     passed: Option<bool>,
 }
 
-/// Run the benchmark against the running services; save and return the run.
+/// Run the benchmark; save and return the run.
+///
+/// With `model` set to a GGUF other than the configured chat model, that
+/// model is swapped in for the run -- fitted to the GPU first -- and the
+/// configured one restored afterwards, so the same set can be put to a second
+/// model and the two runs compared.
 #[tauri::command]
-async fn run_evals(app: tauri::AppHandle, state: State<'_, AppState>, label: String, only: Option<String>) -> UiResult<museion_core::evals::Run> {
+async fn run_evals(app: tauri::AppHandle, state: State<'_, AppState>, label: String, only: Option<String>, model: Option<String>) -> UiResult<museion_core::evals::Run> {
+    let cfg0 = state.config.lock().map_err(ui_err)?.clone();
+    let candidate = model
+        .map(PathBuf::from)
+        .filter(|p| !p.as_os_str().is_empty() && cfg0.chat_model.as_ref() != Some(p));
+    let swapped = if let Some(c) = &candidate {
+        if !c.exists() {
+            return Err(format!("{} does not exist", c.display()));
+        }
+        swap_chat_model(&app, &state, &cfg0, c)?;
+        true
+    } else {
+        false
+    };
+
+    let result = run_evals_inner(&app, &state, label, only).await;
+
+    if swapped {
+        // Put the configured model back whatever happened.
+        let _ = app.emit("service-progress", "Restoring the configured chat model…".to_string());
+        state.supervisor.stop(Role::Chat);
+        std::thread::sleep(Duration::from_secs(2));
+        if let Some(m) = &cfg0.chat_model {
+            if let Err(e) = start_chat(&state, &cfg0, m, &cfg0.chat_args, cfg0.chat_gpu_layers) {
+                let _ = app.emit("service-progress", format!("Could not restore the chat model: {e}"));
+            } else {
+                let _ = app.emit("service-progress", "Ready.".to_string());
+            }
+        }
+    }
+    result
+}
+
+async fn run_evals_inner(app: &tauri::AppHandle, state: &AppState, label: String, only: Option<String>) -> UiResult<museion_core::evals::Run> {
     use museion_core::evals::{self, Progress};
-    let (cfg, index, chat, reranker, use_rerank, kiwix, kiwix_up, native_books) = build_asker_parts(&state)?;
+    let (cfg, index, chat, reranker, use_rerank, kiwix, kiwix_up, native_books) = build_asker_parts(state)?;
     let mut cases = evals::load_cases(evals::BUILTIN).map_err(ui_err)?;
     if let Some(o) = only.filter(|o| !o.is_empty()) {
         cases.retain(|c| c.capability == o || c.horizon == o || c.id == o);
@@ -1152,6 +1274,7 @@ pub fn run() {
             run_evals,
             list_eval_runs,
             eval_cases,
+            list_models,
             kiwix_url,
         ])
         .build(tauri::generate_context!())

@@ -102,6 +102,7 @@ nav { display: flex; gap: 0.25rem; margin-left: 0.5rem; }
   width: 8px; height: 8px; border-radius: 50%;
   background: var(--line);
   transition: background 0.2s;
+  cursor: help;
 }
 .dot.on { background: var(--good); }
 .dot.busy { background: var(--accent); }

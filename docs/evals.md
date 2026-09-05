@@ -12,6 +12,14 @@ museion eval --db ... --only month            # a horizon
 museion eval --db ... --only bleach-drum      # one case
 ```
 
+**Comparing models.** The Evals tab has a *Chat model to test* picker: every `.gguf` in
+your models folder, or any other file via *Choose…*. Picking one that isn't the configured
+model swaps it in for the run — it is stopped, the candidate is fitted to the GPU with
+`llama-fit-params`, loaded, benchmarked — and the configured model is put back when the
+run ends, whatever happened. The run records the model's id, so two runs with two models
+compare directly in the table. From the command line, point `llama-server` at the other
+model yourself and run `museion eval --label "…"`.
+
 Each run is saved under `<library>/evals/run-<timestamp>.json` with the model id, whether
 the reranker was present, every case's answer, sources, calculations, timing, and the
 verdict of every check. The Evals tab lists runs, shows pass rates by capability and by
