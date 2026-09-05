@@ -58,13 +58,16 @@ system already reports rather than judging prose:
 
 - `expect_any` / `expect_all` — terms in the answer or its cited sources.
 - `expect_basis` — the basis label: `library`, `library_and_calculation`, `computed`,
-  or `general_knowledge`. Judged from which tools actually ran, so a model cannot pass a
-  refusal case by *claiming* a source.
+  or `general_knowledge`. Judged from which sources the answer actually cites and which
+  tools actually ran, so a model cannot pass a refusal case by *claiming* a source, and
+  a pure calculation is not labelled *from your library* because the search happened to
+  turn something up.
 - `expect_number` — a value with tolerance, looked for in the **calculator's log first**
   and the prose second. The bleach-drum case also declares `must_not_contain: ["343"]`,
   because a model once produced that figure by relabelling a correct result and
   multiplying again; it is the failure this whole design exists to catch.
-- `min_sources`, `min_steps`, `source_from` — for planning and retrieval cases.
+- `min_sources`, `min_steps`, `source_from` — for planning and retrieval cases. Sources
+  are the ones the answer cites, not everything retrieval returned.
 
 A failed check records why: *"none of [bowline, loop] found"*, *"wanted
 library_and_calculation, got computed"*, *"3 steps, wanted at least 4"*.

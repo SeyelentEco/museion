@@ -287,6 +287,23 @@ Hypatia now has two tools and decides per question:
 
 Pure arithmetic never reaches the model at all: "what is 12 x 12" is evaluated directly.
 
+**The basis label follows what the answer cites.** Once the library was searched on every
+question, "did retrieval find something" stopped meaning anything — a question about
+rationing 20 litres pulled up water passages the model never used, and the answer was
+labelled *from your library*. Now only the sources the answer actually cites are kept, in
+citation order and renumbered to match, and the label is judged from those. A passage the
+model was handed and ignored grounds nothing.
+
+That stricter label exposed the opposite failure at once: a hypothermia answer taken almost
+word for word from *Where There Is No Doctor* p.455 -- "kangarooing" and all -- with no
+citation anywhere, now labelled general knowledge. So an answer that cites nothing while
+passages are on the table gets one repair turn, tools withheld: cite each claim's passage,
+or repeat the answer unchanged if none of it came from them. The same turn catches a
+model that hands back a tool call as text when its searches have run out (a planning
+question once did exactly that, and the raw `<tool_call>` block was the answer). The
+round limit went from 4 to 6 for the same reason: a 72-hour plan legitimately wants
+water, food, sanitation, warmth and light looked up separately.
+
 **The basis label is decided by which tools ran, not by what the model says.** Every
 answer carries one of: *from your library*, *from your library, with calculation*,
 *computed*, or *general knowledge — not from your library, unverified*. The last is the

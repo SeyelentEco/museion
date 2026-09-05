@@ -921,7 +921,9 @@ function renderEvalSummary() {
         if (o) {
           const d = p - o[1];
           c4.textContent = d === 0 ? '=' : d > 0 ? `+${d}` : `${d}`;
-          c4.classList.add(d > 0 ? 'better' : d < 0 ? 'worse' : '');
+          // classList.add('') throws, and took the whole case table with it
+          // whenever a delta was exactly zero.
+          if (d !== 0) c4.classList.add(d > 0 ? 'better' : 'worse');
         }
         r.append(c3, c4);
       }

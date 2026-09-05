@@ -30,6 +30,10 @@ impl Message {
     pub fn user(c: impl Into<String>) -> Self {
         Self { role: "user".into(), content: c.into(), tool_calls: None, tool_call_id: None }
     }
+    /// A plain assistant turn, replayed before a follow-up instruction.
+    pub fn assistant(c: impl Into<String>) -> Self {
+        Self { role: "assistant".into(), content: c.into(), tool_calls: None, tool_call_id: None }
+    }
     /// The assistant turn that asked for tools, replayed so the model sees
     /// its own request before the results.
     pub fn assistant_calls(content: String, calls: Vec<ToolCall>) -> Self {

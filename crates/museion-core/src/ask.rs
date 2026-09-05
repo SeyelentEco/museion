@@ -33,7 +33,23 @@ const RERANK_CHARS: usize = 1200;
 const CONTEXT_CHARS: usize = 2400;
 
 /// Tool rounds before the model must answer with what it has.
-const MAX_ROUNDS: usize = 4;
+const MAX_ROUNDS: usize = 6;
+
+/// Said to the model when the searches run out, and again if it hands back
+/// a tool call as text anyway. Without it a planning question that wanted a
+/// seventh search produced a bare `<tool_call>` block as its answer.
+const NO_MORE_TOOLS: &str = "No more searches or calculations are available. \
+Answer now from the passages already found, citing each by its number.";
+
+/// Said once to an answer that cites nothing while passages were on the
+/// table. A hypothermia answer once came word for word from Where There Is
+/// No Doctor -- kangarooing and all -- with no [n] anywhere, and was labelled
+/// general knowledge. The model is asked to point at its sources, and told
+/// plainly that an answer that owes them nothing may stand as it is.
+const CITE_OR_STAND: &str = "Your answer cites no passages. Every claim taken \
+from the passages above must carry that passage's number, like [2]. Rewrite \
+the answer with those citations, and if you cite anything do not say the library \
+has nothing on this. If no part of it comes from the passages, repeat it unchanged.";
 
 pub struct Asker<'a> {
     pub index: &'a Index,
@@ -339,9 +355,16 @@ impl<'a> Asker<'a> {
             messages.push(Message::tool_result("seed_search", result));
         }
 
-        for round in 0..=MAX_ROUNDS {
+        let mut repaired = false;
+        let mut round = 0;
+        loop {
             // On the last round the tools are withheld so the model must answer.
-            let offered = if round < MAX_ROUNDS { Some(tools.as_slice()) } else { None };
+            let last = round >= MAX_ROUNDS;
+            if round == MAX_ROUNDS {
+                messages.push(Message::user(NO_MORE_TOOLS));
+            }
+            let offered = if last { None } else { Some(tools.as_slice()) };
+            round += 1;
             let turn = self
                 .chat
                 .turn(&messages, offered, 900, |t| on_token(Token::Text(t)))
@@ -355,14 +378,36 @@ impl<'a> Asker<'a> {
 
             if turn.tool_calls.is_empty() {
                 let calculated = !calculations.is_empty();
-                // Searched is always true now; what matters is whether it found anything.
-                let basis = match (!sources.is_empty(), calculated) {
+                // The library is always searched now, so "did retrieval find
+                // something" no longer says anything about the answer. What
+                // does is whether the answer *cites* it: a passage the model
+                // was handed and ignored did not ground anything. Only cited
+                // sources are kept, in citation order, and the label follows.
+                let cited = cited_numbers(&turn.text);
+                let leaked = looks_like_leaked_tool_call(&turn.text);
+                if !repaired && (leaked || (cited.is_empty() && !sources.is_empty())) {
+                    // One more turn, tools withheld: cite the passages, or
+                    // answer at all if what came back was a tool call as
+                    // text. What was streamed so far is taken back.
+                    repaired = true;
+                    on_token(Token::Discard);
+                    messages.push(Message::assistant(turn.text.clone()));
+                    messages.push(Message::user(if leaked { NO_MORE_TOOLS } else { CITE_OR_STAND }));
+                    round = MAX_ROUNDS + 1;
+                    continue;
+                }
+                let used: Vec<Hit> = cited
+                    .iter()
+                    .filter_map(|n| sources.get(n - 1).cloned())
+                    .collect();
+                let text = renumber_citations(&turn.text, &cited);
+                let basis = match (!used.is_empty(), calculated) {
                     (true, true) => Basis::LibraryAndCalculation,
                     (true, false) => Basis::Library,
                     (false, true) => Basis::Computed,
                     (false, false) => Basis::GeneralKnowledge,
                 };
-                return Ok(Answer { text: turn.text, sources, reranked, basis, calculations });
+                return Ok(Answer { text, sources: used, reranked, basis, calculations });
             }
 
             // Replay the model's request, then answer each call.
@@ -395,8 +440,6 @@ impl<'a> Asker<'a> {
                 messages.push(Message::tool_result(call.id.clone(), result));
             }
         }
-
-        unreachable!("the final round withholds tools, so it always returns")
     }
 
     /// Format search hits for the model, numbering them continuously across
@@ -434,6 +477,85 @@ impl<'a> Asker<'a> {
         }
         out
     }
+}
+
+/// The source numbers an answer cites, in order of first appearance.
+/// Handles [2], [4][5] and [4, 5].
+fn cited_numbers(text: &str) -> Vec<usize> {
+    let mut out: Vec<usize> = Vec::new();
+    let bytes = text.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'[' {
+            if let Some(end) = text[i..].find(']') {
+                let inner = &text[i + 1..i + end];
+                if !inner.is_empty() && inner.chars().all(|c| c.is_ascii_digit() || c == ',' || c == ' ') {
+                    for tok in inner.split(',') {
+                        if let Ok(n) = tok.trim().parse::<usize>() {
+                            if n > 0 && !out.contains(&n) {
+                                out.push(n);
+                            }
+                        }
+                    }
+                }
+                i += end + 1;
+                continue;
+            }
+        }
+        i += 1;
+    }
+    out
+}
+
+/// A tool call the chat template failed to parse comes back as prose:
+/// `<tool_call>…`, or Qwen's `<function=search_library>` form. It is not an
+/// answer and must not be shown as one.
+fn looks_like_leaked_tool_call(text: &str) -> bool {
+    let t = text.trim_start();
+    t.starts_with("<tool_call>") || t.starts_with("<function=")
+}
+
+/// Rewrite [n] markers so the kept sources number 1..k in citation order.
+/// The reader sees a source list that matches the markers, with no gaps
+/// for passages the model was handed and never used.
+fn renumber_citations(text: &str, cited: &[usize]) -> String {
+    if cited.is_empty() {
+        return text.to_string();
+    }
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(start) = rest.find('[') {
+        out.push_str(&rest[..start]);
+        let after = &rest[start..];
+        match after.find(']') {
+            Some(end) => {
+                let inner = &after[1..end];
+                if !inner.is_empty() && inner.chars().all(|c| c.is_ascii_digit() || c == ',' || c == ' ') {
+                    let mapped: Vec<String> = inner
+                        .split(',')
+                        .filter_map(|t| t.trim().parse::<usize>().ok())
+                        .filter_map(|n| cited.iter().position(|c| *c == n).map(|p| (p + 1).to_string()))
+                        .collect();
+                    if mapped.is_empty() {
+                        out.push_str(&after[..=end]);
+                    } else {
+                        out.push('[');
+                        out.push_str(&mapped.join(", "));
+                        out.push(']');
+                    }
+                } else {
+                    out.push_str(&after[..=end]);
+                }
+                rest = &after[end + 1..];
+            }
+            None => {
+                out.push_str(after);
+                rest = "";
+            }
+        }
+    }
+    out.push_str(rest);
+    out
 }
 
 /// Kept for callers that want the legacy single-shot path.
@@ -487,6 +609,27 @@ mod tests {
         let s = "évacuation immédiate";
         assert_eq!(truncate_chars(s, 5).chars().count(), 5);
         assert_eq!(truncate_chars(s, 500), s);
+    }
+
+    #[test]
+    fn citations_are_read_and_renumbered_in_order_of_use() {
+        let text = "Boil it [3]. Or add bleach [1][5], see also [3, 1].";
+        assert_eq!(cited_numbers(text), vec![3, 1, 5]);
+        assert_eq!(
+            renumber_citations(text, &[3, 1, 5]),
+            "Boil it [1]. Or add bleach [2][3], see also [1, 2]."
+        );
+        // Prose brackets that are not citations are left alone.
+        assert_eq!(cited_numbers("see [note] and [2024]"), vec![2024]);
+    }
+
+    #[test]
+    fn a_tool_call_returned_as_text_is_recognised() {
+        assert!(looks_like_leaked_tool_call(
+            "<tool_call>\n<function=search_library>\n<parameter=query>\nfood safety\n</parameter>\n</function>\n</tool_call>"
+        ));
+        assert!(looks_like_leaked_tool_call("  <function=calculate>"));
+        assert!(!looks_like_leaked_tool_call("Boil the water for one minute [1]."));
     }
 
     #[test]
