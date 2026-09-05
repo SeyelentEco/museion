@@ -10,16 +10,7 @@
     "beforeBuildCommand": "npm run build"
   },
   "app": {
-    "windows": [
-      {
-        "title": "Museion",
-        "width": 1180,
-        "height": 820,
-        "minWidth": 720,
-        "minHeight": 560,
-        "resizable": true
-      }
-    ],
+    "windows": [],
     "security": {
       "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: http://127.0.0.1:*; frame-src http://127.0.0.1:*; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:*"
     }

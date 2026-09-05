@@ -582,6 +582,23 @@ $('#stop-services').addEventListener('click', async () => {
 void listen<string>('service-progress', (e) => statusMsg(e.payload));
 void listen<string>('index-progress', (e) => statusMsg(e.payload));
 
+// A page in the reader asked for a new window -- a PDF in a Kiwix archive,
+// whose links are all target=_blank. The backend refuses the window and hands
+// the URL here; it opens in the reader, where a PDF renders inline.
+void listen<string>('open-in-reader', (e) => {
+  const url = e.payload;
+  $<HTMLIFrameElement>('#browse-frame').src = url;
+  const last = url.split('#')[0].split('/').pop() ?? '';
+  let name = last;
+  try {
+    name = decodeURIComponent(last);
+  } catch {
+    /* leave it encoded */
+  }
+  $('#browse-where').textContent = name;
+  showTab('library');
+});
+
 /* --------------------------------------------------------------- catalogue */
 
 interface ContentItem {

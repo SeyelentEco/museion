@@ -1085,14 +1085,14 @@ async fn remove_content_dir(state: State<'_, AppState>, path: String) -> UiResul
 /// Open a file with whatever the system uses for it. For PDFs found in a
 /// folder, which the content server cannot serve.
 #[tauri::command]
-fn open_path(app: tauri::AppHandle, path: String) -> UiResult<()> {
-    use tauri_plugin_shell::ShellExt;
-    // The shell plugin's open() is deprecated in favour of a separate opener
-    // plugin. It still works, and it is already bundled and permitted; one
-    // call does not justify another plugin, another permission, and another
-    // dependency to pin.
-    #[allow(deprecated)]
-    app.shell().open(path, None).map_err(ui_err)
+fn open_path(path: String) -> UiResult<()> {
+    // Not the shell/opener plugins: both inject a click handler into every
+    // frame that hijacks target=_blank links and sends them over IPC, and
+    // inside the Kiwix reader frame that IPC call is refused by kiwix-serve's
+    // Content Security Policy. The PDF links in every zimit archive are
+    // target=_blank, so the plugin made them dead. New-window requests are
+    // handled where they arrive instead, in the window builder.
+    open::that_detached(&path).map_err(ui_err)
 }
 
 // ------------------------------------------------------------------ evals
@@ -1236,8 +1236,30 @@ fn kiwix_url(state: State<AppState>) -> UiResult<String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_shell::init())
         .setup(|app| {
+            // The window is built here rather than declared in tauri.conf.json
+            // because only the builder can say what happens when a page asks
+            // for a new window. The Kiwix reader frame does that for every
+            // PDF in a zimit archive (target=_blank), and left alone the
+            // request is silently dropped. A local URL is shown in the reader;
+            // any other web link goes to the system browser.
+            let handle = app.handle().clone();
+            tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
+                .title("Museion")
+                .inner_size(1180.0, 820.0)
+                .min_inner_size(720.0, 560.0)
+                .resizable(true)
+                .on_new_window(move |url, _features| {
+                    let local = matches!(url.host_str(), Some("127.0.0.1" | "localhost"));
+                    if local {
+                        let _ = handle.emit("open-in-reader", url.to_string());
+                    } else if matches!(url.scheme(), "http" | "https") {
+                        let _ = open::that_detached(url.as_str());
+                    }
+                    tauri::webview::NewWindowResponse::Deny
+                })
+                .build()?;
+
             let dir = app.path().app_config_dir()?;
             let config_path = dir.join("config.json");
             let config = Config::load(&config_path);
