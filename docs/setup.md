@@ -112,8 +112,16 @@ tier; a 4B model just fits.
 cd apps/desktop && npm install && npx tauri build
 ```
 
-The installer lands in `target/release/bundle/`. Build the app with `tauri build`, not a
-bare `cargo build`: only the Tauri CLI compiles the web UI in. A cargo-built exe opens a
+On Windows the installer is `target/release/bundle/nsis/Museion_<version>_x64-setup.exe`;
+on macOS a `.dmg` under `bundle/dmg/`. Run the Windows installer and Museion is installed
+per user (no administrator prompt), with a Start menu entry and a desktop shortcut, and
+listed under Settings > Apps for uninstalling. It reads the same configuration as the exe
+you ran from `target/release`, so a library and models set up there carry over. For an
+unattended install, `Museion_<version>_x64-setup.exe /S`; add `/NS` to skip the shortcuts.
+The installer expects the WebView2 runtime that Windows 10 and 11 ship with; on a machine
+without it, it downloads the bootstrapper, which needs internet once.
+
+Build the app with `tauri build`, not a bare `cargo build`: only the Tauri CLI compiles the web UI in. A cargo-built exe opens a
 window pointed at the dev server and shows "localhost refused to connect" — and a later
 `cargo build --release --workspace` will quietly overwrite a good exe with that. On first launch the Library tab asks for
 the paths from steps 2 and 4. **Save**, **Start services**, **Build index** (if you skipped
