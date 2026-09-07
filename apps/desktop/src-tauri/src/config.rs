@@ -66,7 +66,12 @@ impl Config {
     pub fn load(path: &Path) -> Self {
         std::fs::read_to_string(path)
             .ok()
-            .and_then(|s| serde_json::from_str::<Config>(&s).ok())
+            // Notepad and PowerShell 5 write a UTF-8 byte-order mark, which
+            // serde_json rejects. A config that fails to parse becomes an
+            // empty one, and an empty one shows the first-run screen as if
+            // the library had never existed; that is not a fair price for
+            // editing the file by hand.
+            .and_then(|s| serde_json::from_str::<Config>(s.trim_start_matches('\u{feff}')).ok())
             .map(|mut c| {
                 // A config written by an older build may be missing ports.
                 if c.kiwix_port == 0 {
