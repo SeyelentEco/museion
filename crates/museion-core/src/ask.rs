@@ -35,6 +35,37 @@ const CONTEXT_CHARS: usize = 2400;
 /// Tool rounds before the model must answer with what it has.
 const MAX_ROUNDS: usize = 6;
 
+/// Tokens a single turn may produce. A tool call needs a few dozen; a full
+/// procedure -- assisting a birth, the first 72 hours -- needs well over a
+/// thousand, and at 900 the delivery answer stopped mid-sentence at "the
+/// placenta will usually come out within 30 minutes after the".
+const ANSWER_TOKENS: u32 = 1500;
+
+/// How many times a cut-off answer is asked to carry on before it is
+/// declared cut short. Two continuations make room for about 4,500 tokens
+/// of answer, which nothing in the benchmark comes near.
+const MAX_CONTINUATIONS: usize = 2;
+
+const CONTINUE: &str = "Your answer was cut off mid-sentence by a length limit. \
+Continue exactly from where it stopped -- do not repeat anything already said, do \
+not start over, do not add a preamble -- and finish the answer.";
+
+/// Earlier exchanges carried into a follow-up question, and how much of
+/// each answer. Enough to know what was being discussed; not so much that
+/// three long procedures crowd out the passages found for this question.
+const MAX_HISTORY: usize = 4;
+const HISTORY_CHARS: usize = 2500;
+
+/// One earlier question and its answer, as the person saw them.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Exchange {
+    pub question: String,
+    pub answer: String,
+}
+
+const CUT_SHORT: &str = "\n\n*(This answer reached its length limit and was cut short. \
+Ask about the remaining steps separately.)*";
+
 /// Said to the model when the searches run out, and again if it hands back
 /// a tool call as text anyway. Without it a planning question that wanted a
 /// seventh search produced a bare `<tool_call>` block as its answer.
@@ -145,7 +176,15 @@ each with its bracketed number, like [2], as you go. Do not add facts from \
 your own knowledge to a library answer, even if confident.
 2. If the library has nothing on a factual question, say so plainly. For \
 medical, drug or dose, chemical, electrical, or other safety-critical topics \
-that is the complete answer: do not improvise. For general questions the \
+that is the complete answer: do not improvise. But before saying the library \
+has nothing, search once more for the plain subject of the question -- the \
+thing itself, without the person's situation or wording. For \"I'm not near \
+a hospital, how do I deliver this baby?\" search \"delivering a baby, stages \
+of labor\". Passages on the subject are coverage even when they say nothing \
+about the person's particular situation; answer from them and say what they \
+do not address. A later question may refer back to an earlier exchange \
+(\"this baby\", \"what about the placenta\"); read it in that light and \
+search for the underlying subject. For general questions the \
 library does not cover -- history, science background, how something works \
 -- you may answer from general knowledge, but begin with the words \
 \"The library has nothing on this, so from general knowledge:\" and keep it \
@@ -306,8 +345,11 @@ impl<'a> Asker<'a> {
         out
     }
 
-    /// Answer the question, streaming to `on_token` as it arrives.
-    pub fn ask(&self, question: &str, mut on_token: impl FnMut(Token)) -> Result<Answer> {
+    /// Answer the question, streaming to `on_token` as it arrives. `history`
+    /// is the conversation so far, oldest first, so that a follow-up like
+    /// "what about the placenta?" or "I'm not near a hospital, how do I
+    /// deliver this baby?" is read against the exchange it follows.
+    pub fn ask(&self, question: &str, history: &[Exchange], mut on_token: impl FnMut(Token)) -> Result<Answer> {
         // Arithmetic never reaches the model. "10*10" is not a library question
         // and a language model is the wrong instrument for it anyway.
         if calc::looks_like_arithmetic(question) {
@@ -325,7 +367,16 @@ impl<'a> Asker<'a> {
         }
 
         let tools = tools();
-        let mut messages = vec![Message::system(SYSTEM), Message::user(question.to_string())];
+        let mut messages = vec![Message::system(SYSTEM)];
+        // Earlier exchanges give a follow-up its subject. Their citation
+        // markers are stripped: those numbers pointed at passages from an
+        // earlier search, and would otherwise be repeated as if they named
+        // the passages found for this question.
+        for x in history.iter().rev().take(MAX_HISTORY).collect::<Vec<_>>().into_iter().rev() {
+            messages.push(Message::user(x.question.clone()));
+            messages.push(Message::assistant(strip_citations(&truncate_chars(&x.answer, HISTORY_CHARS))));
+        }
+        messages.push(Message::user(question.to_string()));
         let mut sources: Vec<Hit> = Vec::new();
         let mut seen: HashSet<(String, usize)> = HashSet::new();
         let mut reranked = false;
@@ -339,18 +390,36 @@ impl<'a> Asker<'a> {
         // Whether to consult the library is not the model's call; only how to
         // use what it finds is. The seeded search is replayed as a tool
         // exchange so the model sees it exactly as it would its own.
+        //
+        // What is searched for is the subject, not the sentence. "My friend
+        // just went into labor, what are the steps I should take to help with
+        // her delivery? I've never done this before" retrieved pages on
+        // comforting a labouring woman and on when to go to a medical centre,
+        // and the answer said the library had nothing on delivering a baby --
+        // while Where There Is No Doctor's "The stages of labor" sat unread.
+        // So the model first names what a reference book would have a chapter
+        // on, and those queries are searched ahead of the question itself.
         {
-            let (hits, rr) = self.gather(question)?;
-            reranked |= rr;
+            let mut queries = self.seed_queries(question, history);
+            queries.push(question.to_string());
+            let mut result = String::new();
+            for q in &queries {
+                let (hits, rr) = self.gather(q)?;
+                reranked |= rr;
+                let rendered = self.render_search(&hits, &mut sources, &mut seen);
+                if !result.is_empty() {
+                    result.push_str("\n\n");
+                }
+                result.push_str(&rendered);
+            }
             let call = ToolCall {
                 id: "seed_search".into(),
                 r#type: "function".into(),
                 function: crate::llama::ToolCallFunction {
                     name: "search_library".into(),
-                    arguments: serde_json::json!({ "query": question }).to_string(),
+                    arguments: serde_json::json!({ "query": queries.join(" | ") }).to_string(),
                 },
             };
-            let result = self.render_search(&hits, &mut sources, &mut seen);
             messages.push(Message::assistant_calls(String::new(), vec![call]));
             messages.push(Message::tool_result("seed_search", result));
         }
@@ -367,7 +436,7 @@ impl<'a> Asker<'a> {
             round += 1;
             let turn = self
                 .chat
-                .turn(&messages, offered, 900, |t| on_token(Token::Text(t)))
+                .turn(&messages, offered, ANSWER_TOKENS, |t| on_token(Token::Text(t)))
                 .context("generating the answer")?;
 
             if !turn.tool_calls.is_empty() {
@@ -377,6 +446,35 @@ impl<'a> Asker<'a> {
             }
 
             if turn.tool_calls.is_empty() {
+                // An answer that ran into the token limit is not finished; it
+                // is asked to carry on from the cut, and the reader sees the
+                // continuation stream in behind the first part. If it runs
+                // out again after the allowed continuations, say so rather
+                // than end mid-sentence as if that were the whole answer.
+                let mut text = turn.text;
+                let mut limited = turn.hit_token_limit;
+                let mut continuations = 0;
+                while limited && continuations < MAX_CONTINUATIONS {
+                    messages.push(Message::assistant(text.clone()));
+                    messages.push(Message::user(CONTINUE));
+                    let more = self
+                        .chat
+                        .turn(&messages, None, ANSWER_TOKENS, |t| on_token(Token::Text(t)))
+                        .context("continuing the answer")?;
+                    if !text.ends_with(char::is_whitespace) && !more.text.starts_with(char::is_whitespace) {
+                        text.push(' ');
+                        on_token(Token::Text(" "));
+                    }
+                    text.push_str(&more.text);
+                    limited = more.hit_token_limit;
+                    continuations += 1;
+                }
+                if limited {
+                    text.push_str(CUT_SHORT);
+                    on_token(Token::Text(CUT_SHORT));
+                }
+                let turn = crate::llama::Turn { text, tool_calls: Vec::new(), hit_token_limit: limited };
+
                 let calculated = !calculations.is_empty();
                 // The library is always searched now, so "did retrieval find
                 // something" no longer says anything about the answer. What
@@ -440,6 +538,31 @@ impl<'a> Asker<'a> {
                 messages.push(Message::tool_result(call.id.clone(), result));
             }
         }
+    }
+
+    /// The plain subjects behind a question, as up to three short library
+    /// searches, written by the model with the earlier exchanges in view so
+    /// that "this baby" resolves. On any failure the list is empty and the
+    /// question itself is searched, as before.
+    fn seed_queries(&self, question: &str, history: &[Exchange]) -> Vec<String> {
+        let mut context = String::new();
+        for x in history.iter().rev().take(MAX_HISTORY).collect::<Vec<_>>().into_iter().rev() {
+            context.push_str("Earlier question: ");
+            context.push_str(x.question.trim());
+            context.push('\n');
+        }
+        context.push_str("Question: ");
+        context.push_str(question.trim());
+        context.push_str("\nSearches:");
+        let messages = vec![Message::system(REWRITE_SYSTEM), Message::user(context)];
+        let text = match self.chat.chat(&messages, 80) {
+            Ok(t) => t,
+            Err(e) => {
+                eprintln!("  (search rewrite unavailable: {e})");
+                return Vec::new();
+            }
+        };
+        parse_queries(&text, question)
     }
 
     /// Format search hits for the model, numbering them continuously across
@@ -507,6 +630,95 @@ fn cited_numbers(text: &str) -> Vec<usize> {
     out
 }
 
+/// What the model is told when it writes the seed searches.
+const REWRITE_SYSTEM: &str = "You turn a question into searches of a reference \
+library of practical books (medicine, survival, water, food, making things). \
+Reply with one to three searches, one per line, each two to eight words naming \
+the plain subject a book would have a chapter on: the thing itself, in the \
+words a book would use. Leave out the person's situation, feelings, and \
+phrasing. A follow-up question refers to the subject of the earlier questions \
+shown. Reply with the searches only, nothing else.";
+
+/// Turn the rewrite's reply into searches: one per line, bullets, numbering
+/// and quotes stripped, nothing empty, nothing long enough to be a sentence,
+/// nothing that merely repeats the question, at most three.
+fn parse_queries(text: &str, question: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for line in text.lines() {
+        let mut q = line.trim();
+        q = q.trim_start_matches(|c: char| c == '-' || c == '*' || c == '•' || c.is_ascii_digit() || c == '.' || c == ')' || c == ' ');
+        let q = q.trim_matches(|c: char| c == '"' || c == '\'' || c == '`').trim();
+        if q.is_empty() || q.ends_with(':') {
+            continue;
+        }
+        let words = q.split_whitespace().count();
+        if words > 10 || q.eq_ignore_ascii_case(question.trim()) {
+            continue;
+        }
+        if out.iter().any(|o| o.eq_ignore_ascii_case(q)) {
+            continue;
+        }
+        out.push(q.to_string());
+        if out.len() == 3 {
+            break;
+        }
+    }
+    out
+}
+
+/// Remove [n] citation markers from an earlier answer before it is replayed
+/// as history, so their numbers are not carried into a new answer whose
+/// passages are numbered afresh.
+fn strip_citations(text: &str) -> String {
+    renumber_or_strip(text, None)
+}
+
+/// Shared walker: with `cited` it renumbers markers, without it removes them.
+fn renumber_or_strip(text: &str, cited: Option<&[usize]>) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(start) = rest.find('[') {
+        out.push_str(&rest[..start]);
+        let after = &rest[start..];
+        match after.find(']') {
+            Some(end) => {
+                let inner = &after[1..end];
+                let is_marker = !inner.is_empty()
+                    && inner.chars().all(|c| c.is_ascii_digit() || c == ',' || c == ' ')
+                    && inner.chars().any(|c| c.is_ascii_digit());
+                if !is_marker {
+                    out.push_str(&after[..=end]);
+                } else if let Some(cited) = cited {
+                    let mapped: Vec<String> = inner
+                        .split(',')
+                        .filter_map(|t| t.trim().parse::<usize>().ok())
+                        .filter_map(|n| cited.iter().position(|c| *c == n).map(|p| (p + 1).to_string()))
+                        .collect();
+                    if mapped.is_empty() {
+                        out.push_str(&after[..=end]);
+                    } else {
+                        out.push('[');
+                        out.push_str(&mapped.join(", "));
+                        out.push(']');
+                    }
+                } else {
+                    // Stripped. Also eat one space left dangling before a full stop.
+                    if out.ends_with(' ') && after[end + 1..].starts_with(['.', ',', ';', ':']) {
+                        out.pop();
+                    }
+                }
+                rest = &after[end + 1..];
+            }
+            None => {
+                out.push_str(after);
+                rest = "";
+            }
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
 /// A tool call the chat template failed to parse comes back as prose:
 /// `<tool_call>…`, or Qwen's `<function=search_library>` form. It is not an
 /// answer and must not be shown as one.
@@ -522,40 +734,7 @@ fn renumber_citations(text: &str, cited: &[usize]) -> String {
     if cited.is_empty() {
         return text.to_string();
     }
-    let mut out = String::with_capacity(text.len());
-    let mut rest = text;
-    while let Some(start) = rest.find('[') {
-        out.push_str(&rest[..start]);
-        let after = &rest[start..];
-        match after.find(']') {
-            Some(end) => {
-                let inner = &after[1..end];
-                if !inner.is_empty() && inner.chars().all(|c| c.is_ascii_digit() || c == ',' || c == ' ') {
-                    let mapped: Vec<String> = inner
-                        .split(',')
-                        .filter_map(|t| t.trim().parse::<usize>().ok())
-                        .filter_map(|n| cited.iter().position(|c| *c == n).map(|p| (p + 1).to_string()))
-                        .collect();
-                    if mapped.is_empty() {
-                        out.push_str(&after[..=end]);
-                    } else {
-                        out.push('[');
-                        out.push_str(&mapped.join(", "));
-                        out.push(']');
-                    }
-                } else {
-                    out.push_str(&after[..=end]);
-                }
-                rest = &after[end + 1..];
-            }
-            None => {
-                out.push_str(after);
-                rest = "";
-            }
-        }
-    }
-    out.push_str(rest);
-    out
+    renumber_or_strip(text, Some(cited))
 }
 
 /// Kept for callers that want the legacy single-shot path.
@@ -621,6 +800,23 @@ mod tests {
         );
         // Prose brackets that are not citations are left alone.
         assert_eq!(cited_numbers("see [note] and [2024]"), vec![2024]);
+    }
+
+    #[test]
+    fn rewrite_replies_become_short_searches() {
+        let q = "I'm not near a medical center how can I help deliver this baby?";
+        let reply = "Searches:\n1. \"delivering a baby\"\n- stages of labor\n* stages of labor\n\nThis is a long sentence that explains itself at great length and is not a search at all\n3) cutting the umbilical cord\n4) placenta delivery\n";
+        assert_eq!(
+            parse_queries(reply, q),
+            vec!["delivering a baby", "stages of labor", "cutting the umbilical cord"]
+        );
+        assert!(parse_queries(q, q).is_empty());
+    }
+
+    #[test]
+    fn history_answers_lose_their_citation_numbers() {
+        assert_eq!(strip_citations("Boil it [3]. Add bleach [1][5], see [3, 1]."), "Boil it. Add bleach, see.");
+        assert_eq!(strip_citations("see [note] and [2024]"), "see [note] and ");
     }
 
     #[test]

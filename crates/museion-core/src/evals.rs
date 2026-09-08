@@ -116,7 +116,7 @@ pub fn run(
     for (i, case) in cases.iter().enumerate() {
         report(Progress::Case { index: i + 1, total: cases.len(), id: case.id.clone() });
         let t0 = Instant::now();
-        let outcome = asker.ask(&case.prompt, |t| {
+        let outcome = asker.ask(&case.prompt, &[], |t| {
             // Answers are captured from the return value; streaming is
             // ignored here except to honour a discard.
             let _ = matches!(t, Token::Discard);

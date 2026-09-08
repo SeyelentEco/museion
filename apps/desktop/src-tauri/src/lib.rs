@@ -389,6 +389,7 @@ async fn ask(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
     question: String,
+    history: Vec<museion_core::Exchange>,
 ) -> UiResult<AskResult> {
     let cfg = state.config.lock().map_err(ui_err)?.clone();
     let index_path = cfg.index_path().ok_or("no library configured")?;
@@ -440,7 +441,7 @@ async fn ask(
 
     let mut streamed = false;
     let answer = asker
-        .ask(&question, |t| match t {
+        .ask(&question, &history, |t| match t {
             museion_core::Token::Text(s) => {
                 streamed = true;
                 let _ = app.emit("answer-token", s.to_string());

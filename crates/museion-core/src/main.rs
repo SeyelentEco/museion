@@ -389,7 +389,7 @@ fn cmd_ask(args: &Args) -> Result<()> {
 
     println!();
     let mut streamed = false;
-    let answer = asker.ask(&question, |t| match t {
+    let answer = asker.ask(&question, &[], |t| match t {
         museion_core::Token::Text(s) => {
             streamed = true;
             print!("{s}");

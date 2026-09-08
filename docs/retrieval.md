@@ -304,6 +304,29 @@ question once did exactly that, and the raw `<tool_call>` block was the answer).
 round limit went from 4 to 6 for the same reason: a 72-hour plan legitimately wants
 water, food, sanitation, warmth and light looked up separately.
 
+**A cut-off answer is continued, not shown as finished.** Each model turn had a 900-token
+cap, chosen with tool calls in mind. Asked how to help a friend through labour, the answer
+stopped at "the placenta will usually come out within 30 minutes after the", and nothing
+said so: the server reports when it hits the limit, and the ask loop ignored it. The cap is
+now 1,500 tokens, an answer that hits it is asked to carry on from the cut (twice at most,
+streaming in behind the first part), and one that runs out even then ends with a visible
+note that it was cut short. Silence was the bug, not the number.
+
+**The seeded search looks for the subject, not the sentence.** "My friend just went into
+labor, what are the steps I should take to help with her delivery? I've never done this
+before" retrieved pages on comforting a labouring woman and on when to go to a medical
+centre, and the answer opened with "the library has nothing on the specific steps" -- while
+*Where There Is No Doctor*'s "The stages of labor" sat unread. Keyword search and the
+reranker both take the question at its word, and a question's words are mostly about the
+person. So before the seeded search the model is asked, in one short turn, to name what a
+reference book would have a chapter on -- one to three searches of two to eight words --
+and those are searched ahead of the question itself. The same turn sees the earlier
+questions, which is how "this baby" in a follow-up finds the delivery chapter.
+
+**A follow-up carries its conversation.** The last four exchanges go to the model with the
+question, answers trimmed and their [n] markers stripped so old numbers are not repeated
+as if they named the new passages. There is no memory across launches, by design.
+
 **The basis label is decided by which tools ran, not by what the model says.** Every
 answer carries one of: *from your library*, *from your library, with calculation*,
 *computed*, or *general knowledge — not from your library, unverified*. The last is the

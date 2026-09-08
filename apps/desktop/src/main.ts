@@ -238,6 +238,11 @@ function serviceNotice(exchange: HTMLElement, text: string) {
   exchange.append(n);
 }
 
+// The conversation so far, as the person saw it, so a follow-up ("what
+// about the placenta?", "this baby") is read against what came before. It
+// lives for the window; there is no memory across launches, by design.
+const conversation: { question: string; answer: string }[] = [];
+
 async function askQuestion(question: string) {
   if (busy || !question.trim()) return;
   busy = true;
@@ -302,7 +307,11 @@ async function askQuestion(question: string) {
   });
 
   try {
-    const { sources, basis, calculations } = await invoke<AskResult>('ask', { question });
+    const { sources, basis, calculations } = await invoke<AskResult>('ask', {
+      question,
+      history: conversation.slice(-4),
+    });
+    conversation.push({ question, answer: raw });
     renderAnswer(answerEl, raw);
     answerEl.classList.remove('thinking');
 

@@ -27,7 +27,7 @@ pub mod llama;
 pub mod pdf;
 pub mod tools;
 
-pub use ask::{Answer, Asker, Basis, Calculation, Token};
+pub use ask::{Answer, Asker, Basis, Calculation, Exchange, Token};
 pub use fit::{fit_model, Fit};
 pub use indexer::{index_library, IndexOptions, Progress};
 pub use hardware::{detect as detect_hardware, Accelerator, Hardware, Tier};
