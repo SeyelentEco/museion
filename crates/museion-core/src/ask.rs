@@ -9,6 +9,7 @@
 
 use crate::{
     calc,
+    tuning::Tuning,
     index::Hit,
     llama::{Llama, Message, Tool, ToolCall},
     Index,
@@ -16,14 +17,12 @@ use crate::{
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use std::time::Instant;
 
 /// How many passages to retrieve before reranking. Generous, because keyword
 /// search is good at recall and bad at ordering -- which is precisely what the
 /// reranker is there to fix.
 const RETRIEVE: usize = 40;
-
-/// How many survive into the prompt per search.
-const KEEP: usize = 8;
 
 /// Characters of a page passed to the reranker. Cross-encoders have a short
 /// window, and the opening of a page is where its subject is usually stated.
@@ -32,29 +31,25 @@ const RERANK_CHARS: usize = 1200;
 /// Characters of a page quoted to the chat model.
 const CONTEXT_CHARS: usize = 2400;
 
-/// Tool rounds before the model must answer with what it has.
-const MAX_ROUNDS: usize = 6;
+/// Candidates pulled per rewritten seed search. They join the question's
+/// own forty in one pool that is reranked once; the prompt still holds the
+/// usual eight passages. Every other arrangement tried put twelve to thirty
+/// passages in the prompt, and the model changed with the prompt: reading
+/// took thirty seconds before it wrote a word, and on the bleach question
+/// it did the dose in prose and would not touch the calculator.
+const SEED_RETRIEVE: usize = 20;
 
-/// Tokens a single turn may produce. A tool call needs a few dozen; a full
-/// procedure -- assisting a birth, the first 72 hours -- needs well over a
-/// thousand, and at 900 the delivery answer stopped mid-sentence at "the
-/// placenta will usually come out within 30 minutes after the".
-const ANSWER_TOKENS: u32 = 1500;
-
-/// How many times a cut-off answer is asked to carry on before it is
-/// declared cut short. Two continuations make room for about 4,500 tokens
-/// of answer, which nothing in the benchmark comes near.
-const MAX_CONTINUATIONS: usize = 2;
+/// Said once to an answer that worked a sum out in prose. The calculator is
+/// the only arithmetic allowed; "20 ÷ 8 = 2.5" written by the model is the
+/// 343.75 ml failure waiting to happen again.
+const CALCULATE_FIRST: &str = "That answer did arithmetic in prose. Do every \
+calculation with the calculate tool, one expression each, then give the answer \
+again reporting each figure exactly as calculate returned it, with the same \
+citations.";
 
 const CONTINUE: &str = "Your answer was cut off mid-sentence by a length limit. \
 Continue exactly from where it stopped -- do not repeat anything already said, do \
 not start over, do not add a preamble -- and finish the answer.";
-
-/// Earlier exchanges carried into a follow-up question, and how much of
-/// each answer. Enough to know what was being discussed; not so much that
-/// three long procedures crowd out the passages found for this question.
-const MAX_HISTORY: usize = 4;
-const HISTORY_CHARS: usize = 2500;
 
 /// One earlier question and its answer, as the person saw them.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -92,6 +87,9 @@ pub struct Asker<'a> {
     pub kiwix: Option<&'a crate::Kiwix>,
     /// Book ids served by kiwix-serve that the local index does not hold.
     pub native_books: Vec<String>,
+    /// The prompts and limits, loaded by the caller -- from the override
+    /// file on every question in the app, so a prompt edit needs no build.
+    pub tuning: Tuning,
 }
 
 /// Articles fetched per native archive per search.
@@ -146,58 +144,6 @@ pub enum Token<'a> {
     Discard,
 }
 
-/// Hypatia's standing instructions.
-///
-/// Every clause is load-bearing. A model asked to be helpful will fill a gap
-/// in its sources with plausible general knowledge, and plausible general
-/// knowledge about wound care or water treatment, delivered to someone with
-/// no way to check it, is the failure this whole design exists to prevent.
-const SYSTEM: &str = "\
-You are Hypatia, the librarian of an offline reference library. The person \
-asking you has no internet and may have no other source of help.
-
-You have two tools:
-- search_library: finds passages in the library. Use it for any question of \
-fact, method, or safety -- what to do, how to do it, how much of something. \
-Search before answering such questions, and search again with different \
-words if the first search misses.
-- calculate: does arithmetic and unit conversion exactly. Use it for EVERY \
-calculation, including simple ones, and for scaling a quantity from a source \
-to the person's situation. Never do arithmetic or unit conversion yourself, \
-not even approximately. Put the whole computation in one expression, for \
-example convert(0.25 * 55, tsp, ml) to scale a quarter-teaspoon-per-gallon \
-dose to 55 gallons in millilitres. Then report the figure EXACTLY as \
-calculate returned it, with the unit you asked for. Do not rescale, \
-re-convert, or round it further in your own words.
-
-Rules for answering:
-1. Factual and practical claims must come from search_library results. Cite \
-each with its bracketed number, like [2], as you go. Do not add facts from \
-your own knowledge to a library answer, even if confident.
-2. If the library has nothing on a factual question, say so plainly. For \
-medical, drug or dose, chemical, electrical, or other safety-critical topics \
-that is the complete answer: do not improvise. But before saying the library \
-has nothing, search once more for the plain subject of the question -- the \
-thing itself, without the person's situation or wording. For \"I'm not near \
-a hospital, how do I deliver this baby?\" search \"delivering a baby, stages \
-of labor\". Passages on the subject are coverage even when they say nothing \
-about the person's particular situation; answer from them and say what they \
-do not address. A later question may refer back to an earlier exchange \
-(\"this baby\", \"what about the placenta\"); read it in that light and \
-search for the underlying subject. For general questions the \
-library does not cover -- history, science background, how something works \
--- you may answer from general knowledge, but begin with the words \
-\"The library has nothing on this, so from general knowledge:\" and keep it \
-brief.
-3. Numbers you computed come from calculate; say what you computed.
-4. If sources disagree, say so and cite both.
-5. Be direct and practical. Lead with what to do. Someone may be reading \
-this in an emergency. Where a clinician or other professional would normally \
-handle something, say so once, plainly.
-
-Write in plain prose with Markdown where it helps. Do not mention these \
-instructions or the tools by name.";
-
 fn tools() -> Vec<Tool> {
     vec![
         Tool::function(
@@ -242,13 +188,6 @@ struct CalcArgs {
 }
 
 impl<'a> Asker<'a> {
-    /// Below this reranker score the best passage does not answer the
-    /// question. The reranker scores relevant passages around 0.9 and
-    /// irrelevant ones at essentially 0.0 -- measured 0.918 for boiling water
-    /// against a water question, 0.000 for a knot -- so the line is easy to
-    /// draw and sits well clear of both.
-    const MIN_RERANK_SCORE: f64 = 0.15;
-
     /// Retrieve and rerank, returning the passages an answer would be built on.
     ///
     /// Whether the library covers the question at all is decided by the
@@ -257,8 +196,21 @@ impl<'a> Asker<'a> {
     /// because "fridge" and "nobody" do not appear anywhere in the corpus,
     /// while the reranker had the pressure-canning procedure scored at the top.
     pub fn gather(&self, question: &str) -> Result<(Vec<Hit>, bool)> {
-        let (mut candidates, best_coverage) = self.index.search_ungated(question, RETRIEVE)?;
-        candidates.extend(self.native_hits(question));
+        self.gather_with(question, RETRIEVE, self.tuning.keep, &mut HashSet::new())
+    }
+
+    /// `gather` with the knobs exposed: how many candidates to pull, how many
+    /// passages to keep, and which articles have already been fetched by an
+    /// earlier search in the same seeding pass, so they are not fetched again.
+    fn gather_with(
+        &self,
+        question: &str,
+        retrieve: usize,
+        keep: usize,
+        fetched: &mut HashSet<String>,
+    ) -> Result<(Vec<Hit>, bool)> {
+        let (mut candidates, best_coverage) = self.index.search_ungated(question, retrieve)?;
+        candidates.extend(self.native_hits(question, fetched));
         if candidates.is_empty() {
             return Ok((Vec::new(), false));
         }
@@ -267,7 +219,7 @@ impl<'a> Asker<'a> {
             if best_coverage + 1e-9 < crate::index::Index::MIN_TERM_COVERAGE {
                 return Ok((Vec::new(), false));
             }
-            return Ok((candidates.into_iter().take(KEEP).collect(), false));
+            return Ok((candidates.into_iter().take(keep).collect(), false));
         };
 
         let docs: Vec<String> = candidates
@@ -279,13 +231,13 @@ impl<'a> Asker<'a> {
             Ok(scored) => {
                 // The reranker's verdict on coverage: if even its best passage
                 // scores as irrelevant, the library does not hold the answer.
-                if scored.first().map_or(true, |(_, s)| *s < Self::MIN_RERANK_SCORE) {
+                if scored.first().map_or(true, |(_, s)| *s < self.tuning.min_rerank_score) {
                     return Ok((Vec::new(), true));
                 }
                 let mut picked: Vec<Hit> = scored
                     .into_iter()
-                    .take(KEEP)
-                    .filter(|(_, s)| *s >= Self::MIN_RERANK_SCORE)
+                    .take(keep)
+                    .filter(|(_, s)| *s >= self.tuning.min_rerank_score)
                     .filter_map(|(i, _)| candidates.get(i).cloned())
                     .collect();
                 // Demote contents and index pages *after* reranking. Doing it
@@ -303,7 +255,83 @@ impl<'a> Asker<'a> {
                 if best_coverage + 1e-9 < crate::index::Index::MIN_TERM_COVERAGE {
                     return Ok((Vec::new(), false));
                 }
-                Ok((candidates.into_iter().take(KEEP).collect(), false))
+                Ok((candidates.into_iter().take(keep).collect(), false))
+            }
+        }
+    }
+
+    /// The seeded search: the question's candidates and the rewritten
+    /// subjects' candidates in one pool, duplicates dropped, reranked once
+    /// against the question *and* its subjects, keeping `keep` in all. The
+    /// cross-encoder sees "how can I help deliver this baby, not near a
+    /// medical center" together with "delivering a baby, stages of labor",
+    /// so the chapter pages compete with the when-to-seek-help pages on the
+    /// subject rather than on the person's wording. Coverage is judged as in
+    /// `gather`: a best passage below the threshold means the library does
+    /// not hold the answer.
+    fn gather_seeded(
+        &self,
+        question: &str,
+        rewrites: &[String],
+        keep: usize,
+        fetched: &mut HashSet<String>,
+    ) -> Result<(Vec<Hit>, bool)> {
+        let mut pool: Vec<Hit> = Vec::new();
+        let mut seen: HashSet<(String, usize, String)> = HashSet::new();
+        let mut push = |hits: Vec<Hit>, pool: &mut Vec<Hit>| {
+            for h in hits {
+                if seen.insert((h.book.clone(), h.page, h.file.clone())) {
+                    pool.push(h);
+                }
+            }
+        };
+        let (found, best_coverage) = self.index.search_ungated(question, RETRIEVE)?;
+        push(found, &mut pool);
+        push(self.native_hits(question, fetched), &mut pool);
+        for q in rewrites {
+            let (found, _) = self.index.search_ungated(q, SEED_RETRIEVE)?;
+            push(found, &mut pool);
+            push(self.native_hits(q, fetched), &mut pool);
+        }
+        if pool.is_empty() {
+            return Ok((Vec::new(), false));
+        }
+
+        let Some(reranker) = self.reranker else {
+            if best_coverage + 1e-9 < crate::index::Index::MIN_TERM_COVERAGE {
+                return Ok((Vec::new(), false));
+            }
+            return Ok((pool.into_iter().take(keep).collect(), false));
+        };
+        let rank_query = if rewrites.is_empty() {
+            question.to_string()
+        } else {
+            format!("{question} ({})", rewrites.join("; "))
+        };
+        let docs: Vec<String> = pool
+            .iter()
+            .map(|h| truncate_chars(&format!("{}. {}", h.doc_title, h.body), RERANK_CHARS))
+            .collect();
+        match reranker.rerank(&rank_query, &docs) {
+            Ok(scored) => {
+                if scored.first().map_or(true, |(_, s)| *s < self.tuning.min_rerank_score) {
+                    return Ok((Vec::new(), true));
+                }
+                let mut picked: Vec<Hit> = scored
+                    .into_iter()
+                    .filter(|(_, s)| *s >= self.tuning.min_rerank_score)
+                    .take(keep)
+                    .filter_map(|(i, _)| pool.get(i).cloned())
+                    .collect();
+                picked.sort_by_key(|h| crate::index::is_navigation_page(&h.body));
+                Ok((picked, true))
+            }
+            Err(e) => {
+                eprintln!("  (reranker unavailable, using keyword ranking: {e})");
+                if best_coverage + 1e-9 < crate::index::Index::MIN_TERM_COVERAGE {
+                    return Ok((Vec::new(), false));
+                }
+                Ok((pool.into_iter().take(keep).collect(), false))
             }
         }
     }
@@ -312,7 +340,7 @@ impl<'a> Asker<'a> {
     /// and read the matching articles. They join the local candidates and go
     /// through the same reranker, so a Wikipedia article competes on equal
     /// terms with a page of a PDF.
-    fn native_hits(&self, question: &str) -> Vec<Hit> {
+    fn native_hits(&self, question: &str, fetched: &mut HashSet<String>) -> Vec<Hit> {
         let Some(kiwix) = self.kiwix else {
             return Vec::new();
         };
@@ -324,6 +352,11 @@ impl<'a> Asker<'a> {
             };
             for h in hits {
                 let Some(path) = h.path() else { continue };
+                // Reading an article is the expensive part of a native
+                // search; the same one found by two searches is read once.
+                if !fetched.insert(format!("{book}/{path}")) {
+                    continue;
+                }
                 let Ok(text) = kiwix.article_text(book, &path) else { continue };
                 if text.split_whitespace().count() < 30 {
                     continue;
@@ -366,15 +399,25 @@ impl<'a> Asker<'a> {
             return Ok(Answer { text, sources: Vec::new(), reranked: false, basis: Basis::Computed, calculations });
         }
 
+        // MUSEION_TRACE=1 prints where the seconds go: rewrite, each search,
+        // each model turn. The dev loop's stopwatch.
+        let t0 = Instant::now();
+        let trace = std::env::var_os("MUSEION_TRACE").is_some();
+        let mark = |what: &str| {
+            if trace {
+                eprintln!("  [{:6.1}s] {what}", t0.elapsed().as_secs_f64());
+            }
+        };
+
         let tools = tools();
-        let mut messages = vec![Message::system(SYSTEM)];
+        let mut messages = vec![Message::system(self.tuning.system_prompt.clone())];
         // Earlier exchanges give a follow-up its subject. Their citation
         // markers are stripped: those numbers pointed at passages from an
         // earlier search, and would otherwise be repeated as if they named
         // the passages found for this question.
-        for x in history.iter().rev().take(MAX_HISTORY).collect::<Vec<_>>().into_iter().rev() {
+        for x in history.iter().rev().take(self.tuning.max_history).collect::<Vec<_>>().into_iter().rev() {
             messages.push(Message::user(x.question.clone()));
-            messages.push(Message::assistant(strip_citations(&truncate_chars(&x.answer, HISTORY_CHARS))));
+            messages.push(Message::assistant(strip_citations(&truncate_chars(&x.answer, self.tuning.history_chars))));
         }
         messages.push(Message::user(question.to_string()));
         let mut sources: Vec<Hit> = Vec::new();
@@ -401,17 +444,13 @@ impl<'a> Asker<'a> {
         // on, and those queries are searched ahead of the question itself.
         {
             let mut queries = self.seed_queries(question, history);
+            mark(&format!("rewrite -> {queries:?}"));
+            let mut fetched: HashSet<String> = HashSet::new();
+            let (hits, rr) = self.gather_seeded(question, &queries, self.tuning.keep, &mut fetched)?;
+            mark(&format!("seeded search ({} queries): {} passages", queries.len() + 1, hits.len()));
+            reranked |= rr;
+            let result = self.render_search(&hits, &mut sources, &mut seen);
             queries.push(question.to_string());
-            let mut result = String::new();
-            for q in &queries {
-                let (hits, rr) = self.gather(q)?;
-                reranked |= rr;
-                let rendered = self.render_search(&hits, &mut sources, &mut seen);
-                if !result.is_empty() {
-                    result.push_str("\n\n");
-                }
-                result.push_str(&rendered);
-            }
             let call = ToolCall {
                 id: "seed_search".into(),
                 r#type: "function".into(),
@@ -425,19 +464,21 @@ impl<'a> Asker<'a> {
         }
 
         let mut repaired = false;
+        let mut math_repaired = false;
         let mut round = 0;
         loop {
             // On the last round the tools are withheld so the model must answer.
-            let last = round >= MAX_ROUNDS;
-            if round == MAX_ROUNDS {
+            let last = round >= self.tuning.max_rounds;
+            if round == self.tuning.max_rounds {
                 messages.push(Message::user(NO_MORE_TOOLS));
             }
             let offered = if last { None } else { Some(tools.as_slice()) };
             round += 1;
             let turn = self
                 .chat
-                .turn(&messages, offered, ANSWER_TOKENS, |t| on_token(Token::Text(t)))
+                .turn(&messages, offered, self.tuning.answer_tokens, |t| on_token(Token::Text(t)))
                 .context("generating the answer")?;
+            mark(&format!("turn {round}: {} tool call(s), {} chars", turn.tool_calls.len(), turn.text.len()));
 
             if !turn.tool_calls.is_empty() {
                 // Whatever it narrated on the way to the tool call is not the
@@ -454,12 +495,12 @@ impl<'a> Asker<'a> {
                 let mut text = turn.text;
                 let mut limited = turn.hit_token_limit;
                 let mut continuations = 0;
-                while limited && continuations < MAX_CONTINUATIONS {
+                while limited && continuations < self.tuning.max_continuations {
                     messages.push(Message::assistant(text.clone()));
                     messages.push(Message::user(CONTINUE));
                     let more = self
                         .chat
-                        .turn(&messages, None, ANSWER_TOKENS, |t| on_token(Token::Text(t)))
+                        .turn(&messages, None, self.tuning.answer_tokens, |t| on_token(Token::Text(t)))
                         .context("continuing the answer")?;
                     if !text.ends_with(char::is_whitespace) && !more.text.starts_with(char::is_whitespace) {
                         text.push(' ');
@@ -474,6 +515,20 @@ impl<'a> Asker<'a> {
                     on_token(Token::Text(CUT_SHORT));
                 }
                 let turn = crate::llama::Turn { text, tool_calls: Vec::new(), hit_token_limit: limited };
+
+                // A sum worked out in prose is sent back once, with the
+                // tools still on offer, to be done by the calculator.
+                if !math_repaired
+                    && calculations.is_empty()
+                    && round < self.tuning.max_rounds
+                    && has_prose_arithmetic(&turn.text)
+                {
+                    math_repaired = true;
+                    on_token(Token::Discard);
+                    messages.push(Message::assistant(turn.text.clone()));
+                    messages.push(Message::user(CALCULATE_FIRST));
+                    continue;
+                }
 
                 let calculated = !calculations.is_empty();
                 // The library is always searched now, so "did retrieval find
@@ -491,7 +546,7 @@ impl<'a> Asker<'a> {
                     on_token(Token::Discard);
                     messages.push(Message::assistant(turn.text.clone()));
                     messages.push(Message::user(if leaked { NO_MORE_TOOLS } else { CITE_OR_STAND }));
-                    round = MAX_ROUNDS + 1;
+                    round = self.tuning.max_rounds + 1;
                     continue;
                 }
                 let used: Vec<Hit> = cited
@@ -546,7 +601,7 @@ impl<'a> Asker<'a> {
     /// question itself is searched, as before.
     fn seed_queries(&self, question: &str, history: &[Exchange]) -> Vec<String> {
         let mut context = String::new();
-        for x in history.iter().rev().take(MAX_HISTORY).collect::<Vec<_>>().into_iter().rev() {
+        for x in history.iter().rev().take(self.tuning.max_history).collect::<Vec<_>>().into_iter().rev() {
             context.push_str("Earlier question: ");
             context.push_str(x.question.trim());
             context.push('\n');
@@ -554,7 +609,7 @@ impl<'a> Asker<'a> {
         context.push_str("Question: ");
         context.push_str(question.trim());
         context.push_str("\nSearches:");
-        let messages = vec![Message::system(REWRITE_SYSTEM), Message::user(context)];
+        let messages = vec![Message::system(self.tuning.rewrite_prompt.clone()), Message::user(context)];
         let text = match self.chat.chat(&messages, 80) {
             Ok(t) => t,
             Err(e) => {
@@ -629,15 +684,6 @@ fn cited_numbers(text: &str) -> Vec<usize> {
     }
     out
 }
-
-/// What the model is told when it writes the seed searches.
-const REWRITE_SYSTEM: &str = "You turn a question into searches of a reference \
-library of practical books (medicine, survival, water, food, making things). \
-Reply with one to three searches, one per line, each two to eight words naming \
-the plain subject a book would have a chapter on: the thing itself, in the \
-words a book would use. Leave out the person's situation, feelings, and \
-phrasing. A follow-up question refers to the subject of the earlier questions \
-shown. Reply with the searches only, nothing else.";
 
 /// Turn the rewrite's reply into searches: one per line, bullets, numbering
 /// and quotes stripped, nothing empty, nothing long enough to be a sentence,
@@ -719,6 +765,61 @@ fn renumber_or_strip(text: &str, cited: Option<&[usize]>) -> String {
     out
 }
 
+/// Does the text work a sum out itself -- "4 × 2 = 8", "20 ÷ 8 = 2.5"?
+/// A number, an operator, a number and an equals sign followed by a number,
+/// in that order. Ranges ("5-10 minutes"), dates and "pH = 7" do not match.
+fn has_prose_arithmetic(text: &str) -> bool {
+    // Space out the symbols so "4×2=8" and "4 × 2 = 8" tokenise alike. An
+    // 'x' counts as multiplication only between digits.
+    let chars: Vec<char> = text.chars().collect();
+    let mut spaced = String::with_capacity(text.len() + 32);
+    for (i, &c) in chars.iter().enumerate() {
+        let between_digits = i > 0
+            && i + 1 < chars.len()
+            && chars[i - 1].is_ascii_digit()
+            && chars[i + 1].is_ascii_digit();
+        if matches!(c, '×' | '÷' | '=' | '*' | '/' | '+') || ((c == 'x' || c == 'X') && between_digits) {
+            spaced.push(' ');
+            spaced.push(c);
+            spaced.push(' ');
+        } else {
+            spaced.push(c);
+        }
+    }
+    let is_num = |t: &str| {
+        let t = t.trim_matches(|c: char| !c.is_ascii_digit() && c != '.').replace(',', "");
+        !t.is_empty() && t.parse::<f64>().is_ok()
+    };
+    let is_op = |t: &str| matches!(t, "×" | "÷" | "*" | "/" | "+" | "x" | "X");
+    let toks: Vec<&str> = spaced.split_whitespace().collect();
+    for e in 0..toks.len() {
+        if toks[e] != "=" || e + 1 >= toks.len() || !is_num(toks[e + 1]) {
+            continue;
+        }
+        // In the eight tokens before the '=': a number, then an operator,
+        // then a number, with unit words allowed between them.
+        let window = &toks[e.saturating_sub(8)..e];
+        let (mut num_before, mut op, mut num_after) = (false, false, false);
+        for t in window {
+            if is_op(t) {
+                if num_before {
+                    op = true;
+                }
+            } else if is_num(t) {
+                if op {
+                    num_after = true;
+                } else {
+                    num_before = true;
+                }
+            }
+        }
+        if num_before && op && num_after {
+            return true;
+        }
+    }
+    false
+}
+
 /// A tool call the chat template failed to parse comes back as prose:
 /// `<tool_call>…`, or Qwen's `<function=search_library>` form. It is not an
 /// answer and must not be shown as one.
@@ -744,7 +845,7 @@ fn legacy_prompt(sources: &[Hit], question: &str) -> Vec<Message> {
     for (i, h) in sources.iter().enumerate() {
         block.push_str(&format!("[{}] {} (page {})\n{}\n\n", i + 1, h.doc_title, h.page, truncate_chars(&h.body, CONTEXT_CHARS)));
     }
-    vec![Message::system(SYSTEM), Message::user(format!("Sources:\n\n{block}---\n\nQuestion: {question}"))]
+    vec![Message::system(Tuning::default().system_prompt), Message::user(format!("Sources:\n\n{block}---\n\nQuestion: {question}"))]
 }
 
 /// The stretch of an article most likely to answer the question: a window
@@ -820,6 +921,16 @@ mod tests {
     }
 
     #[test]
+    fn arithmetic_worked_out_in_prose_is_noticed() {
+        assert!(has_prose_arithmetic("Daily use: 4 people × 2 litres per person = 8 litres per day."));
+        assert!(has_prose_arithmetic("20 litres ÷ 8 litres per day = 2.5 days"));
+        assert!(has_prose_arithmetic("so 55*0.25=13.75 teaspoons"));
+        assert!(!has_prose_arithmetic("Wait 5-10 minutes, then check the pH = 7 reading [1]."));
+        assert!(!has_prose_arithmetic("You need 2 litres per person per day [2]."));
+        assert!(!has_prose_arithmetic("Between 1 and 2 = a range, not a sum"));
+    }
+
+    #[test]
     fn a_tool_call_returned_as_text_is_recognised() {
         assert!(looks_like_leaked_tool_call(
             "<tool_call>\n<function=search_library>\n<parameter=query>\nfood safety\n</parameter>\n</function>\n</tool_call>"
@@ -830,10 +941,13 @@ mod tests {
 
     #[test]
     fn the_system_prompt_keeps_its_safety_clauses() {
-        assert!(SYSTEM.contains("do not improvise"));
-        assert!(SYSTEM.contains("Never do arithmetic or unit conversion yourself"));
-        assert!(SYSTEM.contains("EXACTLY as \\\ncalculate returned it") || SYSTEM.contains("EXACTLY as calculate returned it"));
-        assert!(SYSTEM.contains("The library has nothing on this, so from general knowledge:"));
+        let s = Tuning::default().system_prompt;
+        let flat = s.replace('\n', " ");
+        assert!(flat.contains("do not improvise"));
+        assert!(flat.contains("Never do arithmetic or unit conversion yourself"));
+        assert!(flat.contains("EXACTLY as calculate returned it"));
+        assert!(flat.contains("The library has nothing on this, so from general knowledge:"));
+        assert!(flat.contains("Cite each with its bracketed number"));
     }
 
     #[test]

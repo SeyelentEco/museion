@@ -262,6 +262,20 @@
                 <button id="fit-model" type="button">Fit model to this machine</button>
               </div>
             </div>
+            <div class="card">
+              <h2>Advanced</h2>
+              <p class="muted">
+                The assistant's instructions and limits — the system prompt, how many passages it
+                reads, how long an answer may run — are plain text. Museion reads the file below
+                before every question, so an edit shows in the very next answer with no restart.
+                Fields you leave out keep their defaults; a file that won't parse is ignored.
+              </p>
+              <div class="field">
+                <label for="tuning-open">Prompts and limits</label>
+                <span class="what" id="tuning-path">…</span>
+                <button id="tuning-open" type="button">Create and open the override file</button>
+              </div>
+            </div>
             <p id="setup-status" class="status" role="status"></p>
 
             <p class="hint" id="rerun-setup-row">

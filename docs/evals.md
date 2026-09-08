@@ -61,7 +61,8 @@ system already reports rather than judging prose:
   or `general_knowledge`. Judged from which sources the answer actually cites and which
   tools actually ran, so a model cannot pass a refusal case by *claiming* a source, and
   a pure calculation is not labelled *from your library* because the search happened to
-  turn something up.
+  turn something up. Alternatives are written `computed|library_and_calculation`, for a
+  case where the model may legitimately add what the library says.
 - `expect_number` — a value with tolerance, looked for in the **calculator's log first**
   and the prose second. The bleach-drum case also declares `must_not_contain: ["343"]`,
   because a model once produced that figure by relabelling a correct result and

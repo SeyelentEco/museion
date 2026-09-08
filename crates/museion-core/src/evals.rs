@@ -257,7 +257,7 @@ pub fn score(
     if let Some(b) = &case.expect_basis {
         out.push(CheckResult {
             check: "expect_basis".into(),
-            passed: basis == b,
+            passed: b.split('|').any(|alt| alt.trim() == basis),
             detail: format!("wanted {b}, got {basis}"),
         });
     }

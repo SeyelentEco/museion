@@ -327,6 +327,25 @@ questions, which is how "this baby" in a follow-up finds the delivery chapter.
 question, answers trimmed and their [n] markers stripped so old numbers are not repeated
 as if they named the new passages. There is no memory across launches, by design.
 
+**One pool, one rerank, eight passages.** The first version of the rewritten searches ran
+each as its own search and kept its own passages, and the prompt grew from eight passages
+to seventeen. Two things followed. Reading them took the model thirty seconds before it
+wrote a word, and a question that had taken thirty seconds took seventy. And the model's
+behaviour changed with the prompt: on the bleach question it worked the dose out in
+prose and would not touch the calculator, twice, when for weeks it had called it every
+time. So the question's candidates and the rewrites' candidates go into one pool,
+duplicates dropped, reranked once against the question *and* its rewritten subjects,
+keeping eight. The cross-encoder sees "how can I help deliver this baby, not near a
+medical center" together with "delivering a baby, stages of labor", and the chapter pages
+compete with the when-to-seek-help pages on the subject rather than on the wording.
+Articles found by more than one search are read once. `MUSEION_TRACE=1` prints where the
+seconds go: the rewrite, the seeded search, each model turn.
+
+**Arithmetic in prose is sent back.** "4 people × 2 litres = 8 litres per day" written by
+the model is the 343.75 ml failure waiting to happen again. An answer that contains a
+worked sum while no calculation ran is returned once, with the tools still on offer, and
+told to do every calculation with the calculator and report its figures exactly.
+
 **The basis label is decided by which tools ran, not by what the model says.** Every
 answer carries one of: *from your library*, *from your library, with calculation*,
 *computed*, or *general knowledge — not from your library, unverified*. The last is the

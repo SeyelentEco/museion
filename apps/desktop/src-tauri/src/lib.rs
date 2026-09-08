@@ -15,6 +15,9 @@ use tauri::{Emitter, Manager, State};
 pub struct AppState {
     config: Mutex<Config>,
     config_path: PathBuf,
+    /// tuning.yaml beside config.json: prompts and limits, read on every
+    /// question so an edit needs no build and no restart.
+    tuning_path: PathBuf,
     supervisor: Supervisor,
     /// Detected once. Detection shells out to nvidia-smi, and doing that on
     /// the main thread every time the Library tab opened is what made the
@@ -217,21 +220,29 @@ async fn start_services(app: tauri::AppHandle, state: State<'_, AppState>) -> Ui
     };
 
     let _ = &library;
-    say("Starting the content server…");
-    state
-        .supervisor
-        .start_kiwix(&kiwix_exe, &cfg.content_dirs(), cfg.kiwix_port)
-        .map_err(ui_err)?;
-    state
-        .supervisor
-        .wait_ready(
-            Role::Kiwix,
-            &format!("http://127.0.0.1:{}/catalog/v2/entries", cfg.kiwix_port),
-            Duration::from_secs(60),
-        )
-        .map_err(ui_err)?;
+    // A server already answering on the port is used, not replaced. That is
+    // what makes an app restart cost seconds when the servers were left up
+    // (MUSEION_KEEP_SERVICES=1 while developing), and it also means two
+    // copies of Museion do not fight over one GPU.
+    let kiwix_health = format!("http://127.0.0.1:{}/catalog/v2/entries", cfg.kiwix_port);
+    if state.supervisor.adopt(Role::Kiwix, cfg.kiwix_port, &kiwix_health, None) {
+        say("Content server already running; using it.");
+    } else {
+        say("Starting the content server…");
+        state
+            .supervisor
+            .start_kiwix(&kiwix_exe, &cfg.content_dirs(), cfg.kiwix_port)
+            .map_err(ui_err)?;
+        state
+            .supervisor
+            .wait_ready(Role::Kiwix, &kiwix_health, Duration::from_secs(60))
+            .map_err(ui_err)?;
+    }
 
-    if let Some(model) = &cfg.reranker_model {
+    let reranker_health = format!("http://127.0.0.1:{}/v1/models", cfg.reranker_port);
+    if let Some(model) = cfg.reranker_model.as_ref().filter(|m| {
+        !state.supervisor.adopt(Role::Reranker, cfg.reranker_port, &reranker_health, Some(m))
+    }) {
         say("Starting the reranker…");
         // GPU layers deliberately 0: on a 12 GB card the chat model wants all of
         // it, and this costs only seconds on CPU.
@@ -253,12 +264,10 @@ async fn start_services(app: tauri::AppHandle, state: State<'_, AppState>) -> Ui
             .map_err(ui_err)?;
         state
             .supervisor
-            .wait_ready(
-                Role::Reranker,
-                &format!("http://127.0.0.1:{}/v1/models", cfg.reranker_port),
-                Duration::from_secs(180),
-            )
+            .wait_ready(Role::Reranker, &reranker_health, Duration::from_secs(180))
             .map_err(ui_err)?;
+    } else if cfg.reranker_model.is_some() {
+        say("Reranker already running; using it.");
     }
 
     let model = cfg.chat_model.clone().ok_or("no chat model configured")?;
@@ -273,6 +282,10 @@ async fn start_services(app: tauri::AppHandle, state: State<'_, AppState>) -> Ui
 /// given ones, and wait for it.
 fn start_chat(state: &AppState, cfg: &Config, model: &std::path::Path, extra: &[String], gpu_layers: u32) -> UiResult<()> {
     let llama_exe = cfg.llama_exe.clone().ok_or("llama-server path not configured")?;
+    let chat_health = format!("http://127.0.0.1:{}/v1/models", cfg.chat_port);
+    if state.supervisor.adopt(Role::Chat, cfg.chat_port, &chat_health, Some(model)) {
+        return Ok(());
+    }
     let mut args = extra.to_vec();
     for a in ["--flash-attn", "on", "--jinja", "--parallel", "1",
               "--cache-type-k", "q8_0", "--cache-type-v", "q8_0"] {
@@ -284,11 +297,7 @@ fn start_chat(state: &AppState, cfg: &Config, model: &std::path::Path, extra: &[
         .map_err(ui_err)?;
     state
         .supervisor
-        .wait_ready(
-            Role::Chat,
-            &format!("http://127.0.0.1:{}/v1/models", cfg.chat_port),
-            Duration::from_secs(600),
-        )
+        .wait_ready(Role::Chat, &chat_health, Duration::from_secs(600))
         .map_err(ui_err)
 }
 
@@ -437,6 +446,7 @@ async fn ask(
         reranker: if use_rerank { Some(&reranker) } else { None },
         kiwix: if kiwix_up { Some(&kiwix) } else { None },
         native_books,
+        tuning: museion_core::Tuning::load(Some(&state.tuning_path)),
     };
 
     let mut streamed = false;
@@ -1189,6 +1199,7 @@ async fn run_evals_inner(app: &tauri::AppHandle, state: &AppState, label: String
     }
     let dir = cfg.library_dir.clone().ok_or("no library configured")?.join("evals");
     let app2 = app.clone();
+    let tuning = museion_core::Tuning::load(Some(&state.tuning_path));
     let run = tauri::async_runtime::spawn_blocking(move || -> anyhow::Result<evals::Run> {
         let asker = Asker {
             index: &index,
@@ -1196,6 +1207,7 @@ async fn run_evals_inner(app: &tauri::AppHandle, state: &AppState, label: String
             reranker: if use_rerank { Some(&reranker) } else { None },
             kiwix: if kiwix_up { Some(&kiwix) } else { None },
             native_books,
+            tuning,
         };
         let run = evals::run(&asker, &cases, &label, |p| {
             let ev = match p {
@@ -1225,6 +1237,32 @@ async fn list_eval_runs(state: State<'_, AppState>) -> UiResult<Vec<museion_core
 #[tauri::command]
 fn eval_cases() -> UiResult<Vec<museion_core::evals::Case>> {
     museion_core::evals::load_cases(museion_core::evals::BUILTIN).map_err(ui_err)
+}
+
+#[derive(Serialize)]
+pub struct TuningInfo {
+    path: String,
+    exists: bool,
+}
+
+/// Where the prompts-and-limits override lives, and whether it exists.
+#[tauri::command]
+fn tuning_info(state: State<AppState>) -> UiResult<TuningInfo> {
+    Ok(TuningInfo { path: state.tuning_path.display().to_string(), exists: state.tuning_path.exists() })
+}
+
+/// Write the built-in defaults out as the override file, if there is none
+/// yet, so editing starts from the real text with its comments. Returns
+/// the path either way.
+#[tauri::command]
+fn write_default_tuning(state: State<AppState>) -> UiResult<String> {
+    if !state.tuning_path.exists() {
+        if let Some(dir) = state.tuning_path.parent() {
+            std::fs::create_dir_all(dir).map_err(ui_err)?;
+        }
+        std::fs::write(&state.tuning_path, museion_core::tuning::DEFAULT_YAML).map_err(ui_err)?;
+    }
+    Ok(state.tuning_path.display().to_string())
 }
 
 #[tauri::command]
@@ -1267,6 +1305,7 @@ pub fn run() {
             app.manage(AppState {
                 config: Mutex::new(config),
                 config_path,
+                tuning_path: dir.join("tuning.yaml"),
                 supervisor: Supervisor::new(),
                 hardware: std::sync::OnceLock::new(),
                 stats: Mutex::new(None),
@@ -1299,6 +1338,8 @@ pub fn run() {
             eval_cases,
             list_models,
             kiwix_url,
+            tuning_info,
+            write_default_tuning,
         ])
         .build(tauri::generate_context!())
         .expect("failed to start Museion")
@@ -1308,7 +1349,7 @@ pub fn run() {
             // GPU until someone kills it by hand.
             if let tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit = event {
                 if let Some(state) = app.try_state::<AppState>() {
-                    state.supervisor.stop_all();
+                    state.supervisor.release_all();
                 }
             }
         });

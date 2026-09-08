@@ -26,8 +26,10 @@ pub mod kiwix;
 pub mod llama;
 pub mod pdf;
 pub mod tools;
+pub mod tuning;
 
 pub use ask::{Answer, Asker, Basis, Calculation, Exchange, Token};
+pub use tuning::Tuning;
 pub use fit::{fit_model, Fit};
 pub use indexer::{index_library, IndexOptions, Progress};
 pub use hardware::{detect as detect_hardware, Accelerator, Hardware, Tier};

@@ -19,6 +19,7 @@ museion -- offline library index and search
   museion index  --library <dir> [--extra <dir>]... [--db <file>] [--kiwix <url>] [--force]
   museion search --db <file> <query...> [--limit N]
   museion ask    --db <file> <question...> [--llama <url>] [--reranker <url>]
+  museion chat   --db <file>                [--llama <url>] [--reranker <url>]
   museion status --db <file>
   museion hardware
   museion eval   --db <file> [--label <name>] [--only <capability|horizon|id>]
@@ -33,6 +34,7 @@ Options
   --llama <url>     chat model server (default: http://127.0.0.1:8080)
   --reranker <url>  reranker server (default: http://127.0.0.1:8081)
   --no-rerank       Skip reranking, use keyword ranking alone
+  --tuning <file>   Prompts and limits override (see crates/museion-core/tuning.yaml)
   --force           Re-index archives that are already present
   --limit N         Number of results (default 10)
 ";
@@ -95,6 +97,7 @@ fn run() -> Result<()> {
         "index" => cmd_index(&args),
         "search" => cmd_search(&args),
         "ask" => cmd_ask(&args),
+        "chat" => cmd_chat(&args),
         "gather" => cmd_gather(&args),
         "hardware" => cmd_hardware(),
         "eval" => cmd_eval(&args),
@@ -315,6 +318,7 @@ fn cmd_gather(args: &Args) -> Result<()> {
         reranker: if use_rerank { Some(&reranker) } else { None },
         kiwix: kiwix.as_ref(),
         native_books: native,
+        tuning: tuning(args),
     };
 
     let (hits, reranked) = asker.gather(&question)?;
@@ -345,7 +349,44 @@ fn cmd_ask(args: &Args) -> Result<()> {
     if question.trim().is_empty() {
         bail!("ask what?");
     }
+    answer_one(args, &question, &[]).map(|_| ())
+}
 
+/// A conversation at the terminal: each question is asked with the ones
+/// before it, so follow-ups can be tried without the window. An empty line,
+/// "quit" or end of input ends it.
+///
+///   museion chat --db <file>
+fn cmd_chat(args: &Args) -> Result<()> {
+    use std::io::BufRead;
+    let mut history: Vec<museion_core::Exchange> = Vec::new();
+    println!("Hypatia. Ask, and ask again; an empty line ends it.\n");
+    let stdin = std::io::stdin();
+    loop {
+        print!("> ");
+        let _ = std::io::stdout().flush();
+        let mut line = String::new();
+        if stdin.lock().read_line(&mut line)? == 0 {
+            break;
+        }
+        let question = line.trim().to_string();
+        if question.is_empty() || question.eq_ignore_ascii_case("quit") || question.eq_ignore_ascii_case("exit") {
+            break;
+        }
+        match answer_one(args, &question, &history) {
+            Ok(answer) => history.push(museion_core::Exchange { question, answer: answer.text }),
+            Err(e) => eprintln!("\nerror: {e:#}\n"),
+        }
+    }
+    Ok(())
+}
+
+/// The prompts and limits: the defaults, or `--tuning <file>` over them.
+fn tuning(args: &Args) -> museion_core::Tuning {
+    museion_core::Tuning::load(args.flags.get("tuning").map(Path::new))
+}
+
+fn answer_one(args: &Args, question: &str, history: &[museion_core::Exchange]) -> Result<museion_core::Answer> {
     let index = Index::open(&db_path(args)?)?;
     if index.stats()?.documents == 0 {
         bail!(
@@ -385,11 +426,12 @@ fn cmd_ask(args: &Args) -> Result<()> {
         reranker: if use_rerank { Some(&reranker) } else { None },
         kiwix: kiwix.as_ref(),
         native_books: native,
+        tuning: tuning(args),
     };
 
     println!();
     let mut streamed = false;
-    let answer = asker.ask(&question, &[], |t| match t {
+    let answer = asker.ask(question, history, |t| match t {
         museion_core::Token::Text(s) => {
             streamed = true;
             print!("{s}");
@@ -444,7 +486,7 @@ fn cmd_ask(args: &Args) -> Result<()> {
         }
         println!();
     }
-    Ok(())
+    Ok(answer)
 }
 
 /// Run the benchmark against the running servers and save the run.
@@ -469,6 +511,7 @@ fn cmd_eval(args: &Args) -> Result<()> {
         reranker: if use_rerank { Some(&reranker) } else { None },
         kiwix: kiwix.as_ref(),
         native_books: native,
+        tuning: tuning(args),
     };
 
     let mut cases = evals::load_cases(evals::BUILTIN)?;

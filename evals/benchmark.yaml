@@ -212,7 +212,11 @@ cases:
     horizon: month
     prompt: We have 20 litres of water for 4 people at 2 litres per person per day. How many days will it last?
     expect_number: { value: 2.5, tolerance: 0 }
-    expect_basis: computed
+    # The sum must go through the calculator either way. The model may add
+    # what the library says about rationing (the Army manual: don't), and
+    # then the basis is library_and_calculation; that is a better answer,
+    # not a worse one.
+    expect_basis: computed|library_and_calculation
 
   # ------------------------------------------------------------------- plan
   - id: first-72-hours

@@ -80,6 +80,7 @@ function showTab(name: string) {
   if (name === 'setup') {
     void refreshSetup();
     void refreshExtraDirs();
+    void refreshTuning();
   }
   if (name === 'welcome') void loadPlan();
   if (name === 'evals') void refreshEvals();
@@ -1413,6 +1414,30 @@ async function boot() {
     void autostartServices();
   }
 }
+
+/* --------------------------------------------------------- advanced */
+
+async function refreshTuning() {
+  try {
+    const info = await invoke<{ path: string; exists: boolean }>('tuning_info');
+    $('#tuning-path').textContent = info.exists
+      ? `${info.path} — in use, read before every question.`
+      : `${info.path} — not created yet; the built-in defaults are in use.`;
+    $('#tuning-open').textContent = info.exists ? 'Open the override file' : 'Create and open the override file';
+  } catch (e) {
+    $('#tuning-path').textContent = String(e);
+  }
+}
+
+$('#tuning-open').addEventListener('click', async () => {
+  try {
+    const path = await invoke<string>('write_default_tuning');
+    await invoke('open_path', { path });
+    await refreshTuning();
+  } catch (e) {
+    statusMsg(String(e), true);
+  }
+});
 
 $('#rerun-setup').addEventListener('click', (e) => {
   e.preventDefault();

@@ -127,6 +127,57 @@ window pointed at the dev server and shows "localhost refused to connect" — an
 the paths from steps 2 and 4. **Save**, **Start services**, **Build index** (if you skipped
 step 5), **Fit model to this machine** (if you skipped step 6). Then ask.
 
+## Iterating on it
+
+The release build exists to make the installer. Nothing about trying a change needs it.
+
+| you changed | do this | wait |
+|---|---|---|
+| the system prompt, a limit | edit `tuning.yaml` (Settings › Advanced), ask again | 0 s |
+| the UI (`main.ts`, `index.html`, `styles.css`) | `scripts\dev.ps1`, save the file | ~1 s, the window reloads |
+| Rust in the ask loop | `scripts\dev-eval.ps1 <case-or-subset>` | ~25 s to build, then the cases |
+| Rust in the app | `scripts\dev.ps1` rebuilds and relaunches, or `scripts\dev-build.ps1 -Run` | ~25 s |
+| anything, for the installer | `npm run tauri build` | ~3 min |
+
+Measured on an i7-12700K: the LTO release build takes about 3 minutes; the first debug
+build of the app 88 seconds; a debug rebuild after a Rust edit 24 seconds.
+
+**The servers stay up between runs.** `scripts\dev.ps1` and `dev-build.ps1 -Run` set
+`MUSEION_KEEP_SERVICES=1`, which starts kiwix-serve and the two llama-servers outside the
+job that would otherwise end them with the app. The next launch finds them answering on
+their ports, checks that the chat and reranker servers report the configured model files,
+and adopts them: the window is usable in seconds and the 22 GB model loads once a day, not
+once a build. Adopted servers are never killed on exit; the Stop button and a benchmark's
+model swap still stop them. Without the variable, nothing changes: servers Museion
+started die with it, Job Object and all.
+
+**Prompts and limits without a build.** The system prompt, the search-rewrite prompt, the
+answer length, the round limit, how many passages are kept and the reranker threshold live
+in [`crates/museion-core/tuning.yaml`](../crates/museion-core/tuning.yaml), compiled in
+as the defaults. Settings › Advanced creates a copy beside `config.json` and opens it; the
+app reads that file before every question, so a saved edit shows in the next answer. The
+command line takes the same file with `--tuning`, and `scripts\dev-eval.ps1` passes it
+automatically when it exists, so what the benchmark tests is what the app would do.
+
+**The ask loop from the command line.**
+
+```bash
+scripts\dev-eval.ps1 reason                 # a capability, a horizon, or one case id
+scripts\dev-eval.ps1 bleach-drum -Label x   # the run is saved like any other
+scripts\dev-eval.ps1 -Chat                  # a conversation: follow-ups keep their context
+museion chat --db <library>\museion-index.db  # the same, by hand
+```
+
+Set `MUSEION_TRACE=1` to see where the seconds go in an answer: the rewrite, the seeded
+search, each model turn.
+
+**If cargo cannot find `link.exe` or the Windows SDK.** On the development machine the
+SDK lives on an external disk that is registered at `E:\Dev\Windows10SDK`; when that disk
+comes up under another letter every C build script fails. `scripts\vsenv.ps1` loads the
+Visual Studio environment with the SDK paths pointed at wherever the disk is, and the dev
+scripts dot-source it when present. It is a workaround for that machine, not a build
+step: on any machine with the SDK where it was installed, the scripts work without it.
+
 ## Or skip the app
 
 Everything the app does, the command line does:
