@@ -23,6 +23,7 @@ interface AskResult {
 
 interface Status {
   configured: boolean;
+  portable_root: string | null;
   library_dir: string | null;
   documents: number;
   pages: number;
@@ -519,6 +520,13 @@ async function refreshSetup() {
   void loadPlan();
 
   const st = await invoke<Status>('get_status');
+  const note = $('#portable-note');
+  if (st.portable_root) {
+    note.textContent = `Running from ${st.portable_root}. Paths are kept relative to that folder, so the drive works under any letter; the model, helper build and GPU split chosen for this computer are remembered on this computer, not on the drive.`;
+    note.hidden = false;
+  } else {
+    note.hidden = true;
+  }
   const sp = await invoke<Space | null>('library_space').catch(() => null);
   const spaceLine = sp ? ` ${gb(sp.library_bytes)} on disk, ${gb(sp.free_bytes)} free on ${sp.volume}.` : '';
   $('#library-summary').textContent = st.documents

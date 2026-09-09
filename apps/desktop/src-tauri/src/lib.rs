@@ -1,6 +1,7 @@
 //! Museion desktop: the shell around the retrieval core and its sidecars.
 
 mod config;
+mod portable;
 mod sidecar;
 
 use config::Config;
@@ -18,6 +19,8 @@ pub struct AppState {
     /// tuning.yaml beside config.json: prompts and limits, read on every
     /// question so an edit needs no build and no restart.
     tuning_path: PathBuf,
+    /// Set when running from a drive (see portable.rs).
+    portable: Option<portable::Portable>,
     supervisor: Supervisor,
     /// Detected once. Detection shells out to nvidia-smi, and doing that on
     /// the main thread every time the Library tab opened is what made the
@@ -78,6 +81,8 @@ fn ui_err(e: impl std::fmt::Display) -> String {
 #[derive(Serialize)]
 pub struct Status {
     configured: bool,
+    /// The drive's root when running from one; None when installed.
+    portable_root: Option<String>,
     library_dir: Option<String>,
     documents: usize,
     pages: usize,
@@ -166,6 +171,7 @@ async fn get_status(state: State<'_, AppState>) -> UiResult<Status> {
     let (documents, pages, words) = state.index_stats(&cfg);
     Ok(Status {
         configured: cfg.is_ready(),
+        portable_root: state.portable.as_ref().map(|p| p.root.display().to_string()),
         library_dir: cfg.library_dir.as_ref().map(|p| p.display().to_string()),
         documents,
         pages,
@@ -200,7 +206,7 @@ fn get_config(state: State<AppState>) -> UiResult<Config> {
 
 #[tauri::command]
 fn set_config(state: State<AppState>, config: Config) -> UiResult<()> {
-    config.save(&state.config_path).map_err(ui_err)?;
+    save_config(&state, &config).map_err(ui_err)?;
     *state.config.lock().map_err(ui_err)? = config;
     Ok(())
 }
@@ -271,6 +277,23 @@ async fn start_services(app: tauri::AppHandle, state: State<'_, AppState>) -> Ui
     }
 
     let model = cfg.chat_model.clone().ok_or("no chat model configured")?;
+    let mut cfg = cfg;
+    if fit_due(&state) && cfg.chat_gpu_layers != 0 {
+        say("First run on this computer: measuring the chat model against its GPU…");
+        match measure_fit(&state, &cfg) {
+            Ok((args, layers, msg)) => {
+                cfg.chat_args = args;
+                if let Some(n) = layers {
+                    cfg.chat_gpu_layers = n;
+                }
+                save_config(&state, &cfg).map_err(ui_err)?;
+                mark_fitted(&state);
+                *state.config.lock().map_err(ui_err)? = cfg.clone();
+                say(&format!("Fitted: {msg}"));
+            }
+            Err(e) => say(&format!("Could not measure the fit ({e}); starting with the defaults.")),
+        }
+    }
     say("Loading the chat model — this can take a few minutes…");
     start_chat(&state, &cfg, &model, &cfg.chat_args, cfg.chat_gpu_layers)?;
 
@@ -546,6 +569,21 @@ async fn build_index(app: tauri::AppHandle, state: State<'_, AppState>, force: b
 #[tauri::command]
 async fn fit_chat_model(state: State<'_, AppState>) -> UiResult<String> {
     let cfg = state.config.lock().map_err(ui_err)?.clone();
+    let (args, gpu_layers, message) = measure_fit(&state, &cfg)?;
+    let mut updated = cfg.clone();
+    updated.chat_args = args;
+    if let Some(n) = gpu_layers {
+        updated.chat_gpu_layers = n;
+    }
+    save_config(&state, &updated).map_err(ui_err)?;
+    mark_fitted(&state);
+    *state.config.lock().map_err(ui_err)? = updated;
+    Ok(message)
+}
+
+/// Run llama-fit-params for the configured model and return the chat
+/// arguments to use, the GPU layer count, and a sentence for the person.
+fn measure_fit(state: &AppState, cfg: &Config) -> UiResult<(Vec<String>, Option<u32>, String)> {
     let model = cfg.chat_model.clone().ok_or("no chat model configured")?;
     let llama = cfg.llama_exe.clone().ok_or("llama-server path not configured")?;
     let fit_exe = llama
@@ -600,15 +638,7 @@ async fn fit_chat_model(state: State<'_, AppState>) -> UiResult<String> {
     }
     args.extend(fitted);
 
-    let mut updated = cfg.clone();
-    updated.chat_args = args;
-    if let Some(n) = fit.gpu_layers {
-        updated.chat_gpu_layers = n;
-    }
-    updated.save(&state.config_path).map_err(ui_err)?;
-    *state.config.lock().map_err(ui_err)? = updated;
-
-    Ok(format!(
+    let message = format!(
         "{} layers on the GPU; {}",
         fit.gpu_layers.map(|n| n.to_string()).unwrap_or_else(|| "all".into()),
         if fit.args.iter().any(|a| a == "-ot") {
@@ -616,7 +646,44 @@ async fn fit_chat_model(state: State<'_, AppState>) -> UiResult<String> {
         } else {
             "everything resident on the GPU."
         }
-    ))
+    );
+    Ok((args, fit.gpu_layers, message))
+}
+
+/// Write the config where it lives. From a drive, the machine-specific
+/// fields go to this computer's profile as well, and a drive that cannot be
+/// written to is not an error: the profile holds what matters.
+fn save_config(state: &AppState, cfg: &Config) -> anyhow::Result<()> {
+    if let Some(p) = &state.portable {
+        let path = p.profile_path();
+        let mut profile = portable::MachineProfile::load(&path).unwrap_or_default();
+        profile.absorb(cfg);
+        profile.save(&path)?;
+        if let Err(e) = cfg.save(&state.config_path) {
+            eprintln!("  (drive config not written: {e:#})");
+        }
+        return Ok(());
+    }
+    cfg.save(&state.config_path)
+}
+
+/// Record that the split has been measured on this computer.
+fn mark_fitted(state: &AppState) {
+    if let Some(p) = &state.portable {
+        let path = p.profile_path();
+        let mut profile = portable::MachineProfile::load(&path).unwrap_or_default();
+        profile.fitted = true;
+        let _ = profile.save(&path);
+    }
+}
+
+/// From a drive on a computer whose split has not been measured yet: is a
+/// fit due before the chat model starts?
+fn fit_due(state: &AppState) -> bool {
+    match &state.portable {
+        Some(p) => !portable::MachineProfile::load(&p.profile_path()).map(|m| m.fitted).unwrap_or(false),
+        None => false,
+    }
 }
 
 // ----------------------------------------------------------------- setup
@@ -707,7 +774,7 @@ async fn fetch_tools(app: tauri::AppHandle, state: State<'_, AppState>, dest: St
     cfg.kiwix_exe = installed.kiwix_serve.clone();
     cfg.llama_exe = installed.llama_server.clone();
     cfg.pdfium_dir = Some(installed.pdfium_dir.clone());
-    cfg.save(&state.config_path).map_err(ui_err)?;
+    save_config(&state, &cfg).map_err(ui_err)?;
     *state.config.lock().map_err(ui_err)? = cfg;
 
     Ok(format!(
@@ -754,7 +821,7 @@ async fn fetch_model(app: tauri::AppHandle, state: State<'_, AppState>, id: Stri
         cfg.chat_model = Some(target.clone());
         cfg.chat_args = model.server_args.clone();
     }
-    cfg.save(&state.config_path).map_err(ui_err)?;
+    save_config(&state, &cfg).map_err(ui_err)?;
     *state.config.lock().map_err(ui_err)? = cfg;
     Ok(target.display().to_string())
 }
@@ -1032,7 +1099,7 @@ async fn add_content_dir(app: tauri::AppHandle, state: State<'_, AppState>, path
         return Err("that folder is already part of the library".into());
     }
     cfg.extra_dirs.push(dir);
-    cfg.save(&state.config_path).map_err(ui_err)?;
+    save_config(&state, &cfg).map_err(ui_err)?;
     *state.config.lock().map_err(ui_err)? = cfg.clone();
 
     if !state.supervisor.is_running(Role::Kiwix) {
@@ -1062,7 +1129,7 @@ async fn remove_content_dir(state: State<'_, AppState>, path: String) -> UiResul
     let dir = PathBuf::from(&path);
     let mut cfg = state.config.lock().map_err(ui_err)?.clone();
     cfg.extra_dirs.retain(|d| d != &dir);
-    cfg.save(&state.config_path).map_err(ui_err)?;
+    save_config(&state, &cfg).map_err(ui_err)?;
     *state.config.lock().map_err(ui_err)? = cfg.clone();
 
     // Forget what came from it: the folder's loose PDFs, and any archives
@@ -1198,6 +1265,10 @@ async fn run_evals_inner(app: &tauri::AppHandle, state: &AppState, label: String
         return Err("no cases match".into());
     }
     let dir = cfg.library_dir.clone().ok_or("no library configured")?.join("evals");
+    let dir = match &state.portable {
+        Some(p) => p.writable_or_cache(&dir),
+        None => dir,
+    };
     let app2 = app.clone();
     let tuning = museion_core::Tuning::load(Some(&state.tuning_path));
     let run = tauri::async_runtime::spawn_blocking(move || -> anyhow::Result<evals::Run> {
@@ -1300,14 +1371,42 @@ pub fn run() {
                 .build()?;
 
             let dir = app.path().app_config_dir()?;
-            let config_path = dir.join("config.json");
-            let config = Config::load(&config_path);
+            let local = app.path().app_local_data_dir().unwrap_or_else(|_| dir.clone());
+            let portable = portable::Portable::detect(&local);
+            let hardware = std::sync::OnceLock::new();
+            let (config_path, tuning_path, config) = match &portable {
+                Some(p) => {
+                    let config_path = p.config_path();
+                    let mut cfg = Config::load_portable(&config_path, &p.root);
+                    // This computer's build, model and split, laid over the
+                    // drive's config; worked out now if it has never seen
+                    // this drive before.
+                    let profile_path = p.profile_path();
+                    match portable::MachineProfile::load(&profile_path) {
+                        Some(profile) => profile.apply(&mut cfg),
+                        None => {
+                            if let Ok(hw) = museion_core::detect_hardware() {
+                                let profile = portable::adapt(&mut cfg, &hw, &p.root);
+                                let _ = profile.save(&profile_path);
+                                let _ = hardware.set(hw);
+                            }
+                        }
+                    }
+                    (config_path, p.tuning_path(), cfg)
+                }
+                None => {
+                    let config_path = dir.join("config.json");
+                    let config = Config::load(&config_path);
+                    (config_path, dir.join("tuning.yaml"), config)
+                }
+            };
             app.manage(AppState {
                 config: Mutex::new(config),
                 config_path,
-                tuning_path: dir.join("tuning.yaml"),
+                tuning_path,
+                portable,
                 supervisor: Supervisor::new(),
-                hardware: std::sync::OnceLock::new(),
+                hardware,
                 stats: Mutex::new(None),
             });
             Ok(())

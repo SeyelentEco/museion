@@ -45,6 +45,10 @@ pub struct Config {
     /// stay free until they choose -- the model holds nearly all of it.
     #[serde(default = "yes")]
     pub autostart: bool,
+    /// Set when running from a drive: paths are stored relative to this
+    /// folder and resolved against it, so the drive's letter can change.
+    #[serde(skip)]
+    pub base: Option<PathBuf>,
 }
 
 fn yes() -> bool {
@@ -88,12 +92,62 @@ impl Config {
             .unwrap_or_else(Self::with_defaults)
     }
 
+    /// Load, then resolve every path against `base`: a drive's config says
+    /// `library`, and means the library folder beside it wherever it is.
+    pub fn load_portable(path: &Path, base: &Path) -> Self {
+        let mut c = Self::load(path);
+        let resolve = |p: &mut Option<PathBuf>| {
+            if let Some(v) = p.as_mut() {
+                if v.is_relative() {
+                    *v = base.join(&*v);
+                }
+            }
+        };
+        resolve(&mut c.library_dir);
+        resolve(&mut c.kiwix_exe);
+        resolve(&mut c.llama_exe);
+        resolve(&mut c.pdfium_dir);
+        resolve(&mut c.models_dir);
+        resolve(&mut c.chat_model);
+        resolve(&mut c.reranker_model);
+        for d in c.extra_dirs.iter_mut() {
+            if d.is_relative() {
+                *d = base.join(&*d);
+            }
+        }
+        c.base = Some(base.to_path_buf());
+        c
+    }
+
     pub fn save(&self, path: &Path) -> Result<()> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)
                 .with_context(|| format!("creating {}", parent.display()))?;
         }
-        std::fs::write(path, serde_json::to_string_pretty(self)?)
+        // On a drive, anything under the root is written relative to it.
+        let mut out = self.clone();
+        if let Some(base) = &self.base {
+            let rel = |p: &mut Option<PathBuf>| {
+                if let Some(v) = p.as_mut() {
+                    if let Ok(r) = v.strip_prefix(base) {
+                        *v = r.to_path_buf();
+                    }
+                }
+            };
+            rel(&mut out.library_dir);
+            rel(&mut out.kiwix_exe);
+            rel(&mut out.llama_exe);
+            rel(&mut out.pdfium_dir);
+            rel(&mut out.models_dir);
+            rel(&mut out.chat_model);
+            rel(&mut out.reranker_model);
+            for d in out.extra_dirs.iter_mut() {
+                if let Ok(r) = d.strip_prefix(base) {
+                    *d = r.to_path_buf();
+                }
+            }
+        }
+        std::fs::write(path, serde_json::to_string_pretty(&out)?)
             .with_context(|| format!("writing {}", path.display()))?;
         Ok(())
     }

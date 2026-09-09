@@ -96,6 +96,13 @@ pub fn keep_services() -> bool {
     std::env::var("MUSEION_KEEP_SERVICES").map(|v| v == "1" || v.eq_ignore_ascii_case("true")).unwrap_or(false)
 }
 
+/// Is anything accepting connections on the port? A quick TCP connect; no
+/// request is made, so a server mid-load still counts as present.
+fn port_open(port: u16) -> bool {
+    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+    std::net::TcpStream::connect_timeout(&addr, Duration::from_millis(250)).is_ok()
+}
+
 /// Kill whatever process is listening on a local TCP port. Used only for
 /// adopted servers, where there is no process handle.
 fn kill_listener(port: u16) {
@@ -135,10 +142,25 @@ impl Supervisor {
     }
 
     pub fn is_running(&self, role: Role) -> bool {
+        self.prune_dead();
         self.running
             .lock()
             .map(|r| r.iter().any(|s| s.role == role))
             .unwrap_or(false)
+    }
+
+    /// Forget servers that are no longer there. A spawned one is asked
+    /// through its handle; an adopted one has only its port to answer for
+    /// it. Adopted at the wrong moment -- a previous instance's servers
+    /// still shutting down under their Job Object -- they were listed as
+    /// running for as long as the app lived, with nothing on the port.
+    fn prune_dead(&self) {
+        if let Ok(mut running) = self.running.lock() {
+            running.retain_mut(|s| match s.child.as_mut() {
+                Some(c) => matches!(c.try_wait(), Ok(None)),
+                None => port_open(s.port),
+            });
+        }
     }
 
     /// If a healthy server of this kind is already answering on the port,
