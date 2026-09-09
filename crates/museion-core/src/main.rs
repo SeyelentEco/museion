@@ -20,6 +20,8 @@ museion -- offline library index and search
   museion search --db <file> <query...> [--limit N]
   museion ask    --db <file> <question...> [--llama <url>] [--reranker <url>]
   museion chat   --db <file>                [--llama <url>] [--reranker <url>]
+  museion prepare --dest <dir> --bundle <id> [--models a,b] [--accelerators cuda,vulkan,cpu]
+                  [--app <exe>] [--installer <exe>] [--no-index] [--no-webview2] [--skeleton]
   museion status --db <file>
   museion hardware
   museion eval   --db <file> [--label <name>] [--only <capability|horizon|id>]
@@ -98,6 +100,7 @@ fn run() -> Result<()> {
         "search" => cmd_search(&args),
         "ask" => cmd_ask(&args),
         "chat" => cmd_chat(&args),
+        "prepare" => cmd_prepare(&args),
         "gather" => cmd_gather(&args),
         "hardware" => cmd_hardware(),
         "eval" => cmd_eval(&args),
@@ -379,6 +382,71 @@ fn cmd_chat(args: &Args) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// Prepare a drive: see docs/portable.md.
+///
+///   museion prepare --dest E:\ --bundle go-bag --models qwen3-4b-instruct-q4 --accelerators cuda,vulkan,cpu
+fn cmd_prepare(args: &Args) -> Result<()> {
+    use museion_core::prepare::{self, Plan, Progress};
+    let dest = args.flags.get("dest").map(PathBuf::from).ok_or_else(|| anyhow::anyhow!("need --dest <dir>"))?;
+    let bundle = args.flags.get("bundle").cloned().unwrap_or_else(|| "go-bag".into());
+    let list = |k: &str, default: &str| -> Vec<String> {
+        args.flags
+            .get(k)
+            .map(|s| s.as_str())
+            .unwrap_or(default)
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect()
+    };
+    let default_accels = if cfg!(target_os = "macos") { "metal" } else { "cuda,vulkan,cpu" };
+    let plan = Plan {
+        dest,
+        bundle,
+        models: if args.flags.contains_key("skeleton") { Vec::new() } else { list("models", "qwen3-4b-instruct-q4") },
+        accelerators: list("accelerators", default_accels),
+        app_exe: args.flags.get("app").map(PathBuf::from),
+        installer: args.flags.get("installer").map(PathBuf::from),
+        build_index: !args.flags.contains_key("no-index"),
+        webview2: !args.flags.contains_key("no-webview2"),
+        skeleton: args.flags.contains_key("skeleton"),
+    };
+    let est = prepare::estimate(&plan)?;
+    println!("\nPreparing {}\n", plan.dest.display());
+    for (name, bytes) in &est.items {
+        println!("  {:>8}  {}", human_gb(*bytes), name);
+    }
+    println!("\n  {} in all, {} still to fetch, {} free\n", human_gb(est.bytes), human_gb(est.remaining), human_gb(est.free_bytes));
+    let mut last = String::new();
+    let root = prepare::run(&plan, |p| match p {
+        Progress::Phase(s) => println!("\n== {s}"),
+        Progress::Note(s) => println!("   {s}"),
+        Progress::Download { item, received, total } => {
+            let line = if total > 0 {
+                format!("   {item}: {}%", received * 100 / total)
+            } else {
+                format!("   {item}: {}", human_gb(received))
+            };
+            if line != last {
+                print!("\r{line}          ");
+                let _ = std::io::stdout().flush();
+                last = line;
+            }
+        }
+    })?;
+    println!("\nDrive ready at {}\n", root.display());
+    Ok(())
+}
+
+fn human_gb(bytes: u64) -> String {
+    let g = bytes as f64 / 1_073_741_824.0;
+    if g >= 1.0 {
+        format!("{g:.1} GB")
+    } else {
+        format!("{} MB", bytes / 1_048_576)
+    }
 }
 
 /// The prompts and limits: the defaults, or `--tuning <file>` over them.

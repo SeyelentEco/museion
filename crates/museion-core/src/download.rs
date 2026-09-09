@@ -178,3 +178,44 @@ mod tests {
         fs::remove_dir_all(&dir).ok();
     }
 }
+
+/// Download a file with no known hash or size -- the WebView2 runtime
+/// installer, which Microsoft republishes under one link -- to a `.part`
+/// renamed into place when complete. Nothing verified by a checksum should
+/// go through here.
+pub fn fetch_unverified(url: &str, dest: &Path, mut on_progress: impl FnMut(u64, u64)) -> Result<()> {
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let part = dest.with_extension("part");
+    let agent = ureq::AgentBuilder::new()
+        .timeout_connect(Duration::from_secs(20))
+        .timeout_read(Duration::from_secs(60))
+        .redirects(8)
+        .build();
+    let res = agent.get(url).call().with_context(|| format!("fetching {url}"))?;
+    let total: u64 = res
+        .header("Content-Length")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
+    let mut reader = res.into_reader();
+    let mut out = File::create(&part)?;
+    let mut buf = vec![0u8; 1 << 20];
+    let mut received = 0u64;
+    loop {
+        let n = reader.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        std::io::Write::write_all(&mut out, &buf[..n])?;
+        received += n as u64;
+        on_progress(received, total);
+    }
+    drop(out);
+    if received < 1_000_000 {
+        let _ = fs::remove_file(&part);
+        bail!("{url} returned only {received} bytes");
+    }
+    fs::rename(&part, dest)?;
+    Ok(())
+}

@@ -25,6 +25,7 @@ pub mod indexer;
 pub mod kiwix;
 pub mod llama;
 pub mod pdf;
+pub mod prepare;
 pub mod tools;
 pub mod tuning;
 

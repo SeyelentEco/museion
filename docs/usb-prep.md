@@ -9,7 +9,39 @@ connection and carry it to one that has none — a cabin, a boat, an air-gapped 
 somewhere the network is simply gone — is what makes it usable after the fact rather than
 only before.
 
-## Build the library onto the drive
+## Prepare the whole drive
+
+Settings › **Prepare a drive** in the app, or on the command line:
+
+```bash
+museion prepare --dest E:\ --bundle go-bag --models qwen3-4b-instruct-q4,qwen3.6-35b-a3b-q4 --accelerators cuda,vulkan,cpu
+```
+
+Either one lays out a drive that runs Museion on any computer: the archives, the models
+you chose, kiwix-serve and pdfium, a llama.cpp build for every kind of graphics card the
+drive may meet, the app itself as `Museion.exe`, the installer in `support\`, the WebView2
+offline installer for a machine that lacks it, the licences, a README, and a manifest of
+every file with its checksum. The index is built on the drive, so the first question on the
+far end is not preceded by ten minutes of indexing. Everything is hash-checked on the way
+in and downloads resume, so a drive can be prepared over several sittings.
+
+On the far end: plug it in and open `Museion.exe`. The first start on a computer measures
+its graphics card, picks the build and the model that fit, and remembers that on the
+computer, not the drive. See [portable.md](portable.md) for how the drive is laid out and
+what happens on a read-only one.
+
+| edition | contents | drive |
+|---|---|---|
+| Go Bag, small model | Go Bag, Qwen3-4B, all three builds | 32 GB |
+| Go Bag, both tiers | + Qwen3.6-35B Q4 | 64 GB |
+| Homestead | Homestead bundle, both tiers | 128 GB |
+| Library | full collection, both tiers | 512 GB SSD |
+
+A flash stick works; an SSD is better. Running from the drive means llama.cpp reads the
+model from it on every start, and a 22 GB model over a slow stick is minutes. The README
+on the drive says how to install to the computer instead.
+
+## Or just the library, by hand
 
 On the machine that has internet, point the fetcher straight at the removable drive:
 

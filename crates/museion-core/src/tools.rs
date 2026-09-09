@@ -48,14 +48,30 @@ pub fn plan(accel: &Accelerator) -> Result<Vec<(String, String, u64)>> {
     Ok(out)
 }
 
-pub fn install(accel: &Accelerator, dest: &Path, mut report: impl FnMut(Step)) -> Result<Installed> {
+pub fn install(accel: &Accelerator, dest: &Path, report: impl FnMut(Step)) -> Result<Installed> {
+    let want = match accel {
+        Accelerator::Cuda { .. } => "cuda",
+        Accelerator::Metal { .. } => "metal",
+        Accelerator::Vulkan { .. } => "vulkan",
+        Accelerator::Cpu => "cpu",
+    };
+    install_selected(want, dest, &[], report)
+}
+
+/// Install some of the tools -- those whose names are in `only`, or all of
+/// them when it is empty -- for a named accelerator. What a drive being
+/// prepared needs: kiwix-tools and pdfium once, then llama.cpp per build.
+pub fn install_selected(accel: &str, dest: &Path, only: &[&str], mut report: impl FnMut(Step)) -> Result<Installed> {
     fs::create_dir_all(dest)?;
-    let staging = std::env::temp_dir().join(format!("museion-tools-{}", std::process::id()));
+    let staging = std::env::temp_dir().join(format!("museion-tools-{}-{}", std::process::id(), seed()));
     fs::create_dir_all(&staging)?;
 
     let result = (|| -> Result<()> {
         for tool in catalog::tools()? {
-            let Some((_, variant)) = catalog::tool_variant(&tool, accel) else {
+            if !only.is_empty() && !only.contains(&tool.name.as_str()) {
+                continue;
+            }
+            let Some((_, variant)) = catalog::tool_variant_named(&tool, accel) else {
                 report(Step::Skipped {
                     tool: tool.name.clone(),
                     reason: "no build for this platform".into(),
@@ -105,6 +121,18 @@ fn find(dir: &Path, stem: &str) -> Option<PathBuf> {
     let exe = if cfg!(windows) { format!("{stem}.exe") } else { stem.to_string() };
     let p = dir.join(exe);
     p.exists().then_some(p)
+}
+
+/// The executable for `stem` in `dir`, if present.
+pub fn find_exe(dir: &Path, stem: &str) -> Option<PathBuf> {
+    find(dir, stem)
+}
+
+fn seed() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos() as u64)
+        .unwrap_or(0)
 }
 
 fn extract(archive: &Path, into: &Path) -> Result<()> {

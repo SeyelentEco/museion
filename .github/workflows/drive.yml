@@ -1,0 +1,71 @@
+# The skeleton release: everything Museion needs on a drive except the
+# content and the models, as one zip per platform (see docs/portable.md).
+# Unzipped onto a drive it runs, finds an empty library, and offers the
+# first-run fetch into the drive. Content and models are never mirrored
+# here; they are fetched from where they live, with the catalogue's hashes.
+#
+# Runs on a version tag. The macOS job produces an unsigned app: until it is
+# notarized, Gatekeeper shows "damaged" and the person must right-click > Open.
+name: drive
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build the app and the installer
+        working-directory: apps/desktop
+        run: |
+          npm ci
+          npm run tauri build
+      - name: Build the CLI
+        run: cargo build --release -p museion-core --bin museion
+      - name: Lay out the skeleton
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
+          ./target/release/museion.exe prepare --skeleton --dest skeleton --bundle go-bag `
+            --accelerators cuda,vulkan,cpu `
+            --app target/release/museion-desktop.exe --installer $installer.FullName
+          Compress-Archive -Path skeleton/* -DestinationPath "museion-drive-${{ github.ref_name }}-windows.zip"
+          Get-Item museion-drive-*.zip | Select-Object Name, Length
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: museion-drive-*-windows.zip
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build the app
+        working-directory: apps/desktop
+        run: |
+          npm ci
+          npm run tauri build -- --bundles app
+      - name: Build the CLI
+        run: cargo build --release -p museion-core --bin museion
+      - name: Lay out the skeleton
+        run: |
+          ./target/release/museion prepare --skeleton --dest skeleton --bundle go-bag \
+            --accelerators metal --no-webview2
+          cp -R target/release/bundle/macos/*.app skeleton/
+          ditto -c -k --keepParent skeleton "museion-drive-${{ github.ref_name }}-macos.zip"
+          ls -l museion-drive-*.zip
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: museion-drive-*-macos.zip

@@ -755,6 +755,19 @@ async fn fetch_tools(app: tauri::AppHandle, state: State<'_, AppState>, dest: St
     use museion_core::tools::{self, Step};
     let hw = state.hardware()?;
     let dest = PathBuf::from(dest);
+    // A prepared drive already carries the helpers -- for every kind of
+    // graphics card, chosen at launch. Nothing to fetch.
+    {
+        let cfg = state.config.lock().map_err(ui_err)?.clone();
+        let have = |p: &Option<PathBuf>| p.as_ref().is_some_and(|p| p.exists());
+        if state.portable.is_some() && have(&cfg.kiwix_exe) && have(&cfg.llama_exe) {
+            return Ok(format!(
+                "Already on the drive: {} and {}",
+                cfg.kiwix_exe.as_ref().map(|p| p.display().to_string()).unwrap_or_default(),
+                cfg.llama_exe.as_ref().map(|p| p.display().to_string()).unwrap_or_default()
+            ));
+        }
+    }
     let app2 = app.clone();
     let installed = tauri::async_runtime::spawn_blocking(move || {
         tools::install(&hw.accelerator, &dest, |s| match s {
@@ -1310,6 +1323,108 @@ fn eval_cases() -> UiResult<Vec<museion_core::evals::Case>> {
     museion_core::evals::load_cases(museion_core::evals::BUILTIN).map_err(ui_err)
 }
 
+// --------------------------------------------------------- prepare a drive
+
+#[derive(Serialize)]
+pub struct PrepareModel {
+    id: String,
+    title: String,
+    size_bytes: u64,
+    tiers: Vec<String>,
+}
+
+#[derive(Serialize)]
+pub struct PrepareOptions {
+    bundles: Vec<PlanItem>,
+    models: Vec<PrepareModel>,
+    accelerators: Vec<String>,
+    app_exe: Option<String>,
+    installer: Option<String>,
+}
+
+/// What a drive can be built from: the bundles, the chat models, the
+/// llama.cpp builds this platform can carry, and where the app and its
+/// installer are so they can go on the drive too.
+#[tauri::command]
+fn prepare_options() -> UiResult<PrepareOptions> {
+    use museion_core::catalog;
+    let mut bundles = Vec::new();
+    for b in catalog::bundles().map_err(ui_err)? {
+        let (_, srcs) = catalog::bundle(&b.id).map_err(ui_err)?;
+        bundles.push(PlanItem { id: b.id, title: b.title, size_bytes: srcs.iter().map(|s| s.size_bytes).sum() });
+    }
+    let models = catalog::models()
+        .map_err(ui_err)?
+        .into_iter()
+        .filter(|m| m.role == "chat")
+        .map(|m| PrepareModel { id: m.id, title: m.title, size_bytes: m.size_bytes, tiers: m.tiers })
+        .collect();
+    let accelerators: Vec<String> = if cfg!(target_os = "macos") {
+        vec!["metal".into()]
+    } else {
+        vec!["cuda".into(), "vulkan".into(), "cpu".into()]
+    };
+    let exe = std::env::current_exe().ok();
+    let installer = exe.as_ref().and_then(|e| e.parent()).and_then(|d| {
+        for sub in ["bundle/nsis", "support"] {
+            if let Ok(rd) = std::fs::read_dir(d.join(sub)) {
+                if let Some(p) = rd.flatten().map(|e| e.path()).find(|p| {
+                    p.file_name().map_or(false, |n| n.to_string_lossy().to_lowercase().ends_with("setup.exe"))
+                }) {
+                    return Some(p);
+                }
+            }
+        }
+        None
+    });
+    Ok(PrepareOptions {
+        bundles,
+        models,
+        accelerators,
+        app_exe: exe.map(|p| p.display().to_string()),
+        installer: installer.map(|p| p.display().to_string()),
+    })
+}
+
+#[tauri::command]
+fn prepare_estimate(plan: museion_core::prepare::Plan) -> UiResult<museion_core::prepare::Estimate> {
+    museion_core::prepare::estimate(&plan).map_err(ui_err)
+}
+
+#[derive(Serialize, Clone)]
+struct PrepareProgress {
+    phase: String,
+    item: String,
+    received: u64,
+    total: u64,
+}
+
+/// Build the drive, reporting as it goes. Everything already in place is
+/// skipped, so a run that was interrupted continues where it stopped.
+#[tauri::command]
+async fn prepare_drive(app: tauri::AppHandle, plan: museion_core::prepare::Plan) -> UiResult<String> {
+    use museion_core::prepare::{self, Progress};
+    let app2 = app.clone();
+    let root = tauri::async_runtime::spawn_blocking(move || {
+        let mut phase = String::new();
+        prepare::run(&plan, |p| {
+            let ev = match p {
+                Progress::Phase(s) => {
+                    phase = s.clone();
+                    PrepareProgress { phase: s, item: String::new(), received: 0, total: 0 }
+                }
+                Progress::Note(s) => PrepareProgress { phase: phase.clone(), item: s, received: 1, total: 1 },
+                Progress::Download { item, received, total } => PrepareProgress { phase: phase.clone(), item, received, total },
+            };
+            let _ = app2.emit("prepare-progress", ev);
+        })
+    })
+    .await
+    .map_err(ui_err)?
+    .map_err(ui_err)?;
+    Ok(root.display().to_string())
+}
+
 #[derive(Serialize)]
 pub struct TuningInfo {
     path: String,
@@ -1439,6 +1554,9 @@ pub fn run() {
             kiwix_url,
             tuning_info,
             write_default_tuning,
+            prepare_options,
+            prepare_estimate,
+            prepare_drive,
         ])
         .build(tauri::generate_context!())
         .expect("failed to start Museion")

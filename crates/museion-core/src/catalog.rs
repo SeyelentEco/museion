@@ -110,6 +110,8 @@ pub struct Tool {
     pub name: String,
     pub provides: Vec<String>,
     pub variants: std::collections::BTreeMap<String, ToolVariant>,
+    #[serde(default)]
+    pub license: Option<License>,
 }
 
 impl Source {
@@ -201,14 +203,21 @@ pub fn reranker_model() -> Result<Option<Model>> {
 
 /// Which tool variant suits this machine.
 pub fn tool_variant<'a>(tool: &'a Tool, accel: &Accelerator) -> Option<(&'a str, &'a ToolVariant)> {
-    let platform = if cfg!(windows) { "windows" } else if cfg!(target_os = "macos") { "darwin" } else { "linux" };
-    let arch = if cfg!(target_arch = "aarch64") { "arm64" } else { "x64" };
     let want = match accel {
         Accelerator::Cuda { .. } => "cuda",
         Accelerator::Metal { .. } => "metal",
         Accelerator::Vulkan { .. } => "vulkan",
         Accelerator::Cpu => "cpu",
     };
+    tool_variant_named(tool, want)
+}
+
+/// The variant for a named accelerator ("cuda", "vulkan", "cpu", "metal")
+/// on this platform. A drive being prepared carries builds for machines
+/// other than the one preparing it, so the accelerator is a name here.
+pub fn tool_variant_named<'a>(tool: &'a Tool, want: &str) -> Option<(&'a str, &'a ToolVariant)> {
+    let platform = if cfg!(windows) { "windows" } else if cfg!(target_os = "macos") { "darwin" } else { "linux" };
+    let arch = if cfg!(target_arch = "aarch64") { "arm64" } else { "x64" };
     let fits = |v: &ToolVariant| {
         !v.internal
             && v.platform.as_deref().map_or(true, |p| p == platform)

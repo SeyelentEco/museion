@@ -263,6 +263,40 @@
                 <button id="fit-model" type="button">Fit model to this machine</button>
               </div>
             </div>
+            <div class="card" id="card-prepare">
+              <h2>Prepare a drive</h2>
+              <p class="muted">
+                Everything Museion needs on one removable drive: the archives, the models, the
+                helper programs for any graphics card, and the app itself. It runs from the drive
+                on any computer, whatever letter the drive comes up under, and needs no internet
+                there. Downloads resume, so a drive can be prepared over several sittings.
+              </p>
+              <div class="field">
+                <label for="prep-dest">Destination</label>
+                <span class="what">The drive's root, or any empty folder that will be copied to one. Use exFAT for a drive that must work on a Mac too.</span>
+                <div class="row">
+                  <input id="prep-dest" type="text" placeholder="E:\" />
+                  <button id="prep-pick" type="button">Choose…</button>
+                </div>
+              </div>
+              <div class="field">
+                <label for="prep-bundle">Content</label>
+                <select id="prep-bundle"></select>
+              </div>
+              <div class="field">
+                <label>Chat models to carry</label>
+                <span class="what">Each computer picks the one that fits it. The small one runs anywhere, slowly; the large one wants a graphics card with 8 GB or more.</span>
+                <div id="prep-models" class="checks"></div>
+              </div>
+              <div class="field">
+                <label>Helper builds to carry</label>
+                <span class="what">One per kind of graphics card the drive may meet. All three is 700 MB.</span>
+                <div id="prep-accels" class="checks"></div>
+              </div>
+              <p id="prep-estimate" class="muted"></p>
+              <button id="prep-start" type="button">Prepare the drive</button>
+              <p id="prep-progress" class="status" role="status"></p>
+            </div>
             <div class="card">
               <h2>Advanced</h2>
               <p class="muted">

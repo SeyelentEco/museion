@@ -82,6 +82,7 @@ function showTab(name: string) {
     void refreshSetup();
     void refreshExtraDirs();
     void refreshTuning();
+    void refreshPrepare();
   }
   if (name === 'welcome') void loadPlan();
   if (name === 'evals') void refreshEvals();
@@ -1422,6 +1423,131 @@ async function boot() {
     void autostartServices();
   }
 }
+
+/* ---------------------------------------------------- prepare a drive */
+
+interface PrepareOptions {
+  bundles: { id: string; title: string; size_bytes: number }[];
+  models: { id: string; title: string; size_bytes: number; tiers: string[] }[];
+  accelerators: string[];
+  app_exe: string | null;
+  installer: string | null;
+}
+interface PreparePlan {
+  dest: string;
+  bundle: string;
+  models: string[];
+  accelerators: string[];
+  app_exe: string | null;
+  installer: string | null;
+  build_index: boolean;
+  webview2: boolean;
+}
+let prepOptions: PrepareOptions | null = null;
+
+function prepPlan(): PreparePlan | null {
+  if (!prepOptions) return null;
+  const dest = $<HTMLInputElement>('#prep-dest').value.trim();
+  if (!dest) return null;
+  const checked = (sel: string) =>
+    [...document.querySelectorAll<HTMLInputElement>(`${sel} input:checked`)].map((i) => i.value);
+  return {
+    dest,
+    bundle: $<HTMLSelectElement>('#prep-bundle').value,
+    models: checked('#prep-models'),
+    accelerators: checked('#prep-accels'),
+    app_exe: prepOptions.app_exe,
+    installer: prepOptions.installer,
+    build_index: true,
+    webview2: true,
+  };
+}
+
+async function refreshPrepare() {
+  if (prepOptions) return;
+  try {
+    prepOptions = await invoke<PrepareOptions>('prepare_options');
+  } catch (e) {
+    $('#prep-estimate').textContent = String(e);
+    return;
+  }
+  const sel = $<HTMLSelectElement>('#prep-bundle');
+  sel.textContent = '';
+  for (const b of prepOptions.bundles) {
+    const o = el('option', undefined, `${b.title} (${gb(b.size_bytes)})`) as HTMLOptionElement;
+    o.value = b.id;
+    sel.append(o);
+  }
+  const check = (host: HTMLElement, value: string, label: string, on: boolean) => {
+    const l = el('label', 'check');
+    const i = el('input') as HTMLInputElement;
+    i.type = 'checkbox';
+    i.value = value;
+    i.checked = on;
+    l.append(i, document.createTextNode(' ' + label));
+    host.append(l);
+    i.addEventListener('change', () => void prepEstimate());
+  };
+  const models = $('#prep-models');
+  models.textContent = '';
+  for (const m of prepOptions.models) {
+    check(models, m.id, `${m.title} (${gb(m.size_bytes)}, ${m.tiers.join('/')})`, m.tiers.includes('Modest'));
+  }
+  const accels = $('#prep-accels');
+  accels.textContent = '';
+  for (const a of prepOptions.accelerators) check(accels, a, a.toUpperCase(), true);
+  sel.addEventListener('change', () => void prepEstimate());
+  $('#prep-dest').addEventListener('change', () => void prepEstimate());
+  void prepEstimate();
+}
+
+async function prepEstimate() {
+  const plan = prepPlan();
+  const out = $('#prep-estimate');
+  if (!plan) {
+    out.textContent = 'Choose a destination to see the size.';
+    return;
+  }
+  try {
+    const e = await invoke<{ bytes: number; remaining: number; free_bytes: number }>('prepare_estimate', { plan });
+    const fits = e.free_bytes >= e.remaining + 1024 ** 3;
+    out.textContent = `${gb(e.bytes)} in all; ${gb(e.remaining)} to fetch; ${gb(e.free_bytes)} free at the destination.${fits ? '' : ' That will not fit.'}`;
+    if (fits) $('#prep-start').removeAttribute('disabled');
+    else $('#prep-start').setAttribute('disabled', 'true');
+  } catch (err) {
+    out.textContent = String(err);
+  }
+}
+
+$('#prep-pick').addEventListener('click', async () => {
+  const chosen = await open({ directory: true, multiple: false, title: 'Where the drive is' });
+  if (typeof chosen !== 'string') return;
+  $<HTMLInputElement>('#prep-dest').value = chosen;
+  void prepEstimate();
+});
+
+$('#prep-start').addEventListener('click', async () => {
+  const plan = prepPlan();
+  if (!plan) return;
+  const btn = $('#prep-start');
+  const out = $('#prep-progress');
+  btn.setAttribute('disabled', 'true');
+  const off = await listen<{ phase: string; item: string; received: number; total: number }>('prepare-progress', (e) => {
+    const p = e.payload;
+    const pct = p.total > 0 && p.received <= p.total ? ` ${Math.floor((p.received / p.total) * 100)}%` : '';
+    out.textContent = p.item ? `${p.phase}: ${p.item}${pct}` : p.phase;
+  });
+  try {
+    const root = await invoke<string>('prepare_drive', { plan });
+    out.textContent = `Ready. The drive at ${root} runs Museion on any computer: open Museion.exe on it.`;
+  } catch (err) {
+    out.textContent = String(err);
+  } finally {
+    off();
+    btn.removeAttribute('disabled');
+    void prepEstimate();
+  }
+});
 
 /* --------------------------------------------------------- advanced */
 
