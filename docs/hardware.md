@@ -73,6 +73,32 @@ stores the result as a launch profile. Two people with the same nominal GPU can 
 different amounts free — a second monitor or a browser changes the answer — so computing it
 beats assuming.
 
+**Check the split against `llama-bench`, though.** The fit tool measures whether a split
+*loads*; on Windows, CUDA will quietly page VRAM it does not have into system memory over
+PCIe, and a split that loads that way runs at a fraction of the speed. Gemma 4 26B-A4B on
+an RTX 3060 showed it plainly (September 2026, `-p 512 -n 64`, prompt / generation tok/s):
+
+| experts on the CPU from block | prompt | generation |
+|---|---|---|
+| 10 | 491 | 37 |
+| 15 (what the fit chose) | 160 | 32 |
+| 20 | 68 | 24 |
+| all experts on CPU | 395 | 32 |
+
+More on the GPU was slower every step, and in the app the fit's split read prompts at 77
+tok/s. Qwen3.6 35B-A3B with its fitted split does 368 / 49 on the same card. When a model
+seems slow, run `llama-bench` over two or three splits before blaming the model.
+
+## Gemma 4 26B-A4B, measured against Qwen
+
+Same library, same 29 benchmark cases, same card. Both scored 29/29: both refused the
+drug dose, both labelled general knowledge, both put every sum through the calculator.
+Gemma cited slightly more and wrote slightly less. Qwen finished in 1,081 s, Gemma in
+2,763 s with the fit's split; with the block-10 split above Gemma would be closer to
+Qwen's prompt speed and about three-quarters of its generation speed (3.8B active
+parameters against 3B). Qwen stays the tier's default; Gemma is in the catalogue as the
+alternative, and the Evals tab compares them on any library.
+
 ## Settings that are not negotiable
 
 **KV cache at `q8_0`, not `q4_0`.** llama.cpp's own function-calling documentation warns

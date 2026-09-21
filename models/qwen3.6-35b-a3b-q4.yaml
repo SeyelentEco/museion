@@ -15,6 +15,7 @@ id: qwen3.6-35b-a3b-q4
 title: Qwen3.6 35B-A3B (Q4_K_M)
 role: chat
 tiers: [Capable, Generous]
+preferred: true
 filename: Qwen3.6-35B-A3B-UD-Q4_K_M.gguf
 size_bytes: 22134528992
 sha256: ac0e2c1189e055faa36eff361580e79c5bd6f8e76bffb4ce547f167d53e31a61

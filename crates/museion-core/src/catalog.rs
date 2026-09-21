@@ -84,6 +84,11 @@ pub struct Model {
     pub server_args: Vec<String>,
     pub requires: Option<Requires>,
     pub license: Option<License>,
+    /// The tier's default when more than one model names it. Without this
+    /// the first manifest in directory order wins, which is alphabetical --
+    /// adding a Gemma beside the Qwen would have made Gemma the default.
+    #[serde(default)]
+    pub preferred: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -181,11 +186,12 @@ pub fn chat_model_for(tier: Tier, system_ram_mb: u64) -> Result<Option<Model>> {
     let mut t = tier;
     loop {
         let name = format!("{t:?}");
-        if let Some(m) = all.iter().find(|m| {
+        let fits = |m: &&Model| {
             m.role == "chat"
                 && m.tiers.iter().any(|x| x == &name)
                 && m.requires.as_ref().map_or(true, |r| r.system_ram_mb <= system_ram_mb)
-        }) {
+        };
+        if let Some(m) = all.iter().filter(fits).find(|m| m.preferred).or_else(|| all.iter().find(fits)) {
             return Ok(Some(m.clone()));
         }
         t = match t {
@@ -241,6 +247,12 @@ mod tests {
         let (b, srcs) = bundle("go-bag").unwrap();
         assert_eq!(b.sources.len(), srcs.len());
         assert!(srcs.iter().all(|s| s.sha256.len() == 64));
+    }
+
+    #[test]
+    fn the_preferred_model_wins_a_tier_over_directory_order() {
+        let m = chat_model_for(Tier::Capable, 64_000).unwrap().unwrap();
+        assert_eq!(m.id, "qwen3.6-35b-a3b-q4", "gemma sorts first but qwen is preferred");
     }
 
     #[test]
