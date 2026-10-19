@@ -75,3 +75,8 @@ desktop.ini
 .vscode/
 .idea/
 *.swp
+
+# Python
+__pycache__/
+*.pyc
+/.ci/
