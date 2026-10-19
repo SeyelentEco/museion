@@ -21,9 +21,13 @@ _ALIGN = 32
 
 # Hyperparameters: as small as llama.cpp will load.
 N_EMBD = 64
-N_HEAD = 4
+# Two heads of 32: the q8_0 KV cache the chat model runs with stores keys in
+# blocks of 32, and llama.cpp refuses a head size that does not divide by it.
+N_HEAD = 2
 N_FF = 128
-N_CTX = 512
+# Long enough for a whole question as Museion asks it -- prompt, passages and
+# tools -- since llama-server will not run a model past its trained length.
+N_CTX = 32768
 
 CHAT_TEMPLATE = (
     "{% for m in messages %}<|im_start|>{{ m['role'] }}\n{{ m['content'] }}<|im_end|>\n"

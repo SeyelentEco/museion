@@ -1,8 +1,10 @@
-"""museion -- index and search the offline library from the command line.
+"""museion -- the offline library, from the command line.
 
-The same code the app uses, exposed as a command line so retrieval can be
-measured and regression-tested without a window in the way.
+With no command, Museion opens in the browser (app.py). The commands are the
+same code the window uses, exposed so retrieval can be measured and
+regression-tested without a window in the way.
 
+  python -m museion
   python -m museion index  --library E:\\museion-library
   python -m museion search --library E:\\museion-library how do I purify water
   python -m museion status --library E:\\museion-library
@@ -18,7 +20,7 @@ import sys
 from contextlib import closing
 from pathlib import Path
 
-from museion import ask, calc, evals, fit, hardware, indexer, tools, tuning
+from museion import app, ask, calc, evals, fit, hardware, indexer, tools, tuning
 from museion.index import Index
 from museion.kiwix import Kiwix, book_id_from_filename
 from museion.llama import Llama
@@ -50,8 +52,8 @@ def main(argv: list[str] | None = None) -> None:
             stream.reconfigure(encoding="utf-8")
     args = parser().parse_args(argv)
     if not args.command:
-        parser().print_help()
-        return
+        # No command: what a person double-clicking Museion wants.
+        args = parser().parse_args(["app"])
     try:
         args.run(args)
     except EXPECTED_ERRORS as e:
@@ -62,8 +64,12 @@ def main(argv: list[str] | None = None) -> None:
 
 
 def parser() -> argparse.ArgumentParser:
-    top = argparse.ArgumentParser(prog="museion", description="Offline library index and search.")
+    top = argparse.ArgumentParser(prog="museion", description="Offline library: the window, index and search.")
     commands = top.add_subparsers(dest="command", metavar="<command>")
+
+    c = commands.add_parser("app", help="open Museion in the browser (what no command does)")
+    app.add_arguments(c)
+    c.set_defaults(run=lambda a: app.serve(a.port, not a.no_browser, a.stay, a.config_dir))
 
     # Where the index is, shared by every command that reads it.
     where = argparse.ArgumentParser(add_help=False)
