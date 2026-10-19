@@ -1,0 +1,477 @@
+{
+  "books": [
+    [
+      "folder:found",
+      4
+    ],
+    [
+      "zimgit-water_en_2024-01",
+      2
+    ]
+  ],
+  "processed_books": [
+    "folder:found",
+    "zimgit-water_en_2024-01"
+  ],
+  "results": [
+    {
+      "best": 1.0,
+      "gated": 5,
+      "hits": [
+        {
+          "author": "",
+          "body": "To disinfect clear water add two drops of unscented household bleach per litre, stir well and let it stand for thirty minutes before drinking. Cloudy water needs four drops.",
+          "book": "folder:found",
+          "coverage": 1.0,
+          "doc_title": "Water Treatment WHO",
+          "file": "found/Water_Treatment-WHO.pdf",
+          "page": 2,
+          "rank": -3.4682634095725806,
+          "snippet": "To disinfect clear water add two drops of unscented household bleach per litre, stir well and let it stand for thirty minutes before drinking ... "
+        },
+        {
+          "author": "FEMA",
+          "body": "Replace stored water every six months, and treat it with bleach before drinking if the container seal was ever broken or the water smells stale or looks cloudy.",
+          "book": "zimgit-water_en_2024-01",
+          "coverage": 0.4801276622510202,
+          "doc_title": "Don't Drink the Water",
+          "file": "Emergency Preparedness (1).pdf",
+          "page": 2,
+          "rank": -1.4154319097686148,
+          "snippet": "Replace stored water every six months, and treat it with bleach before drinking if the container seal was ever broken or the water smells ... "
+        },
+        {
+          "author": "",
+          "body": "Water Treatment Guide. This guide explains how households can make drinking water safe when the normal supply has failed after a disaster or during a long outage.",
+          "book": "folder:found",
+          "coverage": 0.0728687706391513,
+          "doc_title": "Water Treatment WHO",
+          "file": "found/Water_Treatment-WHO.pdf",
+          "page": 1,
+          "rank": -1.508521913491836e-6,
+          "snippet": " ... This guide explains how households can make drinking water safe when the normal supply has failed after a disaster or during a long outage."
+        },
+        {
+          "author": "FEMA",
+          "body": "Store at least four litres of water per person per day for drinking and sanitation, in clean food grade containers kept away from sunlight, fuel and garden chemicals.",
+          "book": "zimgit-water_en_2024-01",
+          "coverage": 0.0728687706391513,
+          "doc_title": "Don't Drink the Water",
+          "file": "Emergency Preparedness (1).pdf",
+          "page": 1,
+          "rank": -1.2085484796328172e-6,
+          "snippet": "Store at least four litres of water per person per day for drinking and sanitation, in clean food grade containers kept away from sunlight ... "
+        },
+        {
+          "author": "",
+          "body": "Boiling is the most reliable method. Bring the water to a rolling boil for one full minute, or three minutes above two thousand metres of altitude, then let it cool.",
+          "book": "folder:found",
+          "coverage": 0.0728687706391513,
+          "doc_title": "Water Treatment WHO",
+          "file": "found/Water_Treatment-WHO.pdf",
+          "page": 3,
+          "rank": -1.2085484796328172e-6,
+          "snippet": " ... Bring the water to a rolling boil for one full minute, or three minutes above two thousand metres of altitude, then let it cool."
+        }
+      ],
+      "limit": 5,
+      "query": "how do I disinfect water with bleach?"
+    },
+    {
+      "best": 0.537276991620391,
+      "gated": 5,
+      "hits": [
+        {
+          "author": "",
+          "body": "Water Treatment Guide. This guide explains how households can make drinking water safe when the normal supply has failed after a disaster or during a long outage.",
+          "book": "folder:found",
+          "coverage": 0.527581348242563,
+          "doc_title": "Water Treatment WHO",
+          "file": "found/Water_Treatment-WHO.pdf",
+          "page": 1,
+          "rank": -2.0881834186206514,
+          "snippet": " ... This guide explains how households can make drinking water safe when the normal supply has failed after a disaster or during a long outage."
+        },
+        {
+          "author": "",
+          "body": "Boiling is the most reliable method. Bring the water to a rolling boil for one full minute, or three minutes above two thousand metres of altitude, then let it cool.",
+          "book": "folder:found",
+          "coverage": 0.537276991620391,
+          "doc_title": "Water Treatment WHO",
+          "file": "found/Water_Treatment-WHO.pdf",
+          "page": 3,
+          "rank": -1.493495203825223,
+          "snippet": " ... Bring the water to a rolling boil for one full minute, or three minutes above two thousand metres of altitude, then let it cool."
+        },
+        {
+          "author": "",
+          "body": "Pack the beans into hot jars leaving one inch of headspace, add boiling water and process pints for twenty minutes at ten pounds of pressure, adjusting for altitude.",
+          "book": "folder:found",
+          "coverage": 0.537276991620391,
+          "doc_title": "Home Canning",
+          "file": "found/Home_Canning.pdf",
+          "page": 2,
+          "rank": -1.304014006906605,
+          "snippet": " ... hot jars leaving one inch of headspace, add boiling water and process pints for twenty minutes at ten pounds of pressure, adjusting for altitude."
+        },
+        {
+          "author": "",
+          "body": "Canning green beans safely needs a pressure canner, because beans are a low acid food and boiling water cannot destroy the spores that cause botulism poisoning.",
+          "book": "folder:found",
+          "coverage": 0.3010676657416726,
+          "doc_title": "Home Canning",
+          "file": "found/Home_Canning.pdf",
+          "page": 1,
+          "rank": -0.6696051198778823,
+          "snippet": "Canning green beans safely needs a pressure canner, because beans are a low acid food and boiling water cannot destroy the spores that cause ... "
+        },
+        {
+          "author": "",
+          "body": "Contents Bleeding 4 Burns 9 Fractures 12 Shock 15 Wounds 18 Water 21 Canning 24 Altitude 27 Index 30 Splints 33 Bandages 36 Eyes 39",
+          "book": "folder:found",
+          "coverage": 0.3010676657416726,
+          "doc_title": "Field First Aid",
+          "file": "found/Field_First_Aid.pdf",
+          "page": 1,
+          "rank": -0.6696051198778823,
+          "snippet": "Contents Bleeding 4 Burns 9 Fractures 12 Shock 15 Wounds 18 Water 21 Canning 24 Altitude 27 Index 30 Splints 33 Bandages 36 Eyes ... "
+        }
+      ],
+      "limit": 5,
+      "query": "how long should I boil water at altitude"
+    },
+    {
+      "best": 1.0,
+      "gated": 3,
+      "hits": [
+        {
+          "author": "",
+          "body": "To stop bleeding from a deep wound press firmly on it with a clean cloth and keep pressing for at least ten minutes without lifting to look. Raise the injured limb.",
+          "book": "folder:found",
+          "coverage": 1.0,
+          "doc_title": "Field First Aid",
+          "file": "found/Field_First_Aid.pdf",
+          "page": 2,
+          "rank": -6.338129738851837,
+          "snippet": "To stop bleeding from a deep wound press firmly on it with a clean cloth and keep pressing for at least ten minutes without ... "
+        },
+        {
+          "author": "",
+          "body": "A wound that will not close or that shows spreading redness, heat and pus is infected. Clean it twice a day with boiled water and seek help if a fever develops.",
+          "book": "folder:found",
+          "coverage": 0.18449357559160565,
+          "doc_title": "Field First Aid",
+          "file": "found/Field_First_Aid.pdf",
+          "page": 3,
+          "rank": -0.9725585391881122,
+          "snippet": "A wound that will not close or that shows spreading redness, heat and pus is infected. Clean it twice a day with boiled water ... "
+        },
+        {
+          "author": "",
+          "body": "Contents Bleeding 4 Burns 9 Fractures 12 Shock 15 Wounds 18 Water 21 Canning 24 Altitude 27 Index 30 Splints 33 Bandages 36 Eyes 39",
+          "book": "folder:found",
+          "coverage": 0.4140177108847101,
+          "doc_title": "Field First Aid",
+          "file": "found/Field_First_Aid.pdf",
+          "page": 1,
+          "rank": -2.5622424256658993,
+          "snippet": "Contents Bleeding 4 Burns 9 Fractures 12 Shock 15 Wounds 18 Water 21 Canning 24 Altitude 27 Index 30 Splints 33 Bandages 36 Eyes ... "
+        }
+      ],
+      "limit": 3,
+      "query": "how do I stop bleeding from a deep wound"
+    },
+    {
+      "best": 0.3181183586798395,
+      "gated": 0,
+      "hits": [
+        {
+          "author": "",
+          "body": "Canning green beans safely needs a pressure canner, because beans are a low acid food and boiling water cannot destroy the spores that cause botulism poisoning.",
+          "book": "folder:found",
+          "coverage": 0.3181183586798395,
+          "doc_title": "Home Canning",
+          "file": "found/Home_Canning.pdf",
+          "page": 1,
+          "rank": -6.728108838131108,
+          "snippet": "Canning green beans safely needs a pressure canner, because beans are a low acid food and boiling water cannot destroy the spores that cause ... "
+        },
+        {
+          "author": "",
+          "body": "Pack the beans into hot jars leaving one inch of headspace, add boiling water and process pints for twenty minutes at ten pounds of pressure, adjusting for altitude.",
+          "book": "folder:found",
+          "coverage": 0.11907387666706808,
+          "doc_title": "Home Canning",
+          "file": "found/Home_Canning.pdf",
+          "page": 2,
+          "rank": -1.67850626129998,
+          "snippet": "Pack the beans into hot jars leaving one inch of headspace, add boiling water and process pints for twenty minutes at ten pounds of ... "
+        },
+        {
+          "author": "",
+          "body": "Water Treatment Guide. This guide explains how households can make drinking water safe when the normal supply has failed after a disaster or during a long outage.",
+          "book": "folder:found",
+          "coverage": 0.04110989470471087,
+          "doc_title": "Water Treatment WHO",
+          "file": "found/Water_Treatment-WHO.pdf",
+          "page": 1,
+          "rank": -0.3179663494206292,
+          "snippet": " ... This guide explains how households can make drinking water safe when the normal supply has failed after a disaster or during a long outage."
+        },
+        {
+          "author": "",
+          "body": "Altitude adjustment for the pressure canner: up to 1000 feet use 10 pounds, 1001 to 2000 feet use 11 pounds, 2001 to 4000 feet use 12 pounds, above that use 13 pounds.",
+          "book": "folder:found",
+          "coverage": 0.04110989470471087,
+          "doc_title": "Home Canning",
+          "file": "found/Home_Canning.pdf",
+          "page": 3,
+          "rank": -0.19398496332305162,
+          "snippet": "Altitude adjustment for the pressure canner: up to 1000 feet use 10 pounds, 1001 to 2000 feet use 11 pounds, 2001 to 4000 feet ... "
+        },
+        {
+          "author": "",
+          "body": "Contents Bleeding 4 Burns 9 Fractures 12 Shock 15 Wounds 18 Water 21 Canning 24 Altitude 27 Index 30 Splints 33 Bandages 36 Eyes 39",
+          "book": "folder:found",
+          "coverage": 0.04110989470471087,
+          "doc_title": "Field First Aid",
+          "file": "found/Field_First_Aid.pdf",
+          "page": 1,
+          "rank": -0.3265482226525242,
+          "snippet": "Contents Bleeding 4 Burns 9 Fractures 12 Shock 15 Wounds 18 Water 21 Canning 24 Altitude 27 Index 30 Splints 33 Bandages 36 Eyes ... "
+        }
+      ],
+      "limit": 5,
+      "query": "we have a lot of green beans and no fridge, how do I can them so nobody gets botulism"
+    },
+    {
+      "best": 0.0,
+      "gated": 0,
+      "hits": [
+        {
+          "author": "",
+          "body": "Canning green beans safely needs a pressure canner, because beans are a low acid food and boiling water cannot destroy the spores that cause botulism poisoning.",
+          "book": "folder:found",
+          "coverage": 0.0,
+          "doc_title": "Home Canning",
+          "file": "found/Home_Canning.pdf",
+          "page": 1,
+          "rank": -2.1445416867551574,
+          "snippet": "Canning green beans safely needs a pressure canner, because beans are a low acid food and boiling water cannot destroy the spores that cause ... "
+        }
+      ],
+      "limit": 5,
+      "query": "what caused the Bronze Age collapse"
+    },
+    {
+      "best": 0.30346291348559606,
+      "gated": 0,
+      "hits": [
+        {
+          "author": "",
+          "body": "To stop bleeding from a deep wound press firmly on it with a clean cloth and keep pressing for at least ten minutes without lifting to look. Raise the injured limb.",
+          "book": "folder:found",
+          "coverage": 0.30346291348559606,
+          "doc_title": "Field First Aid",
+          "file": "found/Field_First_Aid.pdf",
+          "page": 2,
+          "rank": -2.9564641130063443,
+          "snippet": "To stop bleeding from a deep wound press firmly on it with a clean cloth and keep pressing for at least ten minutes without ... "
+        },
+        {
+          "author": "",
+          "body": "A wound that will not close or that shows spreading redness, heat and pus is infected. Clean it twice a day with boiled water and seek help if a fever develops.",
+          "book": "folder:found",
+          "coverage": 0.30346291348559606,
+          "doc_title": "Field First Aid",
+          "file": "found/Field_First_Aid.pdf",
+          "page": 3,
+          "rank": -2.9564641130063443,
+          "snippet": "A wound that will not close or that shows spreading redness, heat and pus is infected. Clean it twice a day with boiled water ... "
+        },
+        {
+          "author": "",
+          "body": "Contents Bleeding 4 Burns 9 Fractures 12 Shock 15 Wounds 18 Water 21 Canning 24 Altitude 27 Index 30 Splints 33 Bandages 36 Eyes 39",
+          "book": "folder:found",
+          "coverage": 0.11725392584479663,
+          "doc_title": "Field First Aid",
+          "file": "found/Field_First_Aid.pdf",
+          "page": 1,
+          "rank": -1.0513062504706183,
+          "snippet": "Contents Bleeding 4 Burns 9 Fractures 12 Shock 15 Wounds 18 Water 21 Canning 24 Altitude 27 Index 30 Splints 33 Bandages 36 Eyes ... "
+        }
+      ],
+      "limit": 5,
+      "query": "wound that won't close (deep) NOT healing"
+    },
+    {
+      "best": 1.0,
+      "gated": 2,
+      "hits": [
+        {
+          "author": "",
+          "body": "To stop bleeding from a deep wound press firmly on it with a clean cloth and keep pressing for at least ten minutes without lifting to look. Raise the injured limb.",
+          "book": "folder:found",
+          "coverage": 0.20705876288677397,
+          "doc_title": "Field First Aid",
+          "file": "found/Field_First_Aid.pdf",
+          "page": 2,
+          "rank": -1.397760052027261,
+          "snippet": "To stop bleeding from a deep wound press firmly on it with a clean cloth and keep pressing for at least ten minutes without ... "
+        },
+        {
+          "author": "",
+          "body": "Contents Bleeding 4 Burns 9 Fractures 12 Shock 15 Wounds 18 Water 21 Canning 24 Altitude 27 Index 30 Splints 33 Bandages 36 Eyes 39",
+          "book": "folder:found",
+          "coverage": 1.0,
+          "doc_title": "Field First Aid",
+          "file": "found/Field_First_Aid.pdf",
+          "page": 1,
+          "rank": -7.944561235460753,
+          "snippet": "Contents Bleeding 4 Burns 9 Fractures 12 Shock 15 Wounds 18 Water 21 Canning 24 Altitude 27 Index 30 Splints 33 Bandages 36 Eyes ... "
+        }
+      ],
+      "limit": 5,
+      "query": "bleeding burns fractures shock"
+    },
+    {
+      "best": 0.15176957373694097,
+      "gated": 0,
+      "hits": [
+        {
+          "author": "FEMA",
+          "body": "Replace stored water every six months, and treat it with bleach before drinking if the container seal was ever broken or the water smells stale or looks cloudy.",
+          "book": "zimgit-water_en_2024-01",
+          "coverage": 0.15176957373694097,
+          "doc_title": "Don't Drink the Water",
+          "file": "Emergency Preparedness (1).pdf",
+          "page": 2,
+          "rank": -1.4154319097686148,
+          "snippet": "Replace stored water every six months, and treat it with bleach before drinking if the container seal was ever broken or the water smells ... "
+        },
+        {
+          "author": "FEMA",
+          "body": "Store at least four litres of water per person per day for drinking and sanitation, in clean food grade containers kept away from sunlight, fuel and garden chemicals.",
+          "book": "zimgit-water_en_2024-01",
+          "coverage": 0.15176957373694097,
+          "doc_title": "Don't Drink the Water",
+          "file": "Emergency Preparedness (1).pdf",
+          "page": 1,
+          "rank": -1.4154316440029848,
+          "snippet": "Store at least four litres of water per person per day for drinking and sanitation, in clean food grade containers kept away from sunlight ... "
+        },
+        {
+          "author": "",
+          "body": "Water Treatment Guide. This guide explains how households can make drinking water safe when the normal supply has failed after a disaster or during a long outage.",
+          "book": "folder:found",
+          "coverage": 0.15176957373694097,
+          "doc_title": "Water Treatment WHO",
+          "file": "found/Water_Treatment-WHO.pdf",
+          "page": 1,
+          "rank": -1.508521913491836e-6,
+          "snippet": " ... This guide explains how households can make drinking water safe when the normal supply has failed after a disaster or during a long outage."
+        },
+        {
+          "author": "",
+          "body": "To disinfect clear water add two drops of unscented household bleach per litre, stir well and let it stand for thirty minutes before drinking. Cloudy water needs four drops.",
+          "book": "folder:found",
+          "coverage": 0.15176957373694097,
+          "doc_title": "Water Treatment WHO",
+          "file": "found/Water_Treatment-WHO.pdf",
+          "page": 2,
+          "rank": -1.485543018335684e-6,
+          "snippet": "To disinfect clear water add two drops of unscented household bleach per litre, stir well and let it stand for thirty minutes before drinking ... "
+        },
+        {
+          "author": "",
+          "body": "Boiling is the most reliable method. Bring the water to a rolling boil for one full minute, or three minutes above two thousand metres of altitude, then let it cool.",
+          "book": "folder:found",
+          "coverage": 0.15176957373694097,
+          "doc_title": "Water Treatment WHO",
+          "file": "found/Water_Treatment-WHO.pdf",
+          "page": 3,
+          "rank": -1.2085484796328172e-6,
+          "snippet": " ... Bring the water to a rolling boil for one full minute, or three minutes above two thousand metres of altitude, then let it cool."
+        },
+        {
+          "author": "",
+          "body": "Canning green beans safely needs a pressure canner, because beans are a low acid food and boiling water cannot destroy the spores that cause botulism poisoning.",
+          "book": "folder:found",
+          "coverage": 0.15176957373694097,
+          "doc_title": "Home Canning",
+          "file": "found/Home_Canning.pdf",
+          "page": 1,
+          "rank": -1.0528551793077595e-6,
+          "snippet": "Canning green beans safely needs a pressure canner, because beans are a low acid food and boiling water cannot destroy the spores that cause ... "
+        },
+        {
+          "author": "",
+          "body": "Pack the beans into hot jars leaving one inch of headspace, add boiling water and process pints for twenty minutes at ten pounds of pressure, adjusting for altitude.",
+          "book": "folder:found",
+          "coverage": 0.15176957373694097,
+          "doc_title": "Home Canning",
+          "file": "found/Home_Canning.pdf",
+          "page": 2,
+          "rank": -1.0251855456868231e-6,
+          "snippet": "Pack the beans into hot jars leaving one inch of headspace, add boiling water and process pints for twenty minutes at ten pounds of ... "
+        },
+        {
+          "author": "",
+          "body": "A wound that will not close or that shows spreading redness, heat and pus is infected. Clean it twice a day with boiled water and seek help if a fever develops.",
+          "book": "folder:found",
+          "coverage": 0.15176957373694097,
+          "doc_title": "Field First Aid",
+          "file": "found/Field_First_Aid.pdf",
+          "page": 3,
+          "rank": -9.739914460755983e-7,
+          "snippet": " ... Clean it twice a day with boiled water and seek help if a fever develops."
+        },
+        {
+          "author": "",
+          "body": "Contents Bleeding 4 Burns 9 Fractures 12 Shock 15 Wounds 18 Water 21 Canning 24 Altitude 27 Index 30 Splints 33 Bandages 36 Eyes 39",
+          "book": "folder:found",
+          "coverage": 0.15176957373694097,
+          "doc_title": "Field First Aid",
+          "file": "found/Field_First_Aid.pdf",
+          "page": 1,
+          "rank": -1.0528551793077595e-6,
+          "snippet": "Contents Bleeding 4 Burns 9 Fractures 12 Shock 15 Wounds 18 Water 21 Canning 24 Altitude 27 Index 30 Splints 33 Bandages 36 Eyes ... "
+        }
+      ],
+      "limit": 10,
+      "query": "storing water"
+    },
+    {
+      "best": 1.0,
+      "gated": 1,
+      "hits": [
+        {
+          "author": "",
+          "body": "Signal for rescue with three fires in a triangle, three whistle blasts or a mirror flash aimed at aircraft; rescuers everywhere read groups of three as a call for help.",
+          "book": "zimgit-water_en_2024-01",
+          "coverage": 1.0,
+          "doc_title": "Emergency Preparedness (2).pdf",
+          "file": "Emergency Preparedness (2).pdf",
+          "page": 1,
+          "rank": -3.967811147636464,
+          "snippet": "Signal for rescue with three fires in a triangle, three whistle blasts or a mirror flash aimed at aircraft; rescuers everywhere read groups of ... "
+        }
+      ],
+      "limit": 5,
+      "query": "signal for rescue"
+    },
+    {
+      "best": 0.0,
+      "gated": 0,
+      "hits": [],
+      "limit": 5,
+      "query": "what is it?"
+    }
+  ],
+  "stats": {
+    "documents": 6,
+    "image_only": 1,
+    "pages": 14,
+    "words": 347
+  }
+}

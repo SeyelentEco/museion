@@ -1,0 +1,26 @@
+# Generated from models/qwen3-4b-instruct-q4.yaml by scripts/yaml-to-toml.mjs. Edit the YAML, not this file, until the Rust app is retired.
+
+# The chat model for the Modest tier: CPU-only machines, or under ~6 GB of VRAM.
+#
+# Small enough to run everywhere, which is the point. Answers are noticeably
+# less capable than the MoE tiers, but every answer is still built from
+# retrieved passages with citations, so the model's job is mostly to read and
+# summarise -- a task a 4B model does acceptably. Slow on CPU, but working.
+
+id = "qwen3-4b-instruct-q4"
+title = "Qwen3 4B Instruct (Q4_K_M)"
+role = "chat"
+tiers = ["Modest"]
+filename = "Qwen3-4B-Instruct-2507-Q4_K_M.gguf"
+size_bytes = 2497281120
+sha256 = "3605803b982cb64aead44f6c1b2ae36e3acdb41d8e46c8a94c6533bc4c67e597"
+quant = "Q4_K_M"
+context = 262144
+urls = [
+  "https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF/resolve/main/Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
+]
+server_args = [
+  "--ctx-size",
+  "16384",
+]
+license = { name = "Apache-2.0", attribution = "Alibaba Qwen team; GGUF quantisation by Unsloth" }

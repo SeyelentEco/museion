@@ -621,8 +621,12 @@ impl<'a> Asker<'a> {
     }
 
     /// Format search hits for the model, numbering them continuously across
-    /// searches so citations stay unambiguous, and skipping passages already
-    /// shown.
+    /// searches so citations stay unambiguous. A passage already shown keeps
+    /// its number. The file is part of what makes it the same passage: every
+    /// PDF in an archive shares the archive's book id, and every article from
+    /// a native archive has page 0, so book and page alone gave page 2 of
+    /// Home Canning the number of page 2 of the water guide shown before it,
+    /// and a citation of it named the wrong book.
     fn render_search(
         &self,
         hits: &[Hit],
@@ -638,7 +642,7 @@ impl<'a> Asker<'a> {
         let mut out = String::new();
         for h in hits {
             let key = (h.book.clone(), h.page);
-            let n = if let Some(i) = sources.iter().position(|s| s.book == h.book && s.page == h.page) {
+            let n = if let Some(i) = sources.iter().position(|s| s.book == h.book && s.page == h.page && s.file == h.file) {
                 i + 1
             } else {
                 seen.insert(key);
@@ -948,6 +952,28 @@ mod tests {
         assert!(flat.contains("EXACTLY as calculate returned it"));
         assert!(flat.contains("The library has nothing on this, so from general knowledge:"));
         assert!(flat.contains("Cite each with its bracketed number"));
+    }
+
+    #[test]
+    fn two_documents_in_one_archive_never_share_a_citation_number() {
+        let dir = std::env::temp_dir().join(format!("museion-ask-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let index = Index::open(&dir.join("index.db")).unwrap();
+        let chat = Llama::new("http://127.0.0.1:1");
+        let asker = Asker { index: &index, chat: &chat, reranker: None, kiwix: None, native_books: Vec::new(), tuning: Tuning::default() };
+        let hit = |title: &str, file: &str| Hit {
+            doc_title: title.into(), author: String::new(), book: "zimgit-water".into(), file: file.into(),
+            page: 2, snippet: String::new(), rank: 0.0, coverage: 1.0, body: "text".into(),
+        };
+        let mut sources = Vec::new();
+        let mut seen = HashSet::new();
+        let first = asker.render_search(&[hit("Water Guide", "water.pdf"), hit("Home Canning", "canning.pdf")], &mut sources, &mut seen);
+        assert!(first.contains("[1] Water Guide (page 2)") && first.contains("[2] Home Canning (page 2)"), "{first}");
+        // Found again by a later search, a passage keeps its number.
+        let again = asker.render_search(&[hit("Home Canning", "canning.pdf")], &mut sources, &mut seen);
+        assert!(again.starts_with("[2] Home Canning"), "{again}");
+        assert_eq!(sources.len(), 2);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

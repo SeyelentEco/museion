@@ -8,17 +8,54 @@
 # which has no way to do that).
 name: python
 on:
+  # The data folders are here because the TOML the Python app reads is
+  # generated from them (see the data job), and the Rust crate because the
+  # Python port must keep matching it (see the parity job).
   pull_request:
-    paths: ['museion/**', 'tests/**', '.github/workflows/python.yml']
+    paths: ['museion/**', 'tests/**', '.github/workflows/python.yml',
+            'catalog/**', 'models/**', 'tools/**', 'evals/**', 'crates/museion-core/**',
+            'scripts/yaml-to-toml.mjs', 'package.json', 'package-lock.json']
   push:
     branches: [main]
-    paths: ['museion/**', 'tests/**', '.github/workflows/python.yml']
+    paths: ['museion/**', 'tests/**', '.github/workflows/python.yml',
+            'catalog/**', 'models/**', 'tools/**', 'evals/**', 'crates/museion-core/**',
+            'scripts/yaml-to-toml.mjs', 'package.json', 'package-lock.json']
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
+  # The TOML under catalog/, models/, tools/ and evals/, and museion/tuning.toml,
+  # are generated from the YAML the Rust app still reads. This fails if anyone
+  # edited one side without regenerating the other, or if the TOML holds
+  # different data from the YAML.
+  data:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+      - name: The TOML is what the YAML generates
+        run: node scripts/yaml-to-toml.mjs --check
+      - name: The TOML holds the same data as the YAML
+        run: python3 -m unittest discover -s tests -p test_data.py -v
+
+  # Until the Rust code is retired: asked the same question of the same index,
+  # with the same scripted model, the Python and Rust command lines must send
+  # the model exactly the same requests and print the same answer.
+  parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the Rust command line
+        run: cargo build -p museion-core --bin museion
+      - name: Python asks exactly as Rust does
+        env:
+          MUSEION_RUST: ${{ github.workspace }}/target/debug/museion
+        run: python3 -m unittest discover -s tests -p test_parity_rust.py -v
+
   test:
     strategy:
       fail-fast: false

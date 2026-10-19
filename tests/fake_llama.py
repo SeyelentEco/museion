@@ -2,7 +2,9 @@
 
 It answers /v1/chat/completions with a scripted stream of server-sent events
 and /v1/rerank with scripted scores, the same shapes the real server sends.
-Each test sets `FakeLlama.chunks` or `FakeLlama.rerank_scores` before calling.
+Each test sets `FakeLlama.chunks` or `FakeLlama.rerank_scores` before calling,
+or `FakeLlama.script`, a list of chunk lists played one per chat request
+before falling back to `chunks`.
 """
 
 import json
@@ -13,6 +15,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 class FakeLlama:
     def __init__(self) -> None:
         self.chunks: list[dict] = []
+        self.script: list[list[dict]] = []
         self.rerank_scores: list[float] = []
         self.requests: list[dict] = []
         fake = self
@@ -37,7 +40,7 @@ class FakeLlama:
                 self.send_response(200)
                 self.send_header("Content-Type", "text/event-stream")
                 self.end_headers()
-                for chunk in fake.chunks:
+                for chunk in fake.script.pop(0) if fake.script else fake.chunks:
                     self.wfile.write(f"data: {json.dumps(chunk)}\n\n".encode())
                 self.wfile.write(b"data: [DONE]\n\n")
 

@@ -1,0 +1,23 @@
+# Generated from catalog/bundles/go-bag.yaml by scripts/yaml-to-toml.mjs. Edit the YAML, not this file, until the Rust app is retired.
+
+# The Go Bag: the smallest library worth having.
+#
+# Chosen so that the whole thing fits comfortably on a phone-sized SD card and
+# downloads in minutes rather than days. Everything here answers a question you
+# might have in the first week: how do I make this water safe, what do I do
+# about this wound, how do I keep this food from killing me, how do I tie this
+# so it holds.
+#
+# Broader reference -- Wikipedia, medical corpora, repair guides -- lives in
+# the larger bundles. This one is the floor, not the ceiling.
+
+id = "go-bag"
+title = "Go Bag"
+description = "Immediate-crisis essentials. Water, medicine, food, shelter, knots."
+sources = [
+  "zimgit-post-disaster",
+  "zimgit-medicine",
+  "zimgit-water",
+  "zimgit-food-preparation",
+  "zimgit-knots",
+]

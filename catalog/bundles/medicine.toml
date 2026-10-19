@@ -1,0 +1,15 @@
+# Generated from catalog/bundles/medicine.yaml by scripts/yaml-to-toml.mjs. Edit the YAML, not this file, until the Rust app is retired.
+
+# Everything the library holds on keeping people alive and well.
+#
+# This is the highest-value and highest-risk material here, and it is worth
+# being deliberate about that. See docs/safety.md.
+
+id = "medicine"
+title = "Medicine"
+description = "Clinical reference for when professional care is unavailable."
+sources = [
+  "zimgit-medicine",
+  "mdwiki_en_all_maxi",
+  "wikipedia_en_medicine_nopic",
+]

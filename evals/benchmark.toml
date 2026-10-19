@@ -1,0 +1,291 @@
+# Generated from evals/benchmark.yaml by scripts/yaml-to-toml.mjs. Edit the YAML, not this file, until the Rust app is retired.
+
+# The Museion benchmark.
+#
+# Questions people would actually put to this library, grouped by what they
+# test and by when in the aftermath of a disaster they come up. Every case is
+# checked by machine against things the system already reports -- the basis,
+# the sources, the calculator log -- so a run compares models, not opinions.
+#
+# Capabilities
+#   retrieve_pdf      find it in the indexed PDF collections (the Go Bag)
+#   retrieve_article  find it in an archive with its own index (Wikipedia etc.)
+#   calculate         get a number right, via the calculator
+#   reason            combine a fact from the library with the person's numbers
+#   plan              produce an ordered, multi-step, multi-source answer
+#   refuse            say the library does not cover it, or label general knowledge
+#
+# Horizons
+#   month        the first weeks: water, wounds, sanitation, fallout, fire
+#   six_months   living on stores: preserving food, fuel, hygiene, infection
+#   year         producing again: growing, keeping animals, soap, tools
+#   five_years   rebuilding: metallurgy, chemistry, power, machines
+#
+# Checks (any combination; a case passes when every check passes)
+#   expect_any:        [terms]   at least one appears in the answer or sources
+#   expect_all:        [terms]   every one appears
+#   expect_basis:      library | library_and_calculation | computed | general_knowledge
+#   expect_number:     {value, tolerance}  found among the calculator's results
+#   min_sources:       N         at least N distinct sources cited
+#   min_steps:         N         at least N numbered or bulleted steps
+#   source_from:       text      some source's title or archive contains it
+#   must_not_contain:  [terms]   none of these appear (the answer stayed grounded)
+
+# ---------------------------------------------------------------- month
+[[cases]]
+id = "water-bleach-dose"
+capability = "retrieve_pdf"
+horizon = "month"
+prompt = "How much household bleach do I add to a gallon of water to make it safe to drink?"
+expect_any = ["1/4 teaspoon", "¼ teaspoon", "16 drops", "8 drops"]
+expect_basis = "library"
+min_sources = 1
+
+[[cases]]
+id = "water-no-chemicals"
+capability = "retrieve_pdf"
+horizon = "month"
+prompt = "How can I make water safe to drink if I have no bleach or tablets?"
+expect_any = ["boil", "boiling", "distill", "solar"]
+expect_basis = "library"
+
+[[cases]]
+id = "wound-bleeding"
+capability = "retrieve_pdf"
+horizon = "month"
+prompt = "Someone has a deep cut that will not stop bleeding and there is no doctor. What do I do right now?"
+expect_all = ["pressure"]
+expect_any = ["raise", "elevate", "tourniquet"]
+expect_basis = "library"
+source_from = "No Doctor"
+
+[[cases]]
+id = "fallout-shelter"
+capability = "retrieve_pdf"
+horizon = "month"
+prompt = "There has been a nuclear detonation upwind. How long do I need to stay sheltered from fallout, and what makes a good shelter?"
+expect_any = ["fallout", "shielding", "days", "hours"]
+expect_basis = "library"
+min_sources = 1
+
+[[cases]]
+id = "latrine"
+capability = "retrieve_pdf"
+horizon = "month"
+prompt = "The toilets do not work. How do I dig and manage a latrine so nobody gets sick?"
+expect_any = ["latrine", "feet", "metres", "meters", "downhill", "water source", "lime"]
+expect_basis = "library"
+
+[[cases]]
+id = "hypothermia"
+capability = "retrieve_pdf"
+horizon = "month"
+prompt = "Someone fell in cold water and is shivering badly and confused. What do I do?"
+expect_any = ["hypothermia", "warm", "blankets", "wet clothing"]
+expect_basis = "library"
+
+[[cases]]
+id = "bowline"
+capability = "retrieve_pdf"
+horizon = "month"
+prompt = "How do I tie a bowline?"
+expect_any = ["bowline", "loop"]
+expect_basis = "library"
+
+# ------------------------------------------------------------ six_months
+[[cases]]
+id = "canning-beans"
+capability = "retrieve_pdf"
+horizon = "six_months"
+prompt = "We have a lot of green beans and no fridge. How do I can them so nobody gets botulism?"
+expect_all = ["pressure"]
+expect_any = ["canner", "pounds", "psi", "headspace"]
+expect_basis = "library"
+min_steps = 3
+
+[[cases]]
+id = "drying-meat"
+capability = "retrieve_pdf"
+horizon = "six_months"
+prompt = "How do I dry meat into jerky so it keeps without refrigeration?"
+expect_any = ["jerky", "dry", "strips", "salt", "smoke"]
+expect_basis = "library"
+
+[[cases]]
+id = "infected-wound"
+capability = "retrieve_pdf"
+horizon = "six_months"
+prompt = "A cut from two weeks ago is red, swollen and leaking pus. What should I do without antibiotics?"
+expect_any = ["infection", "infected", "hot water", "soak", "drain", "clean"]
+expect_basis = "library"
+source_from = "No Doctor"
+
+[[cases]]
+id = "solar-dehydrator"
+capability = "retrieve_article"
+horizon = "six_months"
+prompt = "How do I build a solar dehydrator for drying food?"
+expect_any = ["solar", "dehydrator", "dry"]
+expect_basis = "library"
+min_steps = 3
+
+# ------------------------------------------------------------------ year
+[[cases]]
+id = "lye-from-ash"
+capability = "retrieve_article"
+horizon = "year"
+prompt = "How is lye made from wood ash?"
+expect_any = ["ash", "leach", "potash", "potassium"]
+expect_basis = "library"
+
+[[cases]]
+id = "soap"
+capability = "retrieve_article"
+horizon = "year"
+prompt = "How do I make soap from fat and lye?"
+expect_any = ["saponification", "fat", "lye", "tallow", "stir"]
+expect_basis = "library"
+
+[[cases]]
+id = "delivering-baby"
+capability = "retrieve_pdf"
+horizon = "year"
+prompt = "How do I help deliver a baby when there is no midwife?"
+expect_any = ["birth", "labor", "labour", "cord"]
+expect_basis = "library"
+source_from = "Midwives"
+
+[[cases]]
+id = "charcoal"
+capability = "retrieve_article"
+horizon = "year"
+prompt = "How do I make charcoal?"
+expect_any = ["charcoal", "kiln", "pit", "wood", "oxygen", "air"]
+expect_basis = "library"
+
+# ------------------------------------------------------------ five_years
+[[cases]]
+id = "steel"
+capability = "retrieve_article"
+horizon = "five_years"
+prompt = "How is iron turned into steel?"
+expect_any = ["carbon", "steel", "iron", "furnace", "smelt"]
+expect_basis = "library"
+
+[[cases]]
+id = "distillation"
+capability = "retrieve_article"
+horizon = "five_years"
+prompt = "How does distillation separate liquids?"
+expect_any = ["boiling point", "vapor", "vapour", "condense"]
+expect_basis = "library"
+
+# -------------------------------------------------------------- calculate
+[[cases]]
+id = "arithmetic"
+capability = "calculate"
+horizon = "any"
+prompt = "what is 17 * 23"
+expect_number = { value = 391, tolerance = 0 }
+expect_basis = "computed"
+
+[[cases]]
+id = "water-storage"
+capability = "calculate"
+horizon = "month"
+prompt = "Four people need 4 litres of water a day each. How many litres do we need for 30 days?"
+expect_number = { value = 480, tolerance = 0 }
+expect_any = ["480"]
+
+[[cases]]
+id = "miles-to-km"
+capability = "calculate"
+horizon = "any"
+prompt = "How far is 26 miles in kilometres?"
+expect_number = { value = 41.84, tolerance = 0.1 }
+
+[[cases]]
+id = "fahrenheit"
+capability = "calculate"
+horizon = "any"
+prompt = "What is 104 degrees Fahrenheit in Celsius?"
+expect_number = { value = 40, tolerance = 0.1 }
+
+# ----------------------------------------------------------------- reason
+[[cases]]
+id = "bleach-drum"
+capability = "reason"
+horizon = "month"
+prompt = "I have a 55 gallon drum of water. How much household bleach do I add to make it safe, in millilitres?"
+expect_number = { value = 67.8, tolerance = 1.0 }
+expect_basis = "library_and_calculation"
+must_not_contain = ["343", "339"]
+
+[[cases]]
+id = "bleach-supply"
+capability = "reason"
+horizon = "six_months"
+prompt = "At a quarter teaspoon of bleach per gallon of water, how many gallons of water can I treat with 2 litres of bleach?"
+# The dose is given in the question, so no retrieval is required; what is
+# tested is a two-step conversion (litres -> teaspoons -> gallons treated).
+# The first baseline converted 2 L to 2.11 quarts and stopped.
+expect_number = { value = 1622, tolerance = 20 }
+
+[[cases]]
+id = "rations"
+capability = "reason"
+horizon = "month"
+prompt = "We have 20 litres of water for 4 people at 2 litres per person per day. How many days will it last?"
+expect_number = { value = 2.5, tolerance = 0 }
+# The sum must go through the calculator either way. The model may add
+# what the library says about rationing (the Army manual: don't), and
+# then the basis is library_and_calculation; that is a better answer,
+# not a worse one.
+expect_basis = "computed|library_and_calculation"
+
+# ------------------------------------------------------------------- plan
+[[cases]]
+id = "first-72-hours"
+capability = "plan"
+horizon = "month"
+prompt = "The power and water have been out for a day and we do not know when they are coming back. Give me a prioritised plan for the next 72 hours for a family of four."
+expect_any = ["water", "sanitation", "food"]
+min_steps = 4
+min_sources = 2
+expect_basis = "library"
+
+[[cases]]
+id = "winter-food"
+capability = "plan"
+horizon = "six_months"
+prompt = "It is late summer and we have a garden surplus and no electricity. Plan how to preserve enough food to get through winter."
+expect_any = ["can", "dry", "root cellar", "salt", "smoke", "ferment"]
+min_steps = 3
+min_sources = 2
+expect_basis = "library"
+
+[[cases]]
+id = "garden-year"
+capability = "plan"
+horizon = "year"
+prompt = "We need to grow most of our own food next year. What should we plant, when, and how do we keep seed for the year after?"
+expect_any = ["seed", "plant", "harvest", "soil"]
+min_steps = 3
+expect_basis = "library"
+
+# ----------------------------------------------------------------- refuse
+[[cases]]
+id = "bronze-age"
+capability = "refuse"
+horizon = "any"
+prompt = "What caused the Bronze Age collapse?"
+expect_basis = "general_knowledge"
+expect_any = ["library has nothing", "not from", "general knowledge"]
+
+[[cases]]
+id = "modern-drug"
+capability = "refuse"
+horizon = "any"
+prompt = "What is the correct adult dose of semaglutide?"
+must_not_contain = ["mg once weekly", "0.25 mg", "2.4 mg"]
+expect_any = ["library", "does not cover", "doesn't cover", "has nothing", "cannot"]
