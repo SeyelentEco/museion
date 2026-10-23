@@ -11,9 +11,10 @@ from collections.abc import Callable
 from contextlib import closing
 from pathlib import Path
 
-from museion import config, hardware, sidecar
+from museion import config, hardware, portable, sidecar
 from museion.config import Config
 from museion.index import Index
+from museion.portable import MachineProfile, Portable
 
 
 class UiError(Exception):
@@ -22,7 +23,8 @@ class UiError(Exception):
 
 class AppState:
     def __init__(self, config_path: Path, tuning_path: Path,
-                 emit: Callable[[str, object], None] = lambda name, payload: None) -> None:
+                 emit: Callable[[str, object], None] = lambda name, payload: None,
+                 drive: Portable | None = None) -> None:
         self.config_path = config_path
         # tuning.toml beside config.json: prompts and limits, read on every
         # question so an edit needs no restart.
@@ -30,10 +32,26 @@ class AppState:
         # Sends an event to every open page: emit("service-progress", "Ready.").
         self.emit = emit
         self.supervisor = sidecar.Supervisor()
+        # Set when running from a drive (see portable.py).
+        self.drive = drive
         self._lock = threading.Lock()
-        self._config = config.load(config_path)
         self._hardware: hardware.Hardware | None = None
         self._stats: tuple[float, tuple[int, int, int]] | None = None
+        cfg = config.load(config_path)
+        if drive:
+            cfg = cfg.resolved(drive.root)
+            # This computer's build, model and split, laid over the drive's
+            # config; worked out now if it has never seen this drive before.
+            profile = MachineProfile.load(drive.profile_path())
+            if profile:
+                profile.apply(cfg)
+            else:
+                profile = portable.adapt(cfg, self.hardware(), drive.root)
+                try:
+                    profile.save(drive.profile_path())
+                except OSError as e:
+                    print(f"  (machine profile not written: {e})")
+        self._config = cfg
 
     def config(self) -> Config:
         """A copy of the configuration, safe to change and then save."""
@@ -41,9 +59,50 @@ class AppState:
             return self._config.copy()
 
     def save_config(self, cfg: Config) -> None:
-        cfg.save(self.config_path)
+        """Write the config where it lives. From a drive, the machine-specific
+        fields go to this computer's profile as well, and a drive that cannot
+        be written to is not an error: the profile holds what matters."""
+        if self.drive:
+            cfg.base = self.drive.root
+            path = self.drive.profile_path()
+            profile = MachineProfile.load(path) or MachineProfile()
+            profile.absorb(cfg)
+            profile.save(path)
+            try:
+                cfg.save(self.config_path)
+            except OSError as e:
+                print(f"  (drive config not written: {e})")
+        else:
+            cfg.save(self.config_path)
         with self._lock:
             self._config = cfg.copy()
+
+    def fit_due(self) -> bool:
+        """From a drive on a computer whose GPU split has not been measured
+        yet: is a fit due before the chat model starts?"""
+        if not self.drive:
+            return False
+        profile = MachineProfile.load(self.drive.profile_path())
+        return not (profile and profile.fitted)
+
+    def mark_fitted(self) -> None:
+        """Record that the split has been measured on this computer."""
+        if self.drive:
+            path = self.drive.profile_path()
+            profile = MachineProfile.load(path) or MachineProfile()
+            profile.fitted = True
+            try:
+                profile.save(path)
+            except OSError:
+                pass
+
+    def evals_dir(self, cfg: Config) -> Path | None:
+        """Where benchmark runs are kept: the library's evals folder, or on a
+        write-protected drive a folder on this computer."""
+        if not cfg.library_dir:
+            return None
+        wanted = cfg.library_dir / "evals"
+        return self.drive.writable_or_cache(wanted) if self.drive else wanted
 
     def hardware(self) -> hardware.Hardware:
         """Detected once. Detection shells out to nvidia-smi, and doing that
@@ -76,6 +135,17 @@ class AppState:
     def forget_stats(self) -> None:
         with self._lock:
             self._stats = None
+
+
+def open_state(config_dir: Path | None = None,
+               emit: Callable[[str, object], None] = lambda name, payload: None) -> AppState:
+    """The state for this run: from the drive Museion is on, if it is on one,
+    else from `config_dir` or the computer's own settings folder."""
+    drive = None if config_dir else portable.detect()
+    if drive:
+        return AppState(drive.config_path(), drive.tuning_path(), emit, drive)
+    folder = config_dir or config.config_dir()
+    return AppState(folder / "config.json", folder / "tuning.toml", emit)
 
 
 def local(port: int) -> str:

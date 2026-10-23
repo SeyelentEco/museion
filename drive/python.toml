@@ -1,0 +1,49 @@
+# The portable Python a prepared drive carries, which runs Museion with
+# nothing installed on the computer (see docs/portable.md).
+#
+# Only drives carry these, so they live here rather than in tools/, which the
+# set-up screen installs on every machine. No YAML twin: the Rust app never
+# read this folder.
+#
+# python-build-standalone's install_only_stripped builds: CPython with its
+# standard library, SQLite with FTS5, no debug symbols. The same archives CI
+# tests Museion on (.github/workflows/python.yml). Each unpacks into a
+# folder named python/.
+
+id = "python"
+name = "Python"
+version = "3.12.12 (python-build-standalone 20251014)"
+provides = ["python"]
+license = { name = "PSF-2.0", attribution = "Python Software Foundation; builds by Astral" }
+
+[variants.windows-x64]
+platform = "windows"
+arch = "x64"
+file = "cpython-3.12.12+20251014-x86_64-pc-windows-msvc-install_only_stripped.tar.gz"
+url = "https://github.com/astral-sh/python-build-standalone/releases/download/20251014/cpython-3.12.12%2B20251014-x86_64-pc-windows-msvc-install_only_stripped.tar.gz"
+size_bytes = 21433845
+sha256 = "3c8b9b10a933909c98b9916297e2093b24a9c2abaa23df1c2622c2bfe052cb94"
+
+[variants.macos-arm64]
+platform = "darwin"
+arch = "arm64"
+file = "cpython-3.12.12+20251014-aarch64-apple-darwin-install_only_stripped.tar.gz"
+url = "https://github.com/astral-sh/python-build-standalone/releases/download/20251014/cpython-3.12.12%2B20251014-aarch64-apple-darwin-install_only_stripped.tar.gz"
+size_bytes = 16472869
+sha256 = "84cb7acbf75264982c8bdd818bfa1ff0f1eb76007b48a5f3e01d28633b46afdf"
+
+[variants.macos-x64]
+platform = "darwin"
+arch = "x64"
+file = "cpython-3.12.12+20251014-x86_64-apple-darwin-install_only_stripped.tar.gz"
+url = "https://github.com/astral-sh/python-build-standalone/releases/download/20251014/cpython-3.12.12%2B20251014-x86_64-apple-darwin-install_only_stripped.tar.gz"
+size_bytes = 16272392
+sha256 = "f76a921e71e9c8954cccd00f176b7083041527b3b4223670d05bbb2f51209d3f"
+
+[variants.linux-x64]
+platform = "linux"
+arch = "x64"
+file = "cpython-3.12.12+20251014-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz"
+url = "https://github.com/astral-sh/python-build-standalone/releases/download/20251014/cpython-3.12.12%2B20251014-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz"
+size_bytes = 32587947
+sha256 = "c74addcd1b033a6e4d60ead3ab47fcc995569027e01d3061c4a934f363c4a0cf"

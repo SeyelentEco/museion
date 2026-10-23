@@ -17,6 +17,7 @@ import './library.js';
 import './evals.js';
 import './settings.js';
 import './welcome.js';
+import './prepare.js';
 
 /**
  * Bring the services up on launch, narrating in the Ask tab. A person who

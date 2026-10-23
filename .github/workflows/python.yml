@@ -13,12 +13,12 @@ on:
   # Python port must keep matching it (see the parity job).
   pull_request:
     paths: ['museion/**', 'tests/**', '.github/workflows/python.yml',
-            'catalog/**', 'models/**', 'tools/**', 'evals/**', 'crates/museion-core/**',
+            'catalog/**', 'models/**', 'tools/**', 'evals/**', 'drive/**', 'crates/museion-core/**',
             'scripts/yaml-to-toml.mjs', 'package.json', 'package-lock.json']
   push:
     branches: [main]
     paths: ['museion/**', 'tests/**', '.github/workflows/python.yml',
-            'catalog/**', 'models/**', 'tools/**', 'evals/**', 'crates/museion-core/**',
+            'catalog/**', 'models/**', 'tools/**', 'evals/**', 'drive/**', 'crates/museion-core/**',
             'scripts/yaml-to-toml.mjs', 'package.json', 'package-lock.json']
   workflow_dispatch:
 

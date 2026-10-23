@@ -8,6 +8,8 @@ regression-tested without a window in the way.
   python -m museion index  --library E:\\museion-library
   python -m museion search --library E:\\museion-library how do I purify water
   python -m museion status --library E:\\museion-library
+  python -m museion prepare --dest E:\\ --bundle go-bag
+  python -m museion edit
 
 Run `python -m museion <command> --help` for each command's options.
 """
@@ -20,7 +22,8 @@ import sys
 from contextlib import closing
 from pathlib import Path
 
-from museion import app, ask, calc, evals, fit, hardware, indexer, tools, tuning
+from museion import app, ask, calc, drive_cli, evals, fit, hardware, indexer, tools, tuning
+from museion.appstate import UiError
 from museion.index import Index
 from museion.kiwix import Kiwix, book_id_from_filename
 from museion.llama import Llama
@@ -33,7 +36,7 @@ RERANKER_URL = "http://127.0.0.1:8081"
 # than Museion's: a missing file, a server that is not running, bad input.
 # These are printed as one line. Anything else is a bug, and its traceback is
 # shown so it can be found.
-EXPECTED_ERRORS = (OSError, RuntimeError, ValueError, sqlite3.Error)
+EXPECTED_ERRORS = (OSError, RuntimeError, ValueError, sqlite3.Error, UiError)
 
 BASIS_LABELS = {
     ask.LIBRARY: "from the library",
@@ -50,10 +53,12 @@ def main(argv: list[str] | None = None) -> None:
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure") and not stream.isatty():
             stream.reconfigure(encoding="utf-8")
+    argv = sys.argv[1:] if argv is None else argv
+    # No command, or only the window's options (--port 8075): open the
+    # window, which is what a person double-clicking Museion wants.
+    if not argv or (argv[0].startswith("-") and argv[0] not in ("-h", "--help")):
+        argv = ["app", *argv]
     args = parser().parse_args(argv)
-    if not args.command:
-        # No command: what a person double-clicking Museion wants.
-        args = parser().parse_args(["app"])
     try:
         args.run(args)
     except EXPECTED_ERRORS as e:
@@ -132,6 +137,8 @@ def parser() -> argparse.ArgumentParser:
     c.add_argument("--dest", required=True, type=Path, help="folder to put them in")
     c.add_argument("--cpu", action="store_true", help="the CPU build, whatever the GPU")
     c.set_defaults(run=cmd_tools)
+
+    drive_cli.add_commands(commands)
     return top
 
 

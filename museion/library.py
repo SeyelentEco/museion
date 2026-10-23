@@ -68,6 +68,11 @@ def progress(state: AppState, item: str, received: int, total: int, note: str = 
 
 def fetch_tools(state: AppState, dest: str) -> str:
     """Download the helper programs into `dest` and point the config at them."""
+    cfg = state.config()
+    # A prepared drive already carries the helpers -- for every kind of
+    # graphics card, chosen at launch. Nothing to fetch.
+    if state.drive and cfg.kiwix_exe and cfg.kiwix_exe.exists() and cfg.llama_exe and cfg.llama_exe.exists():
+        return f"Already on the drive: {cfg.kiwix_exe} and {cfg.llama_exe}"
 
     def report(step: tools.Step) -> None:
         if step.kind == tools.DOWNLOADING:

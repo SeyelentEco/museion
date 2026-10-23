@@ -21,8 +21,8 @@ The rules the Python code keeps:
 | --- | --- | --- |
 | 0 | Prove the portable runtime: FTS5, pdfium through ctypes, starting and stopping llama-server, helpers dying with Museion | Done: `museion/pdf.py`, `sidecar.py`, `llama.py`, `doctor.py` |
 | 1 | Port the core as a command line: index, search, ask, evals | Done: `python -m museion` (see below); asks exactly as the Rust version does |
-| 2 | Browser UI in plain HTML and JavaScript | Done: `python -m museion` opens it (see below); every screen of the Rust app except preparing a drive |
-| 3 | The drive: portable mode, prepare, `AGENTS.md`, opencode | Not started |
+| 2 | Browser UI in plain HTML and JavaScript | Done: `python -m museion` opens it (see below); every screen of the Rust app |
+| 3 | The drive: portable mode, prepare, `AGENTS.md`, opencode | Built and tested with stand-in helpers and a tiny model (see [The drive](#the-drive-and-changing-museion)); not yet tried with a real model |
 | 4 | Rehearse offline edits with a local coding agent | Not started |
 | 5 | Retire the Rust code | Not started |
 
@@ -67,12 +67,15 @@ python -m museion chat   --library E:/museion-library
 python -m museion eval   --library E:/museion-library --label "qwen3.6 q4, reranker"
 python -m museion hardware
 python -m museion tools  --dest bin
+python -m museion prepare --dest E:/ --models qwen3-4b-instruct-q4
+python -m museion verify --drive E:/
+python -m museion edit
 ```
 
 `index` needs kiwix-serve running over the library; `ask`, `chat` and `eval`
 need llama-server running the chat model (and, if it is running, use the
-reranker). Each command's `--help` lists its options. `prepare` (building a
-drive) comes in phase 3.
+reranker). Each command's `--help` lists its options. `prepare`, `verify` and
+`edit` are described in [The drive](#the-drive-and-changing-museion).
 
 Run the tests (offline, a few seconds):
 
@@ -84,6 +87,49 @@ Tests that need pdfium or llama-server run when `MUSEION_PDFIUM` (the folder
 holding the pdfium library) and `MUSEION_LLAMA_SERVER` (the program) are set,
 and are skipped otherwise. CI runs everything on Windows, macOS and Linux with
 the portable Python (`.github/workflows/python.yml`).
+
+## The drive and changing Museion
+
+`python -m museion prepare` (and Settings › Prepare a drive) builds a drive that
+runs Museion on a computer with nothing installed and no internet:
+
+```
+<drive>/
+  museion-portable, config.json, README.txt, MANIFEST.yaml
+  Museion.cmd, Edit Museion.cmd     or .command on macOS, museion.sh and edit-museion.sh on Linux
+  app/        Museion's code, catalogue, tests, docs and AGENTS.md
+  python/     the portable Python
+  library/ models/
+  bin/        kiwix-serve, pdfium, opencode; bin/llama/<cuda|vulkan|cpu|metal>/
+  support/    LICENSES/README.txt, museion-app-original.zip
+```
+
+Paths in `config.json` are relative to the drive, and what belongs to each
+computer (the llama.cpp build, the model its tier allows, the GPU split) goes in
+a profile under that computer's own app data, as `docs/portable.md` describes.
+`verify` checks every archive and model against the hashes in `MANIFEST.yaml`.
+
+`Edit Museion` runs `python -m museion edit`: it starts the chat model with a
+32,768-token context (opencode's own instructions take some 12,000 tokens) and
+opens [opencode](https://opencode.ai) on `app/`, set up to use only that model.
+opencode reaches for the network in several places, and each is turned off,
+because on a drive with no internet every one of them is a wait or a failure:
+
+- `OPENCODE_PURE=1`: no plugins. Without it opencode tries to install its
+  default plugins from npm at every start and hangs offline.
+- `OPENCODE_DISABLE_AUTOUPDATE`, `OPENCODE_DISABLE_MODELS_FETCH`,
+  `OPENCODE_DISABLE_LSP_DOWNLOAD`: no update check, no model list from
+  models.dev, no language servers downloaded.
+- `OPENCODE_CONFIG_CONTENT`: one provider, `museion/local`, an
+  OpenAI-compatible endpoint at the chat model's port. The adapter it names is
+  built into opencode, so nothing is installed for it.
+- `XDG_DATA_HOME` and friends: opencode's conversations and logs go with the
+  computer's Museion state, not onto the drive.
+
+The drive's Python is put first on opencode's PATH, so the tests it runs use the
+same Python as Museion. `AGENTS.md` at the top of the code is what opencode (or
+a person) reads first: the rules (standard library only, short files, why-comments,
+run the tests) and a map of where each kind of change is made.
 
 ## The browser page
 
@@ -162,8 +208,6 @@ Where the Python version deliberately differs:
   none for this system, rather than clearing their paths.
 
 Not done yet:
-
-- **Preparing a drive** (the Settings card and `prepare`) comes in phase 3.
 
 - **Linux helpers.** The catalogue has no Linux builds of llama.cpp or
   kiwix-tools, so `tools` installs nothing on Linux, as with the Rust version.

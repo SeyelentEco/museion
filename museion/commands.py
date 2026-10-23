@@ -39,8 +39,8 @@ def get_status(state: AppState) -> dict:
     documents, pages, words = state.index_stats(cfg)
     return {
         "configured": cfg.is_ready(),
-        # The drive's root when running from one (phase 3); None when installed.
-        "portable_root": None,
+        # The drive's root when running from one; None when installed.
+        "portable_root": str(state.drive.root) if state.drive else None,
         "library_dir": str(cfg.library_dir) if cfg.library_dir else None,
         "documents": documents,
         "pages": pages,
@@ -196,13 +196,13 @@ def run_evals(state: AppState, label: str, only: str | None = None, model: str |
     finally:
         if candidate:
             restore_chat_model(state, cfg)
-    evals.save_run(cfg.library_dir / "evals", run)
+    evals.save_run(state.evals_dir(cfg), run)
     return dataclasses.asdict(run)
 
 
 def list_eval_runs(state: AppState) -> list[dict]:
-    lib = state.config().library_dir
-    return [dataclasses.asdict(r) for r in evals.list_runs(lib / "evals")] if lib else []
+    folder = state.evals_dir(state.config())
+    return [dataclasses.asdict(r) for r in evals.list_runs(folder)] if folder else []
 
 
 def eval_cases(state: AppState) -> list[dict]:

@@ -47,8 +47,8 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from museion import commands, config, library, services, sidecar
-from museion.appstate import AppState, UiError
+from museion import commands, drives, library, services, sidecar
+from museion.appstate import AppState, UiError, open_state
 
 UI_DIR = Path(__file__).with_name("ui")
 DEFAULT_PORT = 8070
@@ -70,6 +70,7 @@ COMMANDS = {f.__name__: f for f in [
     library.setup_plan, library.fetch_tools, library.fetch_model, library.fetch_bundle,
     library.list_content, library.library_space, library.fetch_source, library.add_content_dir,
     library.remove_content_dir, library.build_index,
+    drives.prepare_options, drives.prepare_estimate, drives.prepare_drive, drives.verify_drive,
 ]}
 
 # The page's kinds of file. Spelled out rather than asked of the mimetypes
@@ -348,9 +349,8 @@ def serve(port: int = DEFAULT_PORT, open_browser: bool = True, stay: bool = Fals
         return
     if sidecar.port_open(port):
         port = sidecar.free_port()
-    folder = config_dir or config.config_dir()
     events = Events()
-    state = AppState(folder / "config.json", folder / "tuning.toml", events.emit)
+    state = open_state(config_dir, events.emit)
     server = Server(state, events, port)
     url = f"http://127.0.0.1:{server.port}/"
     print(f"\nMuseion is at {url}\n"
@@ -375,7 +375,7 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     p.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"port to serve the page on (default {DEFAULT_PORT})")
     p.add_argument("--no-browser", action="store_true", help="do not open a browser; just print the address")
     p.add_argument("--stay", action="store_true", help="keep running after the last Museion tab closes")
-    p.add_argument("--config-dir", type=Path, help="folder holding config.json (default: the Rust app's)")
+    p.add_argument("--config-dir", type=Path, help="folder holding config.json (default: the drive Museion is on, else the Rust app's)")
 
 
 def main(argv: list[str] | None = None) -> None:

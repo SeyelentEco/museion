@@ -61,6 +61,10 @@ class Config:
     # Museion wants to ask something. Off for those who would rather the GPU
     # stay free until they choose -- the model holds nearly all of it.
     autostart: bool = True
+    # Set when running from a drive: paths are stored relative to this
+    # folder and resolved against it, so the drive's letter can change.
+    # Not part of the file.
+    base: Path | None = field(default=None, compare=False, repr=False)
 
     def copy(self) -> Config:
         return dataclasses.replace(self, extra_dirs=list(self.extra_dirs), chat_args=list(self.chat_args))
@@ -79,6 +83,7 @@ class Config:
     def to_json(self) -> dict:
         """The config as the page and the file see it: paths as text."""
         out = dataclasses.asdict(self)
+        del out["base"]
         for name in PATH_FIELDS:
             out[name] = str(out[name]) if out[name] is not None else None
         out["extra_dirs"] = [str(d) for d in self.extra_dirs]
@@ -91,7 +96,7 @@ class Config:
         version did, so a file from an older or newer build still loads."""
         c = cls()
         for f in dataclasses.fields(cls):
-            if f.name not in data or data[f.name] is None:
+            if f.name == "base" or f.name not in data or data[f.name] is None:
                 continue
             value = data[f.name]
             if f.name in PATH_FIELDS:
@@ -112,8 +117,32 @@ class Config:
         return c
 
     def save(self, path: Path) -> None:
+        out = self.to_json()
+        if self.base:
+            # On a drive, anything under the root is written relative to it,
+            # with forward slashes, which every system reads.
+            def rel(p: str | None) -> str | None:
+                if p is None or not Path(p).is_relative_to(self.base):
+                    return p
+                return Path(p).relative_to(self.base).as_posix()
+            for name in PATH_FIELDS:
+                out[name] = rel(out[name])
+            out["extra_dirs"] = [rel(d) for d in out["extra_dirs"]]
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(self.to_json(), indent=2), encoding="utf-8")
+        path.write_text(json.dumps(out, indent=2), encoding="utf-8")
+
+    def resolved(self, base: Path) -> Config:
+        """This config with every relative path made absolute against `base`:
+        a drive's config says `library`, and means the library folder beside
+        it wherever the drive is."""
+        c = self.copy()
+        for name in PATH_FIELDS:
+            p = getattr(c, name)
+            if p is not None and not p.is_absolute():
+                setattr(c, name, base / p)
+        c.extra_dirs = [d if d.is_absolute() else base / d for d in c.extra_dirs]
+        c.base = base
+        return c
 
 
 def load(path: Path) -> Config:

@@ -5,6 +5,18 @@ one removable drive, and for making that drive without a repository checkout.
 
 Three pieces, built in this order because each needs the one before it.
 
+> **The Python version** (`museion/portable.py`, `prepare.py`) follows this plan with
+> three differences. The drive carries Museion's code in `app/` and the portable Python
+> that runs it in `python/`, so the marker sits in the folder *above* `app/`, and the
+> double-click starters are small scripts (`Museion.cmd`, `Museion.command`,
+> `museion.sh`). There is no window toolkit to carry: Museion opens in whatever browser
+> the computer has, so nothing like the WebView2 installer is needed. And the drive also
+> carries opencode in `bin/`, with an `Edit Museion` starter that opens it on `app/`
+> talking to the drive's own chat model, `app/AGENTS.md` for it to read first, and
+> `support/museion-app-original.zip` to undo every change at once. The machine profile is
+> the same file in the same place, so either version runs a drive the other prepared.
+> `python -m museion prepare --help` lists the options; Settings has the same card.
+
 | | what | why first |
 |---|---|---|
 | A | **Portable mode**: the app runs from wherever it is, paths relative to itself | nothing on a drive works without it |

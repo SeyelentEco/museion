@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import sys
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 from museion import fit
@@ -83,9 +84,30 @@ def start_services(state: AppState) -> None:
 
     if not cfg.chat_model:
         raise UiError("no chat model configured")
+    fit_if_due(state, cfg, say)
     say("Loading the chat model — this can take a few minutes…")
     start_chat(state, cfg, cfg.chat_model, cfg.chat_args, cfg.chat_gpu_layers)
     say("Ready.")
+
+
+def fit_if_due(state: AppState, cfg: Config, say: Callable[[str], None]) -> None:
+    """From a drive, on a computer with a GPU it has not been measured on:
+    measure the chat model's split now, before it loads, and keep the result
+    in `cfg` and this computer's profile. A failed measurement is said and
+    the defaults are used; it is tried again next time."""
+    if not (state.fit_due() and cfg.chat_gpu_layers != 0):
+        return
+    say("First run on this computer: measuring the chat model against its GPU…")
+    try:
+        args, layers, message = measure_fit(state, cfg)
+        cfg.chat_args = args
+        if layers is not None:
+            cfg.chat_gpu_layers = layers
+        state.save_config(cfg)
+        state.mark_fitted()
+        say(f"Fitted: {message}")
+    except (OSError, RuntimeError, ValueError, UiError) as e:
+        say(f"Could not measure the fit ({e}); starting with the defaults.")
 
 
 def start_chat(state: AppState, cfg: Config, model: Path, extra: list[str], gpu_layers: int) -> None:
@@ -165,6 +187,7 @@ def fit_chat_model(state: AppState) -> str:
     if gpu_layers is not None:
         cfg.chat_gpu_layers = gpu_layers
     state.save_config(cfg)
+    state.mark_fitted()
     return message
 
 

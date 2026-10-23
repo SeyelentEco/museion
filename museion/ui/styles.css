@@ -268,6 +268,7 @@ main { flex: 1 1 auto; min-height: 0; position: relative; }
 .check { display: block; margin-top: 1rem; color: var(--ink-mid); cursor: pointer; }
 .check input { margin-right: 0.5rem; }
 .check .hint { display: block; margin-left: 1.6rem; }
+.checks .check { margin-top: 0.4rem; }
 
 .notice {
   color: var(--ink-mid);

@@ -1,0 +1,47 @@
+# opencode, the coding agent a prepared drive carries, so that whoever has the
+# drive can change Museion with the same local model it answers with: the
+# "Edit Museion" launcher (`python -m museion edit`, see museion/edit.py).
+#
+# Only drives carry it, so it lives here rather than in tools/ (see
+# python.toml). The archives are npm's per-platform packages, each holding one
+# program at package/bin/opencode (opencode.exe on Windows). npm publishes a
+# SHA-512 per package; the SHA-256 below was computed by downloading each.
+# Re-verify them if you bump the version.
+
+id = "opencode"
+name = "opencode"
+version = "1.19.4"
+provides = ["opencode"]
+license = { name = "MIT", attribution = "opencode contributors" }
+
+[variants.windows-x64]
+platform = "windows"
+arch = "x64"
+file = "opencode-windows-x64-1.19.4.tgz"
+url = "https://registry.npmjs.org/opencode-windows-x64/-/opencode-windows-x64-1.19.4.tgz"
+size_bytes = 79645877
+sha256 = "f7e99cd758187a26daae50c7d2429642013f26bdab4a8b3c12b76428e95dc4e1"
+
+[variants.macos-arm64]
+platform = "darwin"
+arch = "arm64"
+file = "opencode-darwin-arm64-1.19.4.tgz"
+url = "https://registry.npmjs.org/opencode-darwin-arm64/-/opencode-darwin-arm64-1.19.4.tgz"
+size_bytes = 63822755
+sha256 = "79e4e8fc2b461d9ed2141a41b128b82120b590ff50276878a6ae3ab26c2fa12b"
+
+[variants.macos-x64]
+platform = "darwin"
+arch = "x64"
+file = "opencode-darwin-x64-1.19.4.tgz"
+url = "https://registry.npmjs.org/opencode-darwin-x64/-/opencode-darwin-x64-1.19.4.tgz"
+size_bytes = 68630198
+sha256 = "ea8a402c01a8543d55ffc36e72bbf35c841d8aecf88abf25e16a46e1c9fe7210"
+
+[variants.linux-x64]
+platform = "linux"
+arch = "x64"
+file = "opencode-linux-x64-1.19.4.tgz"
+url = "https://registry.npmjs.org/opencode-linux-x64/-/opencode-linux-x64-1.19.4.tgz"
+size_bytes = 79146075
+sha256 = "dca7b06bbb4e4a1ab3681b799cd328057b356d9399e8e47336cf53b7ae658d0d"

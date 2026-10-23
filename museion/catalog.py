@@ -29,6 +29,8 @@ ROOT = Path(__file__).resolve().parent.parent
 CATALOG_DIR = ROOT / "catalog"
 MODELS_DIR = ROOT / "models"
 TOOLS_DIR = ROOT / "tools"
+# What only a prepared drive carries: the portable Python and opencode.
+DRIVE_DIR = ROOT / "drive"
 
 @dataclass
 class License:
@@ -193,6 +195,10 @@ def models() -> list[Model]:
 
 def tools() -> list[Tool]:
     return _parse_dir(TOOLS_DIR, Tool)
+
+
+def drive_tools() -> list[Tool]:
+    return _parse_dir(DRIVE_DIR, Tool)
 
 
 # ------------------------------------------------------------------ choosing
