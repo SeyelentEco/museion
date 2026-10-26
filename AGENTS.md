@@ -26,7 +26,9 @@ can be changed with no internet, years after the last download.
 ## Running and checking
 
 Run these from this folder. `python` is the Python Museion runs on; on a drive
-it is the one in `../python/`, which "Edit Museion" puts first on the PATH.
+it is the one in `../python/`, which "Edit Museion" puts first on the PATH. On
+Windows the shell is PowerShell 5.1: run commands one at a time, or join them
+with `;`, since `&&` does not work there.
 
 ```
 python -m museion                       open Museion in the browser

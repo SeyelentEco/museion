@@ -499,9 +499,11 @@ fn answer_one(args: &Args, question: &str, history: &[museion_core::Exchange]) -
 
     println!();
     let mut streamed = false;
+    let mut shown = String::new();
     let answer = asker.ask(question, history, |t| match t {
         museion_core::Token::Text(s) => {
             streamed = true;
+            shown.push_str(&s);
             print!("{s}");
             let _ = std::io::stdout().flush();
         }
@@ -513,6 +515,7 @@ fn answer_one(args: &Args, question: &str, history: &[museion_core::Exchange]) -
 ");
                 streamed = false;
             }
+            shown.clear();
         }
     })?;
     // Nothing streams when retrieval found nothing, and that answer -- the
@@ -540,16 +543,25 @@ fn answer_one(args: &Args, question: &str, history: &[museion_core::Exchange]) -
     }
     if !answer.sources.is_empty() {
         println!("Sources{}:", if answer.reranked { " (reranked)" } else { "" });
-        for (i, h) in answer.sources.iter().enumerate() {
+        // The answer as streamed carries the model's own numbers ([5]), not
+        // the renumbered ones in answer.text; the list must use the numbers
+        // the reader saw, or [5] above names nothing below.
+        let cited = if streamed { museion_core::ask::cited_numbers(&shown) } else { Vec::new() };
+        let numbers: Vec<usize> = if cited.len() == answer.sources.len() {
+            cited
+        } else {
+            (1..=answer.sources.len()).collect()
+        };
+        for (&n, h) in numbers.iter().zip(&answer.sources) {
             let who = if h.author.is_empty() {
                 String::new()
             } else {
                 format!(", {}", h.author)
             };
             if h.page > 0 {
-                println!("  [{}] {}{} -- page {}", i + 1, h.doc_title, who, h.page);
+                println!("  [{}] {}{} -- page {}", n, h.doc_title, who, h.page);
             } else {
-                println!("  [{}] {}{} -- {}", i + 1, h.doc_title, who, h.book);
+                println!("  [{}] {}{} -- {}", n, h.doc_title, who, h.book);
             }
         }
         println!();

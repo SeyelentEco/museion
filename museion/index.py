@@ -12,8 +12,10 @@ so an index built by either one opens and searches the same in the other.
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import math
+import os
 import sqlite3
 import unicodedata
 from collections.abc import Iterator
@@ -25,7 +27,6 @@ from museion.pdf import Extracted
 
 SCHEMA = """
 PRAGMA journal_mode = WAL;
-PRAGMA synchronous = NORMAL;
 
 CREATE TABLE IF NOT EXISTS docs (
     id          INTEGER PRIMARY KEY,
@@ -134,6 +135,34 @@ class AddOutcome:
     duplicate_of: str = ""  # for DUPLICATE: the title of the copy already indexed
 
 
+@functools.lru_cache(maxsize=None)
+def can_flush(folder: Path) -> bool:
+    """Whether files in `folder` can be flushed to the disk. Some USB disks
+    refuse (Windows' FlushFileBuffers fails on a Seagate Backup Plus), and
+    SQLite then fails every write with "disk I/O error" -- preparing a drive
+    on one stopped at building the index. Such a folder gets the index with
+    synchronous=OFF: a power cut mid-write can corrupt it, but the index is
+    built from the archives and can always be built again. A folder that
+    cannot be written at all needs no flushing for reading."""
+    probe = folder / ".museion-flush-test"
+    try:
+        with open(probe, "wb") as f:
+            f.write(b"x")
+            f.flush()
+            try:
+                os.fsync(f.fileno())
+            except OSError:
+                return False
+    except OSError:
+        return True
+    finally:
+        try:
+            probe.unlink()
+        except OSError:
+            pass
+    return True
+
+
 class Index:
     # How much of a question's *information* the best passage in the library
     # must carry before the library is considered to cover the topic at all.
@@ -171,6 +200,9 @@ class Index:
             # below, as the Rust version does, rather than by the sqlite3
             # module guessing where they should go.
             self.conn = sqlite3.connect(str(path), isolation_level=None)
+            # Before journal_mode, which is itself a write.
+            sync = "NORMAL" if str(path) == ":memory:" or can_flush(Path(path).parent) else "OFF"
+            self.conn.execute(f"PRAGMA synchronous = {sync}")
             self.conn.executescript(SCHEMA)
         except sqlite3.Error as e:
             raise RuntimeError(f"opening index at {path}: {e}") from e

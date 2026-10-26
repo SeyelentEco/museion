@@ -8,8 +8,8 @@ import { el } from './dom.js';
  * No innerHTML anywhere: the text comes from a language model and is not to
  * be trusted as markup. Only what is recognised becomes structure; everything
  * else stays text. Covers what the model actually emits -- paragraphs,
- * headings, bullet and numbered lists with one level of nesting, bold,
- * italic, inline code -- and turns [1] into a chip that reveals the source it
+ * headings, bullet and numbered lists with one level of nesting, quoted
+ * passages (which may hold a list), bold, italic, inline code -- and turns [1] into a chip that reveals the source it
  * points at, because a citation is only worth having if following it is easy.
  */
 export function renderAnswer(container, text) {
@@ -30,6 +30,17 @@ export function renderAnswer(container, text) {
   const flushList = () => {
     list = null;
   };
+  // A > block, gathered whole and rendered as an answer of its own: models
+  // quote a passage's list as "> - ...", which showed as the raw marks.
+  let quote = null;
+  const flushQuote = () => {
+    if (quote) {
+      const bq = el('blockquote');
+      renderAnswer(bq, quote.join('\n'));
+      container.append(bq);
+      quote = null;
+    }
+  };
 
   for (const rawLine of lines) {
     const line = rawLine.replace(/\s+$/, '');
@@ -38,7 +49,15 @@ export function renderAnswer(container, text) {
     const heading = line.match(/^\s*(#{1,6})\s+(.*)$/);
     const bullet = line.match(/^\s*(?:[-*•])\s+(.*)$/);
     const number = line.match(/^\s*\d+[.)]\s+(.*)$/);
+    const quoted = line.match(/^\s*>\s?(.*)$/);
 
+    if (quoted) {
+      flushPara();
+      flushList();
+      (quote ??= []).push(quoted[1]);
+      continue;
+    }
+    flushQuote();
     if (!line.trim()) {
       flushPara();
       flushList();
@@ -87,6 +106,7 @@ export function renderAnswer(container, text) {
     flushList();
     para.push(line.trim());
   }
+  flushQuote();
   flushPara();
 }
 

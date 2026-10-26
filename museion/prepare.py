@@ -134,12 +134,12 @@ def estimate(plan: Plan) -> Estimate:
         elif (picked := catalog.tool_variant_named(t, "cpu")) is not None:
             add(t.name, picked[1].size_bytes, tools.find_exe(root / "bin", "kiwix-serve") is not None)
     for t in catalog.drive_tools():
-        if not getattr(plan, t.id, False):
+        if not carried(plan, t):
             continue
         picked = catalog.tool_variant_named(t, "cpu")
         if picked is None:
             raise ValueError(f"no {t.name} build for this platform")
-        add(t.name, picked[1].size_bytes, drive_tool_present(root, t.id))
+        add(t.name, picked[1].size_bytes, drive_tool_present(root, t))
     add("Museion's code", app_size(), (root / "app").is_dir())
     total = sum(size for _, size in items)
     return Estimate(total, remaining, disk.free_space(nearest_existing(root)), items)
@@ -177,10 +177,16 @@ def selected_models(plan: Plan) -> list[catalog.Model]:
     return out + ([reranker] if reranker else [])
 
 
-def drive_tool_present(root: Path, tool_id: str) -> bool:
-    if tool_id == "python":
+def carried(plan: Plan, tool: catalog.Tool) -> bool:
+    """Whether the plan carries one of drive/'s programs. ripgrep goes with
+    opencode, whose search runs it."""
+    return plan.opencode if tool.id == "ripgrep" else bool(getattr(plan, tool.id, False))
+
+
+def drive_tool_present(root: Path, tool: catalog.Tool) -> bool:
+    if tool.id == "python":
         return python_exe(root).exists()
-    return tools.find_exe(root / "bin", tool_id) is not None
+    return tools.find_exe(root / "bin", tool.provides[0]) is not None
 
 
 def app_parts(source: Path = APP_DIR) -> list[Path]:
@@ -236,7 +242,7 @@ def run(plan: Plan, report: Callable[[Progress], None] = lambda p: None) -> Path
         if tools.find_exe(folder, "llama-server") is None:
             tools.install_selected(a, folder, ["llama.cpp"], on_tool)
     for t in catalog.drive_tools():
-        if getattr(plan, t.id, False) and not drive_tool_present(root, t.id):
+        if carried(plan, t) and not drive_tool_present(root, t):
             install_drive_tool(t, root, report)
 
     report(Progress(PHASE, "Models"))
@@ -279,7 +285,7 @@ def fetch_verified(title: str, urls: list[str], target: Path, size: int, sha256:
 
 
 def install_drive_tool(tool: catalog.Tool, root: Path, report: Callable[[Progress], None]) -> None:
-    """The portable Python into python/, or opencode into bin/."""
+    """The portable Python into python/, or opencode or ripgrep into bin/."""
     picked = catalog.tool_variant_named(tool, "cpu")
     if picked is None:
         raise ValueError(f"no {tool.name} build for this platform")
@@ -295,9 +301,10 @@ def install_drive_tool(tool: catalog.Tool, root: Path, report: Callable[[Progres
             # The archive holds one folder, python/.
             shutil.move(str(unpacked / "python"), str(root / "python"))
         else:
-            program = next((p for p in unpacked.rglob(exe(tool.id)) if p.is_file()), None)
+            name = exe(tool.provides[0])
+            program = next((p for p in unpacked.rglob(name) if p.is_file()), None)
             if program is None:
-                raise RuntimeError(f"no {exe(tool.id)} in {v.file}")
+                raise RuntimeError(f"no {name} in {v.file}")
             target = root / "bin" / program.name
             shutil.move(str(program), str(target))
             target.chmod(0o755)

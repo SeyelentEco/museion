@@ -82,6 +82,8 @@ That opens opencode, a coding assistant, on Museion's own code in app/, using
 the chat model on this drive. Tell it what you want changed. app/AGENTS.md
 describes how the code is laid out and how to check a change. Every change can
 be undone at once by unzipping support/museion-app-original.zip over app/.
+This needs one of the large models and a graphics card with 8 GB or more: the
+small model answers questions, but it cannot be relied on to change code.
 
 Running from a flash drive means the model is read from it on every start; a
 copy of this whole folder on the computer's own disk starts much faster, and

@@ -44,7 +44,11 @@ class AppState:
             # config; worked out now if it has never seen this drive before.
             profile = MachineProfile.load(drive.profile_path())
             if profile:
-                profile.apply(cfg)
+                if profile.apply(cfg, drive.root):
+                    try:
+                        profile.save(drive.profile_path())
+                    except OSError as e:
+                        print(f"  (machine profile not updated: {e})")
             else:
                 profile = portable.adapt(cfg, self.hardware(), drive.root)
                 try:

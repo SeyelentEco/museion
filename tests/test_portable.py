@@ -109,6 +109,30 @@ class DriveTest(Drive):
         self.assertEqual((cfg.chat_model.name, cfg.chat_args), (SMALL, ["-c", "4096"]))
         self.assertIsNone(MachineProfile.load(self.local / "none.json"))
 
+    def test_a_drive_under_a_new_letter_keeps_this_computers_build(self):
+        # Measured with the drive at E/; now it is at H/. The profile's
+        # absolute paths are found again under the new root, not dropped for
+        # the drive's CPU default.
+        old = self.root.parent / "E-before"
+        p = MachineProfile("pc", old / "bin" / "llama" / "cuda" / exe("llama-server"),
+                           old / "models" / SMALL, ["-c", "8192"], 41, True)
+        llama = touch(self.root / "bin" / "llama" / "cuda" / exe("llama-server"))
+        model = touch(self.root / "models" / SMALL)
+        cpu = self.root / "bin" / "llama" / "cpu" / exe("llama-server")
+        cfg = Config(llama_exe=cpu)
+        self.assertTrue(p.apply(cfg, self.root))
+        self.assertEqual((cfg.llama_exe, cfg.chat_model, cfg.chat_gpu_layers), (llama, model, 41))
+        self.assertEqual(p.llama_exe, llama)
+        # Nothing moved the second time.
+        self.assertFalse(p.apply(Config(), self.root))
+
+    def test_rebasing_needs_more_than_a_file_name(self):
+        touch(self.root / "llama-server")
+        self.assertIsNone(portable.rebase(self.root.parent / "gone" / "llama-server", self.root))
+        touch(self.root / "bin" / "llama-server")
+        self.assertEqual(portable.rebase(self.root.parent / "gone" / "x" / "bin" / "llama-server", self.root),
+                         self.root / "bin" / "llama-server")
+
     def test_a_computer_without_a_gpu_gets_the_cpu_build_and_nothing_to_fit(self):
         self.stock()
         cfg = Config()

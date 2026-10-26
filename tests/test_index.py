@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import index_corpus
 from museion.index import (
@@ -54,6 +55,23 @@ class IndexTest(unittest.TestCase):
         index where every page holds a term, that term says nothing about any
         page: its weight is zero, and the topic gate refuses the question."""
         self.ix.add_document("rope", "r.pdf", "Knots", "", "", doc(["tie a bowline in the rope"]))
+
+    def test_a_disk_that_cannot_flush_still_gets_an_index(self):
+        # A Seagate USB disk failed every fsync, and so every SQLite write
+        # with "disk I/O error". The index is rebuildable, so it goes
+        # unsynchronised there rather than not at all.
+        self.assertEqual(self.ix.conn.execute("PRAGMA synchronous").fetchone()[0], 1)  # NORMAL
+        folder = Path(self.tmp.name) / "usb"
+        folder.mkdir()
+        with mock.patch("os.fsync", side_effect=OSError(9, "Bad file descriptor")):
+            ix = Index(folder / "t.db")
+        try:
+            self.assertEqual(ix.conn.execute("PRAGMA synchronous").fetchone()[0], 0)  # OFF
+            ix.add_document("rope", "r.pdf", "Knots", "", "", doc(["tie a bowline in the rope"]))
+            self.assertEqual(ix.stats().documents, 1)
+        finally:
+            ix.close()
+        self.assertEqual(list(folder.glob(".museion-*")), [])
 
     def test_image_only_documents_are_not_duplicates_of_each_other(self):
         """An image-only scan extracts to no pages, so every such document

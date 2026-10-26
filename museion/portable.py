@@ -166,16 +166,42 @@ class MachineProfile:
         self.chat_args = list(cfg.chat_args)
         self.chat_gpu_layers = cfg.chat_gpu_layers
 
-    def apply(self, cfg: Config) -> None:
-        """Lay the machine-specific fields over a config. A path that no
-        longer exists -- the build was deleted from the drive -- is left to
-        the drive's config."""
+    def apply(self, cfg: Config, root: Path | None = None) -> bool:
+        """Lay the machine-specific fields over a config. The profile's paths
+        are absolute, as the Rust app wrote them, so a drive that comes up
+        under another letter finds them missing: each is looked for again
+        under `root` (the drive as it is now). Without that, the CUDA build
+        chosen last time was dropped and the drive ran on the CPU, saying
+        nothing. A path still missing -- the build was deleted from the drive
+        -- is left to the drive's config. Returns whether a path moved, so
+        the caller can save the profile with the paths as they are now."""
+        moved = False
+        if root is not None:
+            for name in ("llama_exe", "chat_model"):
+                old = getattr(self, name)
+                if old is not None and not old.exists() and (new := rebase(old, root)):
+                    setattr(self, name, new)
+                    moved = True
         if self.llama_exe and self.llama_exe.exists():
             cfg.llama_exe = self.llama_exe
         if self.chat_model and self.chat_model.exists():
             cfg.chat_model = self.chat_model
             cfg.chat_args = list(self.chat_args)
             cfg.chat_gpu_layers = self.chat_gpu_layers
+        return moved
+
+
+def rebase(path: Path, root: Path) -> Path | None:
+    """Where a path from the drive's old place is now: the longest tail of it
+    that exists under `root`. E:\\bin\\llama\\cuda\\llama-server.exe with the
+    drive now at H:\\ is H:\\bin\\llama\\cuda\\llama-server.exe. Only tails of two
+    parts or more, so a bare file name never matches by chance."""
+    parts = path.parts[1:]  # without the anchor (E:\\ or /)
+    for i in range(len(parts) - 1):
+        candidate = root.joinpath(*parts[i:])
+        if candidate.exists():
+            return candidate
+    return None
 
 
 def adapt(cfg: Config, hw: hardware.Hardware, root: Path) -> MachineProfile:

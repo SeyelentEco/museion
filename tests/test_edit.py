@@ -13,7 +13,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from museion import edit, sidecar
+from museion import catalog, edit, sidecar
 from museion.appstate import AppState, UiError
 from museion.config import Config
 from museion.portable import APP_DIR
@@ -65,14 +65,22 @@ class EditTest(unittest.TestCase):
         self.assertFalse(c["autoupdate"])
 
     def test_opencode_stays_off_the_network_and_off_the_drive(self):
-        env = edit.opencode_env(self.state, "http://127.0.0.1:8080", "small.gguf", 32768)
+        env = edit.opencode_env(self.state, "http://127.0.0.1:8080", "small.gguf", 32768, self.dir / "bin")
         for name in ("OPENCODE_PURE", "OPENCODE_DISABLE_AUTOUPDATE", "OPENCODE_DISABLE_MODELS_FETCH",
                      "OPENCODE_DISABLE_LSP_DOWNLOAD"):
             self.assertEqual(env[name], "1", name)
         self.assertEqual(json.loads(env["OPENCODE_CONFIG_CONTENT"])["model"], "museion/local")
         self.assertEqual(Path(env["XDG_DATA_HOME"]), self.dir / "opencode" / "data")
-        # `python` in its shell is the one running Museion.
-        self.assertEqual(env["PATH"].split(os.pathsep)[0], str(Path(sys.executable).parent))
+        # `python` in its shell is the one running Museion, and rg (which it
+        # would otherwise download) is found beside opencode.
+        self.assertEqual(env["PATH"].split(os.pathsep)[:2], [str(Path(sys.executable).parent), str(self.dir / "bin")])
+
+    def test_the_small_model_is_said_to_be_unfit_for_changing_code(self):
+        small = next(m for m in catalog.models() if m.tiers == ["Modest"])
+        self.assertIn("small model", edit.small_model_note(Path(small.filename)))
+        large = next(m for m in catalog.models() if "Capable" in m.tiers)
+        self.assertIsNone(edit.small_model_note(Path(large.filename)))
+        self.assertIsNone(edit.small_model_note(Path("my-own.gguf")))
 
     def test_opencode_is_found_beside_the_helper_programs(self):
         name = "opencode.exe" if os.name == "nt" else "opencode"

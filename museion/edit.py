@@ -21,7 +21,7 @@ import sys
 import urllib.request
 from pathlib import Path
 
-from museion import services
+from museion import catalog, hardware, services
 from museion.appstate import AppState, UiError, local
 from museion.llama import Llama
 from museion.portable import APP_DIR
@@ -78,9 +78,13 @@ def opencode_config(chat_url: str, model_name: str, context: int) -> dict:
     }
 
 
-def opencode_env(state: AppState, chat_url: str, model_name: str, context: int) -> dict[str, str]:
+def opencode_env(state: AppState, chat_url: str, model_name: str, context: int,
+                 tools: Path | None = None) -> dict[str, str]:
+    """opencode's environment. `tools` is the folder opencode was found in;
+    on a drive that is bin/, which also holds the ripgrep its search runs."""
     home = (state.drive.cache_dir if state.drive else state.config_path.parent) / "opencode"
     env = dict(os.environ)
+    first = [str(Path(sys.executable).parent), *([str(tools)] if tools else [])]
     env.update({
         "OPENCODE_CONFIG_CONTENT": json.dumps(opencode_config(chat_url, model_name, context)),
         # Nothing from the network: see the module's docstring.
@@ -93,8 +97,10 @@ def opencode_env(state: AppState, chat_url: str, model_name: str, context: int) 
         "XDG_CACHE_HOME": str(home / "cache"),
         "XDG_STATE_HOME": str(home / "state"),
         # The Python running Museion first, so `python` in opencode's shell
-        # is the drive's own and the tests it runs use what Museion uses.
-        "PATH": os.pathsep.join([str(Path(sys.executable).parent), env.get("PATH", "")]),
+        # is the drive's own and the tests it runs use what Museion uses;
+        # then opencode's folder, so it finds rg there rather than going to
+        # GitHub for it at the first search.
+        "PATH": os.pathsep.join([*first, env.get("PATH", "")]),
     })
     return env
 
@@ -108,6 +114,20 @@ def chat_context(url: str) -> int:
         return int(props.get("default_generation_settings", {}).get("n_ctx") or props.get("n_ctx") or 0)
     except (OSError, ValueError, AttributeError, TypeError):
         return 0
+
+
+def small_model_note(model: Path) -> str | None:
+    """A word of warning when the chat model is the catalogue's small one.
+    On a real PC, asked for a one-line change, the 4B model's edits named
+    text that was not in the file, it rewrote a file whole and lost its
+    docstring, and then it said the work was already done. The 35B made the
+    same change, fixed a bug it ran into, and ran the tests."""
+    m = next((m for m in catalog.models() if m.filename == model.name), None)
+    if m is None or m.role != "chat" or m.tiers != [hardware.MODEST]:
+        return None
+    return (f"Note: {m.title} is the small model. It answers questions, but it cannot be relied on "
+            "to change code: in testing its edits missed and it overwrote a file. A large model "
+            "(Capable tier or above, which wants a graphics card with 8 GB or more) can.\n")
 
 
 def run(state: AppState, args: list[str]) -> int:
@@ -133,8 +153,12 @@ def run(state: AppState, args: list[str]) -> int:
             services.fit_if_due(state, cfg, print)
             print(f"Loading the chat model ({cfg.chat_model.name}); this can take a few minutes…")
         services.start_chat(state, cfg, cfg.chat_model, with_context(cfg.chat_args, CONTEXT), cfg.chat_gpu_layers)
-        print(f"Opening opencode on {APP_DIR}\n")
+        if note := small_model_note(cfg.chat_model):
+            print(note)
+        # Before opencode writes to the same terminal, or a pipe would put
+        # these lines after everything opencode printed.
+        print(f"Opening opencode on {APP_DIR}\n", flush=True)
         return subprocess.call([str(exe), *args], cwd=APP_DIR,
-                               env=opencode_env(state, url, cfg.chat_model.name, CONTEXT))
+                               env=opencode_env(state, url, cfg.chat_model.name, CONTEXT, exe.parent))
     finally:
         state.supervisor.release_all()

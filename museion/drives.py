@@ -20,13 +20,13 @@ def prepare_options(state: AppState) -> dict:
         bundles.append({"id": b.id, "title": b.title, "size_bytes": sum(s.size_bytes for s in sources)})
     models = [{"id": m.id, "title": m.title, "size_bytes": m.size_bytes, "tiers": m.tiers}
               for m in catalog.models() if m.role == "chat"]
-    opencode = next((t for t in catalog.drive_tools() if t.id == "opencode"), None)
-    picked = catalog.tool_variant_named(opencode, "cpu") if opencode else None
+    # opencode and the ripgrep it searches with, carried together.
+    picked = [catalog.tool_variant_named(t, "cpu") for t in catalog.drive_tools() if t.id in ("opencode", "ripgrep")]
     return {
         "bundles": bundles,
         "models": models,
         "accelerators": prepare.default_accelerators(),
-        "opencode_bytes": picked[1].size_bytes if picked else None,
+        "opencode_bytes": sum(p[1].size_bytes for p in picked if p) or None,
     }
 
 

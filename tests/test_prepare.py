@@ -56,7 +56,7 @@ class PrepareTest(unittest.TestCase):
 
     def install_drive_tool(self, tool, root, report):
         self.installed.append((tool.id,))
-        touch(prepare.python_exe(root) if tool.id == "python" else root / "bin" / exe(tool.id))
+        touch(prepare.python_exe(root) if tool.id == "python" else root / "bin" / exe(tool.provides[0]))
 
     def run_prepare(self, **plan) -> Path:
         plan = prepare.Plan(dest=self.root, accelerators=["cpu"], skeleton=True, build_index=False, **plan)
@@ -69,6 +69,7 @@ class PrepareTest(unittest.TestCase):
         names = dict(est.items)
         self.assertIn("Museion's code", names)
         self.assertIn("opencode", names)
+        self.assertIn("ripgrep", names)
         self.assertGreater(names["Museion's code"], 0)
         self.assertEqual(est.bytes, sum(names.values()))
         # The llama.cpp build is already there, so it is not still to fetch.
@@ -105,6 +106,8 @@ class PrepareTest(unittest.TestCase):
             self.assertTrue((root / folder).is_dir(), folder)
         self.assertTrue(prepare.python_exe(root).exists())
         self.assertTrue((root / "bin" / exe("opencode")).exists())
+        # opencode's search runs rg, and downloads it if it is not on the PATH.
+        self.assertTrue((root / "bin" / exe("rg")).exists())
         self.assertTrue((root / "bin" / exe("kiwix-serve")).exists())
 
         # Museion's code, what someone changing it needs, and no caches.
@@ -161,10 +164,12 @@ class PrepareTest(unittest.TestCase):
         notes = [p.item for p in self.progress if p.kind == prepare.NOTE]
         self.assertIn("app/ already there; left as it is", notes)
 
-    def test_without_opencode_none_is_carried(self):
+    def test_without_opencode_neither_it_nor_ripgrep_is_carried(self):
         self.run_prepare(opencode=False)
         self.assertFalse((self.root / "bin" / exe("opencode")).exists())
+        self.assertFalse((self.root / "bin" / exe("rg")).exists())
         self.assertNotIn(("opencode",), self.installed)
+        self.assertNotIn(("ripgrep",), self.installed)
 
 
 class ManifestTest(unittest.TestCase):

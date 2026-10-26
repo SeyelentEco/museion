@@ -22,7 +22,7 @@ The rules the Python code keeps:
 | 0 | Prove the portable runtime: FTS5, pdfium through ctypes, starting and stopping llama-server, helpers dying with Museion | Done: `museion/pdf.py`, `sidecar.py`, `llama.py`, `doctor.py` |
 | 1 | Port the core as a command line: index, search, ask, evals | Done: `python -m museion` (see below); asks exactly as the Rust version does |
 | 2 | Browser UI in plain HTML and JavaScript | Done: `python -m museion` opens it (see below); every screen of the Rust app |
-| 3 | The drive: portable mode, prepare, `AGENTS.md`, opencode | Built and tested with stand-in helpers and a tiny model (see [The drive](#the-drive-and-changing-museion)); not yet tried with a real model |
+| 3 | The drive: portable mode, prepare, `AGENTS.md`, opencode | Done: tested on a real PC with real models (see [The drive](#the-drive-and-changing-museion)) |
 | 4 | Rehearse offline edits with a local coding agent | Not started |
 | 5 | Retire the Rust code | Not started |
 
@@ -125,11 +125,31 @@ because on a drive with no internet every one of them is a wait or a failure:
   built into opencode, so nothing is installed for it.
 - `XDG_DATA_HOME` and friends: opencode's conversations and logs go with the
   computer's Museion state, not onto the drive.
+- ripgrep: opencode's search runs `rg`, and with none on the PATH it downloads
+  ripgrep from GitHub at the first search, whatever the switches say. The drive
+  carries `rg` in `bin/` beside opencode, and that folder goes on its PATH.
 
 The drive's Python is put first on opencode's PATH, so the tests it runs use the
 same Python as Museion. `AGENTS.md` at the top of the code is what opencode (or
 a person) reads first: the rules (standard library only, short files, why-comments,
 run the tests) and a map of where each kind of change is made.
+
+What testing on a real PC (Windows, RTX 3060 12 GB) showed:
+
+- With Qwen3.6-35B-A3B, asked to add a `--version` option, opencode edited the
+  right two files, found and fixed the argument handling that swallowed the new
+  option, and ran the tests green, in about four minutes. The 32k context fitted
+  in about 9.5 GB of the card.
+- With the small Qwen3 4B it could not: its edits named text that was not in
+  the file, it rewrote a file whole, and then said the work was done. `edit`
+  says so when the small model is the one configured.
+- opencode's shell on Windows is PowerShell 5.1, so `AGENTS.md` warns that
+  `&&` does not work there.
+- A USB disk whose flushes fail made SQLite fail every write; the index is
+  opened with `synchronous=OFF` in such a folder (it can always be rebuilt).
+- The machine profile holds absolute paths, as the Rust app's does, so a drive
+  under a new letter looks for each one again under its new root rather than
+  dropping it and running on the CPU.
 
 ## The browser page
 

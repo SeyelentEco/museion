@@ -663,7 +663,7 @@ impl<'a> Asker<'a> {
 
 /// The source numbers an answer cites, in order of first appearance.
 /// Handles [2], [4][5] and [4, 5].
-fn cited_numbers(text: &str) -> Vec<usize> {
+pub fn cited_numbers(text: &str) -> Vec<usize> {
     let mut out: Vec<usize> = Vec::new();
     let bytes = text.as_bytes();
     let mut i = 0;

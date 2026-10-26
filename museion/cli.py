@@ -27,6 +27,7 @@ from museion.appstate import UiError
 from museion.index import Index
 from museion.kiwix import Kiwix, book_id_from_filename
 from museion.llama import Llama
+from museion.model_text import cited_numbers
 
 KIWIX_URL = "http://127.0.0.1:8090"
 CHAT_URL = "http://127.0.0.1:8080"
@@ -264,16 +265,19 @@ def answer_from(args, index: Index, question: str, history: list[ask.Exchange]) 
                               "  Start llama-server with a chat model, then try again.")
     print()
     streamed = False
+    shown = ""
 
     def show(text: str | None) -> None:
-        nonlocal streamed
+        nonlocal streamed, shown
         if text is ask.DISCARD:
             # A terminal cannot unprint; mark where the model started over.
             if streamed:
                 print("\n  -- consulted a tool; the answer restarts below --\n")
                 streamed = False
+            shown = ""
         else:
             streamed = True
+            shown += text
             print(text, end="", flush=True)
 
     answer = asker.ask(question, history, show)
@@ -290,7 +294,12 @@ def answer_from(args, index: Index, question: str, history: list[ask.Exchange]) 
             print(f"  {c.expression} = {c.result}")
     if answer.sources:
         print(f"Sources{' (reranked)' if answer.reranked else ''}:")
-        for i, h in enumerate(answer.sources, start=1):
+        # The answer as streamed carries the model's own numbers ([5]), not
+        # the renumbered ones in answer.text; the list must use the numbers
+        # the reader saw, or [5] above names nothing below.
+        cited = cited_numbers(shown) if streamed else []
+        numbers = cited if len(cited) == len(answer.sources) else range(1, len(answer.sources) + 1)
+        for i, h in zip(numbers, answer.sources):
             who = f", {h.author}" if h.author else ""
             where = f"page {h.page}" if h.page > 0 else h.book
             print(f"  [{i}] {h.doc_title}{who} -- {where}")

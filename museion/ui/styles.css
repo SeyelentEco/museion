@@ -178,6 +178,7 @@ main { flex: 1 1 auto; min-height: 0; position: relative; }
 .answer ul, .answer ol { margin: 0.25rem 0 0.75rem; padding-left: 1.4rem; }
 .answer li { margin: 0.2rem 0; }
 .answer li > ul, .answer li > ol { margin: 0.2rem 0 0.2rem; }
+.answer blockquote { margin: 0.25rem 0 0.75rem; padding-left: 0.8rem; border-left: 3px solid var(--line); color: var(--ink-mid); }
 .answer strong { font-weight: 650; }
 .answer em { color: var(--ink-mid); }
 .answer code {
