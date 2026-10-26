@@ -7,7 +7,8 @@ import { $, el, gb } from './dom.js';
 
 let current = null; // { want, resolve, path }
 // Counts listings asked for. A folder typed while the first listing was
-// still coming back was shown, then replaced by that older listing.
+// still coming back was shown, then replaced by that older listing; and the
+// listing's answer wrote over the folder box while it was being typed in.
 let asked = 0;
 
 /**
@@ -34,7 +35,11 @@ export async function pickInto(id, directory, title, want) {
 
 async function show(path) {
   const list = $('#chooser-list');
+  const box = $('#chooser-path');
   const ticket = ++asked;
+  // What the folder box said when this listing was asked for: if the person
+  // has typed since, the listing must not write over what they typed.
+  const typed = box.value;
   let r;
   try {
     r = await invoke('browse', { path, want: current?.want ?? 'dir' });
@@ -45,7 +50,7 @@ async function show(path) {
   if (!current || ticket !== asked) return;
   current.path = r.path;
   current.parent = r.parent;
-  $('#chooser-path').value = r.path;
+  if (box.value === typed) box.value = r.path;
   $('#chooser-up').disabled = !r.parent;
 
   const roots = $('#chooser-roots');
