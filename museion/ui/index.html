@@ -265,6 +265,11 @@
                 <button id="build-index" type="button">Build index</button>
               </div>
               <div class="field">
+                <label for="rebuild-index">Rebuild index</label>
+                <span class="what">Reads everything again, replacing what was indexed before — after Museion's code for indexing has been changed, or if search results look wrong. Needs the services running.</span>
+                <button id="rebuild-index" type="button">Rebuild index</button>
+              </div>
+              <div class="field">
                 <label for="fit-model">Fit model to this machine</label>
                 <span class="what">Measures the chat model against your GPU and stores the layer split. Set-up did this once; run it again after changing the GPU or the chat model. Stops the chat model to measure, so start services afterwards.</span>
                 <button id="fit-model" type="button">Fit model to this machine</button>

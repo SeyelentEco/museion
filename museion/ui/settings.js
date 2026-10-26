@@ -153,18 +153,27 @@ $('#add-dir').addEventListener('click', async () => {
 
 /* ------------------------------------------------------------- maintenance */
 
-$('#build-index').addEventListener('click', async () => {
-  const btn = $('#build-index');
+async function buildIndex(btn, force) {
   btn.setAttribute('disabled', 'true');
-  statusMsg('Building the index…');
+  statusMsg(force ? 'Rebuilding the index from scratch…' : 'Building the index…');
   try {
-    statusMsg(await invoke('build_index', { force: false }));
+    statusMsg(await invoke('build_index', { force }));
     await refreshSetup();
   } catch (e) {
     statusMsg(String(e), true);
   } finally {
     btn.removeAttribute('disabled');
   }
+}
+
+$('#build-index').addEventListener('click', () => buildIndex($('#build-index'), false));
+
+// Build index skips what is already indexed, so a fix to how the index is
+// built showed nothing: on a real PC the planted bug was fixed in the code
+// and the sources stayed wrong, with no way in the page to redo them.
+$('#rebuild-index').addEventListener('click', () => {
+  if (!confirm('Rebuild the whole index? Every archive and PDF is read again; the Go Bag takes about a minute.')) return;
+  buildIndex($('#rebuild-index'), true);
 });
 
 $('#fit-model').addEventListener('click', async () => {

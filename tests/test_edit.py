@@ -63,6 +63,9 @@ class EditTest(unittest.TestCase):
         self.assertEqual(provider["models"]["local"]["limit"]["context"], 32768)
         self.assertEqual((c["model"], c["small_model"]), ("museion/local", "museion/local"))
         self.assertFalse(c["autoupdate"])
+        # Sub-agents overflow the context; the main agent does the work.
+        self.assertTrue(c["agent"]["explore"]["disable"])
+        self.assertTrue(c["agent"]["general"]["disable"])
 
     def test_opencode_stays_off_the_network_and_off_the_drive(self):
         env = edit.opencode_env(self.state, "http://127.0.0.1:8080", "small.gguf", 32768, self.dir / "bin")
@@ -71,6 +74,8 @@ class EditTest(unittest.TestCase):
             self.assertEqual(env[name], "1", name)
         self.assertEqual(json.loads(env["OPENCODE_CONFIG_CONTENT"])["model"], "museion/local")
         self.assertEqual(Path(env["XDG_DATA_HOME"]), self.dir / "opencode" / "data")
+        # The computer's own opencode settings are not read.
+        self.assertEqual(Path(env["XDG_CONFIG_HOME"]), self.dir / "opencode" / "config")
         # `python` in its shell is the one running Museion, and rg (which it
         # would otherwise download) is found beside opencode.
         self.assertEqual(env["PATH"].split(os.pathsep)[:2], [str(Path(sys.executable).parent), str(self.dir / "bin")])

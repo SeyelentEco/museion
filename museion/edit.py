@@ -75,6 +75,11 @@ def opencode_config(chat_url: str, model_name: str, context: int) -> dict:
         },
         "model": "museion/local",
         "small_model": "museion/local",
+        # Its sub-agents start a second conversation with their own long
+        # instructions. On a real PC the explore agent overflowed the 32,768
+        # tokens twice in three tasks, and the work went on without what it
+        # was sent to find. The main agent searches and reads well enough.
+        "agent": {"explore": {"disable": True}, "general": {"disable": True}},
     }
 
 
@@ -96,6 +101,10 @@ def opencode_env(state: AppState, chat_url: str, model_name: str, context: int,
         "XDG_DATA_HOME": str(home / "data"),
         "XDG_CACHE_HOME": str(home / "cache"),
         "XDG_STATE_HOME": str(home / "state"),
+        # And no settings of the computer's own: an opencode installed on it
+        # reads ~/.config/opencode, which on a real PC added an MCP server
+        # that was tried, and failed, at every start.
+        "XDG_CONFIG_HOME": str(home / "config"),
         # The Python running Museion first, so `python` in opencode's shell
         # is the drive's own and the tests it runs use what Museion uses;
         # then opencode's folder, so it finds rg there rather than going to

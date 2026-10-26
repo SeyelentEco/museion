@@ -22,7 +22,7 @@ import sys
 from contextlib import closing
 from pathlib import Path
 
-from museion import app, ask, calc, drive_cli, evals, fit, hardware, indexer, tools, tuning
+from museion import app, ask, calc, catalog_add, drive_cli, evals, fit, hardware, indexer, tools, tuning
 from museion.appstate import UiError
 from museion.index import Index
 from museion.kiwix import Kiwix, book_id_from_filename
@@ -138,6 +138,16 @@ def parser() -> argparse.ArgumentParser:
     c.add_argument("--dest", required=True, type=Path, help="folder to put them in")
     c.add_argument("--cpu", action="store_true", help="the CPU build, whatever the GPU")
     c.set_defaults(run=cmd_tools)
+
+    c = commands.add_parser("add-source", help="add an archive in the library to the catalogue")
+    c.add_argument("file", type=Path, help="the .zim file")
+    c.add_argument("--title", required=True, help="what the Library tab shows")
+    c.add_argument("--category", required=True, choices=catalog_add.CATEGORIES,
+                   help="the Library tab's shelf for it")
+    c.add_argument("--description", default="", help="one line about it")
+    c.set_defaults(run=lambda a: print(
+        f"Added {catalog_add.add_source(a.file, a.title, a.category, a.description)}. "
+        "Reload the Library tab to see it."))
 
     drive_cli.add_commands(commands)
     return top

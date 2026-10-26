@@ -23,7 +23,7 @@ The rules the Python code keeps:
 | 1 | Port the core as a command line: index, search, ask, evals | Done: `python -m museion` (see below); asks exactly as the Rust version does |
 | 2 | Browser UI in plain HTML and JavaScript | Done: `python -m museion` opens it (see below); every screen of the Rust app |
 | 3 | The drive: portable mode, prepare, `AGENTS.md`, opencode | Done: tested on a real PC with real models (see [The drive](#the-drive-and-changing-museion)) |
-| 4 | Rehearse offline edits with a local coding agent | Not started |
+| 4 | Rehearse offline edits with a local coding agent | Done: three tasks on a drive with the 35B, each re-run after `AGENTS.md` was fixed (see [What phase 4 found](#what-phase-4-found)) |
 | 5 | Retire the Rust code | Not started |
 
 ## Running it
@@ -124,7 +124,11 @@ because on a drive with no internet every one of them is a wait or a failure:
   OpenAI-compatible endpoint at the chat model's port. The adapter it names is
   built into opencode, so nothing is installed for it.
 - `XDG_DATA_HOME` and friends: opencode's conversations and logs go with the
-  computer's Museion state, not onto the drive.
+  computer's Museion state, not onto the drive. `XDG_CONFIG_HOME` too, so an
+  opencode installed on the computer does not lend its own settings (its MCP
+  servers, say) to the drive's.
+- Its explore and general sub-agents are turned off: each starts a second
+  conversation with long instructions of its own, and in 32k it overflowed.
 - ripgrep: opencode's search runs `rg`, and with none on the PATH it downloads
   ripgrep from GitHub at the first search, whatever the switches say. The drive
   carries `rg` in `bin/` beside opencode, and that folder goes on its PATH.
@@ -234,6 +238,50 @@ Not done yet:
 - **`museion/tuning.toml`'s header** still describes the Rust app's
   `tuning.yaml` override, because it is generated from that file. It is
   rewritten when the TOML becomes the source in phase 5.
+
+## What phase 4 found
+
+On a prepared drive on a Windows PC (RTX 3060 12 GB), with Qwen3.6-35B-A3B
+chosen in Settings, opencode was given three tasks through `Edit Museion`,
+each in a fresh session and asked for the way someone who does not program
+would ask. The launchers ran with the proxy variables pointing at a dead port,
+so anything honouring them failed at once.
+
+| Task | First try | After the fixes below |
+| --- | --- | --- |
+| Add an archive copied into the library to the catalogue | Right size and checksum, but an invented title and a category the Library tab has no heading for; tests not run; 156 s | With `add-source`: right entry under Reference, nothing invented; 69 s |
+| Make answers with a dose end with "check this against a second source" | Done in one rule beside the safety rules, with a test for it, tests run; 399 s | (not re-run) |
+| A planted bug (author and description swapped when indexing), described only by its symptom | Found and fixed in 414 s, tests run, but never said the index must be rebuilt. Asked again, it "fixed" `ask.py` to read a field that does not exist and changed the test's stand-in to match | Fixed, tests run, and it told the person to press Rebuild index, which put the authors back; 346 s |
+
+The benchmark on the drive was 25/29 before the tasks and 27/29 after (the
+chemistry archive from the first task answers the steel question).
+
+What changed because of it:
+
+- `AGENTS.md`: there is no internet; finish by saying what the person must do;
+  never change a test's stand-ins to make it pass; after changing indexing,
+  Rebuild index; how to add an archive; unzip the undo archive into the
+  drive's top folder (its entries start with `app/`).
+- `python -m museion add-source`: written by hand, a catalogue entry came back
+  with comments copied from a generated file, invented download links, and a
+  magnet whose hash was the start of the SHA-256. The command measures the file
+  and writes only what can be known offline.
+- Settings › Rebuild index: Build index skips what is indexed, so a fix to the
+  indexer showed nothing and the page had no way to redo it.
+- `edit`: opencode's explore and general sub-agents are off (they overflowed
+  the 32k context in two of three tasks), and `XDG_CONFIG_HOME` keeps the
+  computer's own opencode settings out (it had picked up an MCP server).
+
+Still rough:
+
+- 32k is tight: reading four whole files once overflowed the main
+  conversation; opencode compacted and carried on.
+- It seldom ran the tests after a `.toml` change, whatever `AGENTS.md` says.
+- With an empty settings folder opencode tries, in the background, to install
+  its plugin package from npm. Offline it fails and nothing waits on it.
+- Asked for a title it did not know, it ran `curl` at Wikipedia. PowerShell's
+  `curl` ignores the proxy variables, so the rehearsal could not stop that; on
+  a computer with no network it fails.
 
 ## What phase 0 found
 
