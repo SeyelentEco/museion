@@ -6,6 +6,9 @@ import { invoke } from './api.js';
 import { $, el, gb } from './dom.js';
 
 let current = null; // { want, resolve, path }
+// Counts listings asked for. A folder typed while the first listing was
+// still coming back was shown, then replaced by that older listing.
+let asked = 0;
 
 /**
  * Ask for a folder or file. `want` is 'dir', 'gguf' or 'program'. Resolves
@@ -31,14 +34,15 @@ export async function pickInto(id, directory, title, want) {
 
 async function show(path) {
   const list = $('#chooser-list');
+  const ticket = ++asked;
   let r;
   try {
     r = await invoke('browse', { path, want: current?.want ?? 'dir' });
   } catch (e) {
-    list.textContent = String(e);
+    if (ticket === asked) list.textContent = String(e);
     return;
   }
-  if (!current) return;
+  if (!current || ticket !== asked) return;
   current.path = r.path;
   current.parent = r.parent;
   $('#chooser-path').value = r.path;

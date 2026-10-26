@@ -1,13 +1,14 @@
 """PDF extraction. The normalising tests always run; the extraction tests need
-the pdfium library and run when MUSEION_PDFIUM names the folder holding it."""
+the pdfium library: MUSEION_PDFIUM, a drive's or this computer's (see
+helper_programs.py)."""
 
-import os
 import unittest
 from pathlib import Path
 
+import helper_programs
 from museion.pdf import Extracted, PdfExtractor, normalise, sample_pdf
 
-PDFIUM = os.environ.get("MUSEION_PDFIUM")
+PDFIUM = helper_programs.pdfium_dir()
 
 
 class NormaliseTest(unittest.TestCase):
@@ -26,7 +27,7 @@ class ImageOnlyTest(unittest.TestCase):
         self.assertFalse(Extracted(page_count=0, word_count=0).is_image_only())
 
 
-@unittest.skipUnless(PDFIUM, "set MUSEION_PDFIUM to the folder holding the pdfium library")
+@unittest.skipUnless(PDFIUM, "pdfium not found: set MUSEION_PDFIUM to the folder holding it")
 class ExtractTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

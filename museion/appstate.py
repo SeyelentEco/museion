@@ -72,8 +72,15 @@ class AppState:
             profile = MachineProfile.load(path) or MachineProfile()
             profile.absorb(cfg)
             profile.save(path)
+            # The drive keeps its own build, model and split: what this
+            # computer chose was written there too once, and the next
+            # computer started from this one's choices.
+            shared = cfg.copy()
+            own = config.load(self.config_path).resolved(self.drive.root)
+            for name in portable.MACHINE_FIELDS:
+                setattr(shared, name, getattr(own, name))
             try:
-                cfg.save(self.config_path)
+                shared.save(self.config_path)
             except OSError as e:
                 print(f"  (drive config not written: {e})")
         else:

@@ -13,10 +13,10 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
-from museion import fit
+from museion import catalog, fit, hardware
 from museion.appstate import AppState, UiError, file_name, local
 from museion.config import Config
-from museion.sidecar import CHAT, KIWIX, RERANKER
+from museion.sidecar import CHAT, KIWIX, RERANKER, llama_args
 
 KIWIX_HEALTH = "/catalog/v2/entries"
 LLAMA_HEALTH = "/v1/models"
@@ -91,13 +91,14 @@ def start_services(state: AppState) -> None:
 
 
 def fit_if_due(state: AppState, cfg: Config, say: Callable[[str], None]) -> None:
-    """From a drive, on a computer with a GPU it has not been measured on:
-    measure the chat model's split now, before it loads, and keep the result
-    in `cfg` and this computer's profile. A failed measurement is said and
-    the defaults are used; it is tried again next time."""
+    """From a drive, on a computer with a GPU it has not been measured on, or
+    with a chat model chosen since the last measurement: measure the split
+    now, before it loads, and keep the result in `cfg` and this computer's
+    profile. A failed measurement is said and the defaults are used; it is
+    tried again next time."""
     if not (state.fit_due() and cfg.chat_gpu_layers != 0):
         return
-    say("First run on this computer: measuring the chat model against its GPU…")
+    say("Measuring the chat model against this computer's GPU (first run, or a new model)…")
     try:
         args, layers, message = measure_fit(state, cfg)
         cfg.chat_args = args
@@ -116,10 +117,35 @@ def start_chat(state: AppState, cfg: Config, model: Path, extra: list[str], gpu_
     if not cfg.llama_exe:
         raise UiError("llama-server path not configured")
     health = local(cfg.chat_port) + LLAMA_HEALTH
-    if state.supervisor.adopt(CHAT, cfg.chat_port, health, model):
+    sup = state.supervisor
+    flags = [*extra, *CHAT_FLAGS]
+    started = sup.started_with(CHAT)
+    if started and started != llama_args(cfg.llama_exe, model, cfg.chat_port, gpu_layers, flags):
+        # Settings chose another model, or its arguments changed, since this
+        # one was started. Start services used to say "Ready." with the old
+        # model still loaded, until Stop and then Start were pressed.
+        sup.stop(CHAT)
+        time.sleep(2)
+    if sup.adopt(CHAT, cfg.chat_port, health, model):
         return
-    state.supervisor.start_llama(CHAT, cfg.llama_exe, model, cfg.chat_port, gpu_layers, [*extra, *CHAT_FLAGS])
-    state.supervisor.wait_ready(CHAT, health, 600)
+    sup.start_llama(CHAT, cfg.llama_exe, model, cfg.chat_port, gpu_layers, flags)
+    sup.wait_ready(CHAT, health, 600)
+
+
+def new_chat_model(cfg: Config, hw: hardware.Hardware) -> None:
+    """A different chat model was chosen: give it its own arguments. The old
+    model's were kept once, and its fitted split -- a layer count measured
+    for its size, an -ot naming its tensors -- ran the 35B as if it were the
+    4B, spilling out of the card. A catalogue model gets the catalogue's
+    arguments; any other keeps what the person added, without the split."""
+    if not cfg.chat_model:
+        return
+    known = next((m for m in catalog.models() if m.filename == cfg.chat_model.name), None)
+    if known is not None:
+        cfg.chat_args = list(known.server_args)
+    else:
+        cfg.chat_args = without_layers(cfg.chat_args, ("-ngl", "--n-gpu-layers", "-ot", "--override-tensor"))
+    cfg.chat_gpu_layers = 0 if hw.accelerator.kind == hardware.CPU else 999
 
 
 def stop_services(state: AppState) -> None:
@@ -236,13 +262,14 @@ def measure_fit(state: AppState, cfg: Config) -> tuple[list[str], int | None, st
     return args, result.gpu_layers, f"{layers} layers on the GPU; {where}"
 
 
-def without_layers(args: list[str]) -> list[str]:
+def without_layers(args: list[str], flags: tuple[str, ...] = ("-ngl", "--n-gpu-layers")) -> list[str]:
     """The arguments without -ngl and its value: the supervisor passes the
-    layer count itself, from chat_gpu_layers."""
+    layer count itself, from chat_gpu_layers. Other flags (with values) can
+    be named to drop as well."""
     out = []
     i = 0
     while i < len(args):
-        if args[i] in ("-ngl", "--n-gpu-layers"):
+        if args[i] in flags:
             i += 2
             continue
         out.append(args[i])

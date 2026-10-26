@@ -10,7 +10,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from museion import hardware, portable
+from museion import commands, hardware, portable
 from museion.appstate import AppState
 from museion.config import Config, load
 from museion.portable import MachineProfile
@@ -194,18 +194,52 @@ class AppStateOnADriveTest(Drive):
         again.mark_fitted()
         self.assertFalse(again.fit_due())
 
-    def test_saving_writes_relative_paths_and_the_profile(self):
+    def test_saving_writes_relative_paths_and_this_computers_choices_to_its_profile(self):
         self.stock()
         d = self.drive()
-        MachineProfile(fitted=True).save(d.profile_path())
+        Config(chat_model=self.root / "models" / SMALL, chat_args=["-c", "4096"], base=self.root
+               ).save(d.config_path())
+        MachineProfile(chat_model=self.root / "models" / SMALL, fitted=True).save(d.profile_path())
         state = self.state()
         cfg = state.config()
-        cfg.chat_model = self.root / "models" / SMALL
-        cfg.chat_gpu_layers = 12
+        cfg.library_dir = self.root / "library"
+        big = touch(self.root / "models" / "big.gguf")
+        cfg.chat_model, cfg.chat_args, cfg.chat_gpu_layers = big, ["-ot", "x=CPU"], 12
+        cfg.llama_exe = self.root / "bin" / "llama" / "vulkan" / exe("llama-server")
         state.save_config(cfg)
         data = json.loads(d.config_path().read_text(encoding="utf-8"))
-        self.assertEqual(data["chat_model"], f"models/{SMALL}")
-        self.assertEqual(MachineProfile.load(d.profile_path()).chat_gpu_layers, 12)
+        self.assertEqual(data["library_dir"], "library")
+        # The drive keeps its own model and build for the next computer: this
+        # one's choices were once written there too.
+        self.assertEqual((data["chat_model"], data["chat_args"], data["llama_exe"]), (f"models/{SMALL}", ["-c", "4096"], None))
+        p = MachineProfile.load(d.profile_path())
+        self.assertEqual((p.chat_model, p.chat_args, p.chat_gpu_layers), (big, ["-ot", "x=CPU"], 12))
+        self.assertEqual(state.config().chat_model, big)
+        # Another model has not been measured on this computer's GPU.
+        self.assertFalse(p.fitted)
+        self.assertTrue(state.fit_due())
+
+    def test_saving_the_same_model_keeps_the_fit(self):
+        self.stock()
+        d = self.drive()
+        MachineProfile(chat_model=self.root / "models" / SMALL, fitted=True).save(d.profile_path())
+        state = self.state()
+        cfg = state.config()
+        cfg.autostart = False
+        state.save_config(cfg)
+        self.assertFalse(state.fit_due())
+
+    def test_choosing_a_model_in_settings_has_it_measured_at_the_next_start(self):
+        self.stock()
+        d = self.drive()
+        MachineProfile(chat_model=self.root / "models" / SMALL, chat_gpu_layers=999, fitted=True
+                       ).save(d.profile_path())
+        state = self.state()
+        state._hardware = GPU
+        big = touch(self.root / "models" / "big.gguf")
+        said = commands.set_config(state, {**state.config().to_json(), "chat_model": str(big)})
+        self.assertEqual(said, "Press Start services to load the new model.")
+        self.assertTrue(state.fit_due())
 
     def test_a_drive_that_cannot_be_written_still_saves_the_profile(self):
         self.stock()

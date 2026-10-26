@@ -67,8 +67,8 @@ $('#save-config').addEventListener('click', async () => {
     reranker_model: nz($('#reranker-model').value),
   };
   try {
-    await invoke('set_config', { config });
-    statusMsg('Saved.');
+    const next = await invoke('set_config', { config });
+    statusMsg(next ? `Saved. ${next}` : 'Saved.');
     await refreshSetup();
   } catch (e) {
     statusMsg(String(e), true);

@@ -37,7 +37,7 @@ import sys
 import threading
 import time
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from museion import winjob
@@ -64,6 +64,8 @@ class Sidecar:
     # MUSEION_KEEP_SERVICES, which a developer wants to outlive one run of
     # the app so the next run adopts them instead of reloading a 22 GB model.
     owned: bool
+    # The command line it was started with; empty for an adopted server.
+    args: list[str] = field(default_factory=list)
 
     def is_alive(self) -> bool:
         """A model that failed to load exits rather than hanging, and the
@@ -169,6 +171,12 @@ class Supervisor:
         with self._lock:
             return any(s.role == role for s in self._running)
 
+    def started_with(self, role: str) -> list[str] | None:
+        """The command line Museion started a helper with, or None when it is
+        not running or was adopted."""
+        with self._lock:
+            return next((list(s.args) for s in self._running if s.role == role and s.args), None)
+
     def port_for(self, role: str) -> int | None:
         with self._lock:
             return next((s.port for s in self._running if s.role == role), None)
@@ -230,11 +238,7 @@ class Supervisor:
             return
         if not model.is_file():
             raise FileNotFoundError(f"model not found: {model}")
-        args = [
-            str(exe), "--model", str(model), "--host", "127.0.0.1",
-            "--port", str(port), "--n-gpu-layers", str(gpu_layers), *(extra or []),
-        ]
-        self.start(role, args, port)
+        self.start(role, llama_args(exe, model, port, gpu_layers, extra or []), port)
 
     def start(self, role: str, args: list[str], port: int) -> None:
         """Start any helper from a full command line and supervise it."""
@@ -244,7 +248,7 @@ class Supervisor:
         except OSError as e:
             raise RuntimeError(f"starting {LABELS.get(role, role)} ({args[0]}): {e}") from e
         with self._lock:
-            self._running.append(Sidecar(role, port, process, owned))
+            self._running.append(Sidecar(role, port, process, owned, list(args)))
 
     def wait_ready(self, role: str, health_url: str, timeout: float) -> None:
         """Wait until the service answers, or until it gives up.
@@ -297,6 +301,12 @@ class Supervisor:
         for s in everything:
             if s.owned:
                 s.kill()
+
+
+def llama_args(exe: Path, model: Path, port: int, gpu_layers: int, extra: list[str]) -> list[str]:
+    """The command line a llama-server is started with."""
+    return [str(exe), "--model", str(model), "--host", "127.0.0.1",
+            "--port", str(port), "--n-gpu-layers", str(gpu_layers), *extra]
 
 
 def _spawn(args: list[str], owned: bool) -> subprocess.Popen:

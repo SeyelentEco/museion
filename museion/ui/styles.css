@@ -518,6 +518,14 @@ select {
 .progress .label { margin-top: 0.4rem; font-size: 0.87rem; color: var(--ink-mid); font-family: var(--mono); }
 .status { margin-top: 0.9rem; color: var(--ink-mid); min-height: 1.4rem; }
 .status.err { color: var(--bad); white-space: pre-wrap; }
+/* Settings is long, and Save or Start services sat a screen above the line
+   that answered them, so pressing one seemed to do nothing. Pinned to the
+   bottom of the window while it says something, it is seen from anywhere. */
+#setup-status:not(:empty) {
+  position: sticky; bottom: 0.75rem; z-index: 5;
+  padding: 0.55rem 0.9rem; background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: var(--radius);
+}
 
 /* ---------- the browser version's own pieces ---------- */
 

@@ -1,6 +1,6 @@
 """Building the index over a library, with tests/fake_kiwix.py standing in for
 kiwix-serve. Most tests stand in for pdfium too; the last one uses the real
-pdfium, when MUSEION_PDFIUM names the folder holding it, and checks the rows
+pdfium, when it is found (see helper_programs.py), and checks the rows
 it builds are the ones the Rust version built from the same library."""
 
 import io
@@ -13,6 +13,7 @@ from contextlib import redirect_stderr
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from unittest import mock
 
+import helper_programs
 import index_corpus
 from fake_kiwix import FakeKiwix
 from museion import sidecar
@@ -30,7 +31,7 @@ from museion.indexer import (
 )
 from museion.pdf import Extracted, Page
 
-PDFIUM = os.environ.get("MUSEION_PDFIUM")
+PDFIUM = helper_programs.pdfium_dir()
 ARCHIVE = index_corpus.ARCHIVE
 FOLDER = "folder:found"
 
@@ -156,7 +157,7 @@ class NamesTest(unittest.TestCase):
         self.assertEqual(folder_book_id(PureWindowsPath("E:\\")), "folder:E:\\")
 
 
-@unittest.skipUnless(PDFIUM, "set MUSEION_PDFIUM to the folder holding the pdfium library")
+@unittest.skipUnless(PDFIUM, "pdfium not found: set MUSEION_PDFIUM to the folder holding it")
 class SameRowsAsRustTest(LibraryTestCase):
     def test_builds_the_rows_the_rust_version_built(self):
         self.index(pdfium=PDFIUM)

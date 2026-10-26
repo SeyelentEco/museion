@@ -40,6 +40,7 @@ class SupervisorTest(unittest.TestCase):
         self.sup.wait_ready(sidecar.KIWIX, f"http://127.0.0.1:{port}/", timeout=20)
         self.assertTrue(self.sup.is_running(sidecar.KIWIX))
         self.assertEqual(self.sup.port_for(sidecar.KIWIX), port)
+        self.assertEqual(self.sup.started_with(sidecar.KIWIX), fake_helper(port))
         self.sup.stop(sidecar.KIWIX)
         self.assertFalse(self.sup.is_running(sidecar.KIWIX))
         self.assertTrue(wait_closed(port))
@@ -93,6 +94,8 @@ class AdoptTest(unittest.TestCase):
         sup = sidecar.Supervisor()
         self.assertTrue(sup.adopt(sidecar.CHAT, self.port, url, Path("models/qwen-chat.gguf")))
         self.assertTrue(sup.is_running(sidecar.CHAT))
+        # How someone else started it is not known.
+        self.assertIsNone(sup.started_with(sidecar.CHAT))
         # Leaving the app does not kill a server that was not ours.
         sup.release_all()
         self.assertTrue(sidecar.port_open(self.port))

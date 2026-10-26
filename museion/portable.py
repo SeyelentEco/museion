@@ -41,6 +41,10 @@ from museion.config import Config
 
 MARKER = "museion-portable"
 
+# What belongs to the computer rather than the drive: the profile holds these,
+# and the drive's own config.json keeps its defaults for the next computer.
+MACHINE_FIELDS = ("llama_exe", "chat_model", "chat_args", "chat_gpu_layers")
+
 # The folder holding the museion package: <root>/app on a drive.
 APP_DIR = Path(__file__).resolve().parent.parent
 
@@ -160,11 +164,16 @@ class MachineProfile:
         path.write_text(json.dumps(out, indent=2), encoding="utf-8")
 
     def absorb(self, cfg: Config) -> None:
-        """Take the machine-specific fields from a config."""
-        self.llama_exe = cfg.llama_exe
-        self.chat_model = cfg.chat_model
-        self.chat_args = list(cfg.chat_args)
-        self.chat_gpu_layers = cfg.chat_gpu_layers
+        """Take the machine-specific fields from a config. A different chat
+        model has not been measured against this computer's GPU, so a fit is
+        due again: without one, the 35B chosen in place of the 4B ran with
+        the 4B's settings, spilled out of the card and took three minutes a
+        question."""
+        if cfg.chat_model != self.chat_model:
+            self.fitted = False
+        for name in MACHINE_FIELDS:
+            value = getattr(cfg, name)
+            setattr(self, name, list(value) if isinstance(value, list) else value)
 
     def apply(self, cfg: Config, root: Path | None = None) -> bool:
         """Lay the machine-specific fields over a config. The profile's paths
@@ -255,8 +264,9 @@ def adapt(cfg: Config, hw: hardware.Hardware, root: Path) -> MachineProfile:
     cfg.chat_gpu_layers = 0 if cpu_only else 999
 
     # Nothing to fit without a GPU: everything runs on the CPU.
-    profile = MachineProfile(machine=describe(hw), fitted=cpu_only)
+    profile = MachineProfile(machine=describe(hw))
     profile.absorb(cfg)
+    profile.fitted = cpu_only
     return profile
 
 

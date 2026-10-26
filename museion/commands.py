@@ -26,7 +26,7 @@ from museion.index import Index
 from museion.kiwix import Kiwix, book_id_from_filename
 from museion.library import describe_hardware
 from museion.llama import Llama
-from museion.services import restore_chat_model, service_state, swap_chat_model
+from museion.services import new_chat_model, restore_chat_model, service_state, swap_chat_model
 from museion.sidecar import CHAT, KIWIX
 
 
@@ -55,8 +55,20 @@ def get_config(state: AppState) -> dict:
     return state.config().to_json()
 
 
-def set_config(state: AppState, config: dict) -> None:
-    state.save_config(Config.from_json(config))
+def set_config(state: AppState, config: dict) -> str | None:
+    """Save the page's settings. Returns what the person should do next when
+    the chat model changed: it is not loaded until services start again, and
+    on a GPU it wants measuring first (a drive does that by itself)."""
+    cfg = Config.from_json(config)
+    changed = cfg.chat_model is not None and cfg.chat_model != state.config().chat_model
+    if changed:
+        new_chat_model(cfg, state.hardware())
+    state.save_config(cfg)
+    if not changed:
+        return None
+    if cfg.chat_gpu_layers == 0 or state.drive:
+        return "Press Start services to load the new model."
+    return "Press Fit model to measure the new model against this computer's graphics card, then Start services."
 
 
 def kiwix_url(state: AppState) -> str:
