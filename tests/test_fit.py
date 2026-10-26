@@ -85,7 +85,10 @@ class FitModelTest(unittest.TestCase):
     def test_runs_with_the_kv_cache_museion_uses(self):
         f = self.run_fake("ok")
         self.assertEqual(self.args_file.read_text().split("\n"),
-                         ["-c", "32768", "-fa", "on", "-ctk", "q8_0", "-ctv", "q8_0"])
+                         ["-c", "32768", "-fa", "on", "-ctk", "q8_0", "-ctv", "q8_0",
+                          "-fitt", str(fit.MARGIN_MIB)])
+        # Room for what else is on the card: the default 1024 spilled.
+        self.assertGreaterEqual(fit.MARGIN_MIB, 2048)
         self.assertEqual(f.gpu_layers, 41)
         self.assertEqual(f.args[:4], ["-c", "32768", "-ngl", "41"])
         self.assertEqual(f.args[5], r"blk\.15\.ffn_down.*=CPU,blk\.16\.ffn_(up|down)_exps=CPU")

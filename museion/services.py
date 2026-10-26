@@ -179,7 +179,7 @@ def swap_chat_model(state: AppState, cfg: Config, candidate: Path) -> None:
     # model that fits entirely gets every layer; a MoE gets its split.
     say(f"Fitting {file_name(candidate)} to this GPU…")
     try:
-        result = fit.fit_model(exe, candidate, 32768)
+        result = fit.fit_model(exe, candidate, fit.CONTEXT)
         args, layers = without_layers(result.args), result.gpu_layers if result.gpu_layers is not None else 999
     except (OSError, RuntimeError, ValueError) as e:
         say(f"Fit failed ({e}); trying with everything on the GPU.")
@@ -224,13 +224,16 @@ def measure_fit(state: AppState, cfg: Config) -> tuple[list[str], int | None, st
         raise UiError("no chat model configured")
     exe = fit_exe(cfg)
 
-    # Context comes from whatever --ctx-size is already configured, so the
-    # fit is measured for the configuration that will actually run.
-    ctx = 32768
+    # The model answers with the configured context, but `edit` runs it at
+    # fit.CONTEXT without measuring again, so the split is measured for the
+    # larger of the two: fitted at 16k and run at 32k for opencode, the 35B
+    # filled the card. The configured context is kept for answering.
+    ctx = None
     for flag, value in zip(cfg.chat_args, cfg.chat_args[1:]):
         if flag in ("--ctx-size", "-c") and value.isdigit():
             ctx = int(value)
             break
+    ctx = ctx or fit.CONTEXT
 
     # The fit measures free GPU memory. With the chat model already resident
     # the card reads as nearly full and the split comes out far too cautious:
@@ -240,11 +243,11 @@ def measure_fit(state: AppState, cfg: Config) -> tuple[list[str], int | None, st
     if state.supervisor.is_running(CHAT):
         state.supervisor.stop(CHAT)
         time.sleep(2)
-    result = fit.fit_model(exe, cfg.chat_model, ctx)
+    result = fit.fit_model(exe, cfg.chat_model, max(ctx, fit.CONTEXT))
 
-    # Keep any arguments the person added, replace the fitted ones. The fit
-    # already includes -c, so ours is dropped to avoid a repeat.
-    args = []
+    # Keep any arguments the person added, replace the fitted ones. The fit's
+    # own -c is the measuring context, so the configured one is put back.
+    args = ["-c", str(ctx)]
     skip = False
     for a in cfg.chat_args:
         if skip:
@@ -254,7 +257,7 @@ def measure_fit(state: AppState, cfg: Config) -> tuple[list[str], int | None, st
             skip = True
             continue
         args.append(a)
-    args += without_layers(result.args)
+    args += without_layers(result.args, ("-ngl", "--n-gpu-layers", "-c", "--ctx-size"))
 
     layers = "all" if result.gpu_layers is None else str(result.gpu_layers)
     where = ("expert tensors split between GPU and CPU." if "-ot" in result.args

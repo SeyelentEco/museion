@@ -253,8 +253,23 @@ so anything honouring them failed at once.
 | Make answers with a dose end with "check this against a second source" | Done in one rule beside the safety rules, with a test for it, tests run; 399 s | (not re-run) |
 | A planted bug (author and description swapped when indexing), described only by its symptom | Found and fixed in 414 s, tests run, but never said the index must be rebuilt. Asked again, it "fixed" `ask.py` to read a field that does not exist and changed the test's stand-in to match | Fixed, tests run, and it told the person to press Rebuild index, which put the authors back; 346 s |
 
-The benchmark on the drive was 25/29 before the tasks and 27/29 after (the
-chemistry archive from the first task answers the steel question).
+The benchmark on the drive was 25/29 before the tasks, 27/29 after them, and
+28/29 after the re-runs (the chemistry archive from the first task answers the
+steel question; the one left is the model's unit arithmetic).
+
+The first benchmark took 3874 s and the others about 1000: the fitted split
+filled the 12 GB card, and what else the desktop had open decided how much of
+it spilled into shared memory. Timed directly at 32k (prompt of 3,600 tokens):
+
+| Split | GPU | Shared | Prompt tok/s | Output tok/s |
+| --- | --- | --- | --- | --- |
+| Fitted with the default 1 GiB margin | 11.8 GB | 553 MB | 106 | 23 |
+| Fitted with a 2 GiB margin | 11.5 GB | 261 MB | 689 | 42 |
+| Fitted with a 3 GiB margin | 10.4 GB | 260 MB | 631 | 40 |
+| Chosen by hand over several evenings | 10.2 GB | 267 MB | 599 | 40 |
+
+So the fit now keeps 2 GiB free, and is measured at opencode's 32k whatever
+context the model answers with, since `edit` raises it without measuring again.
 
 What changed because of it:
 

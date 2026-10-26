@@ -12,7 +12,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from museion import catalog, commands, hardware, services, sidecar
+from museion import catalog, commands, fit, hardware, services, sidecar
 from museion.appstate import AppState
 from museion.config import Config
 
@@ -97,6 +97,20 @@ class ChooseModelTest(Settings):
         self.state._hardware = CPU
         self.assertEqual(self.choose(self.dir / self.large.filename), "Press Start services to load the new model.")
         self.assertEqual(self.state.config().chat_gpu_layers, 0)
+
+
+class MeasureFitTest(Settings):
+    def test_the_split_is_measured_for_opencodes_context_but_answers_keep_theirs(self):
+        cfg = self.state.config()
+        cfg.chat_args = ["--ctx-size", "16384", "--temp", "0.7", "-ot", "old"]
+        measured = fit.Fit(["-c", str(fit.CONTEXT), "-ngl", "41", "-ot", "new"], 41)
+        self.sup.is_running = lambda role: False
+        with mock.patch("museion.services.fit_exe", return_value=Path("fit")), \
+                mock.patch("museion.services.fit.fit_model", return_value=measured) as run:
+            args, layers, _ = services.measure_fit(self.state, cfg)
+        self.assertEqual(run.call_args.args[2], fit.CONTEXT)
+        self.assertEqual(args, ["-c", "16384", "--temp", "0.7", "-ot", "new"])
+        self.assertEqual(layers, 41)
 
 
 class StartChatTest(Settings):

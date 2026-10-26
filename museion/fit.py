@@ -23,6 +23,18 @@ from pathlib import Path
 # Stops a console window flashing up on Windows while the fit runs.
 CREATE_NO_WINDOW = 0x0800_0000
 
+# What llama-fit-params leaves free on the card, in MiB. Its default, 1024,
+# filled an RTX 3060 to 11.8 of 12 GB; whatever else the desktop had open
+# then pushed half a gigabyte into shared memory, and the 35B read prompts at
+# 106 tokens a second instead of 689 and wrote at 23 instead of 42. With 2048
+# it measured fastest of the splits tried and left room for the rest.
+MARGIN_MIB = 2048
+
+# The largest context Museion runs a chat model with: opencode's, in edit.py.
+# Measuring at it means the split that answers questions also serves `edit`,
+# which raises the context afterwards without measuring again.
+CONTEXT = 32768
+
 
 @dataclass(frozen=True)
 class Fit:
@@ -47,7 +59,7 @@ def fit_model(fit_exe: Path, model: Path, ctx: int) -> Fit:
     try:
         out = subprocess.run(
             [str(fit_exe), "-m", str(model), "-c", str(ctx),
-             "-fa", "on", "-ctk", "q8_0", "-ctv", "q8_0"],
+             "-fa", "on", "-ctk", "q8_0", "-ctv", "q8_0", "-fitt", str(MARGIN_MIB)],
             capture_output=True, stdin=subprocess.DEVNULL,
             creationflags=CREATE_NO_WINDOW if sys.platform == "win32" else 0,
         )
