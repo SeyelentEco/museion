@@ -90,6 +90,7 @@ class SyncSourceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = catalog_sync.sync_source(url, "making", sources_dir=Path(tmp), get=get, say=lambda s: None)
             text = path.read_text(encoding="utf-8")
+            self.assertNotIn(b"\r", path.read_bytes())  # LF on Windows too, as the repository has it
         data = tomllib.loads(text)
         self.assertEqual(path.name, "new-thing_en.toml")
         self.assertEqual(data["size_bytes"], 4096)

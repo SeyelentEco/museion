@@ -98,5 +98,6 @@ def add_source(path: Path, title: str, category: str, description: str = "",
     if target.exists():
         raise ValueError(f"{target.name} is already in the catalogue")
     text = source_toml(path, title, category, description)
-    target.write_text(text, encoding="utf-8")
+    # Unix line endings on every system, as the other entries have them.
+    target.write_text(text, encoding="utf-8", newline="\n")
     return target

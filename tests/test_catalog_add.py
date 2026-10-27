@@ -29,6 +29,7 @@ class AddSourceTest(unittest.TestCase):
         path = catalog_add.add_source(self.zim, 'Chemistry by "Wikipedia"', "reference",
                                       "Chemistry articles", self.sources)
         data = tomllib.loads(path.read_text(encoding="utf-8"))
+        self.assertNotIn(b"\r", path.read_bytes())  # LF on Windows too, as the other entries have it
         source = catalog._build(catalog.Source, data)
         self.assertEqual(source.id, "wikipedia_en_chemistry_nopic")
         self.assertEqual(source.title, 'Chemistry by "Wikipedia"')

@@ -236,7 +236,9 @@ def sync_source(url: str, category: str, id: str | None = None, title: str | Non
     """Write (or rewrite) catalog/sources/<id>.toml and return where."""
     id, text = source_entry(url, category, id, title, license, attribution, get, say)
     target = (sources_dir or catalog.CATALOG_DIR / "sources") / f"{id}.toml"
-    target.write_text(text, encoding="utf-8")
+    # Unix line endings on every system, as the repository keeps them: on
+    # Windows write_text would turn each one into CRLF.
+    target.write_text(text, encoding="utf-8", newline="\n")
     return target
 
 
