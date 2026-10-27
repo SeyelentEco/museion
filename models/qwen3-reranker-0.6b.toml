@@ -1,5 +1,3 @@
-# Generated from models/qwen3-reranker-0.6b.yaml by scripts/yaml-to-toml.mjs. Edit the YAML, not this file, until the Rust app is retired.
-
 # The reranker.
 #
 # Keyword search finds passages containing a question's words; it has no

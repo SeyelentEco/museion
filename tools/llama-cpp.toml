@@ -1,5 +1,3 @@
-# Generated from tools/llama-cpp.yaml by scripts/yaml-to-toml.mjs. Edit the YAML, not this file, until the Rust app is retired.
-
 # llama.cpp — the inference server.
 #
 # The build is pinned. Upstream ships ten to fifteen builds a day, so "latest"

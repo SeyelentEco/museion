@@ -75,18 +75,17 @@ tab is reloaded; no bundle or index change is needed.
 | What the page can ask of the program | `museion/app.py` (the list `COMMANDS`), `commands.py`, `services.py`, `library.py`, `drives.py` |
 | Settings and where they are saved | `museion/config.py`, `appstate.py` |
 | Starting and stopping the helper programs | `museion/sidecar.py`, `services.py` |
-| What can be downloaded, with checksums | `catalog/`, `models/`, `tools/`, `drive/` (`.toml` files), read by `museion/catalog.py`; `catalog_add.py` adds an archive |
+| What can be downloaded, with checksums | `catalog/`, `models/`, `tools/`, `drive/` (`.toml` files), read by `museion/catalog.py`; `catalog_add.py` adds an archive (`catalog_sync.py` does it from a Kiwix link, with internet) |
 | Running from a drive, preparing one | `museion/portable.py`, `prepare.py`, `manifest.py`, `launchers.py` |
 | This editing set-up | `museion/edit.py` |
-| The benchmark of questions and expected answers | `evals/benchmark.toml`, `museion/evals.py` |
-| The command line | `museion/cli.py`, `drive_cli.py` |
-
-The `.toml` files are what this program reads. In the source repository they
-are generated from the `.yaml` beside them, for the older Rust app; on a
-drive, change the `.toml`.
+| The benchmark of questions and expected answers | `evals/benchmark.toml`, `museion/evals.py`; retrieval alone: `evals/retrieval.toml`, `retrieval_eval.py` |
+| The command line | `museion/cli.py`, `catalog_cli.py`, `drive_cli.py` |
 
 `docs/` explains the design: `retrieval.md` (how search works and why),
-`python.md` (this Python version), `portable.md` (drives), `evals.md`.
+`python.md` (how this Python version works), `portable.md` (drives),
+`evals.md`, `adding-content.md`. Comments that say what "the Rust version" did
+describe the program Museion was before it was Python, kept on purpose: the
+indexes and settings it wrote still work.
 
 ## How it fits together
 

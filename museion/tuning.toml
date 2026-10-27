@@ -1,13 +1,12 @@
-# Generated from crates/museion-core/tuning.yaml by scripts/yaml-to-toml.mjs. Edit the YAML, not this file, until the Rust app is retired.
-
 # Museion's tunables: the prompts and limits of the ask loop.
 #
-# This file is compiled into the binary as the defaults. To change any of it
-# without a build, copy this file to the app's config folder as tuning.yaml
-# (Settings > Advanced shows the exact path) and edit; it is read afresh on
-# every question, so a saved edit shows in the very next answer. Fields you
-# leave out keep their defaults. A file that fails to parse is reported and
-# ignored -- the defaults are used, never an empty prompt.
+# These are the defaults, for everyone who has this copy of Museion. To change
+# them on one computer only, press "Create and open the override file" under
+# Settings > Advanced: it copies this file to the app's config folder, as
+# tuning.toml, and opens it. That copy is read afresh on every question, so a
+# saved edit shows in the very next answer. Fields left out of it keep their
+# defaults. A file that fails to parse is reported and ignored -- the defaults
+# are used, never an empty prompt.
 #
 # Every clause of the system prompt is load-bearing. A model asked to be
 # helpful will fill a gap in its sources with plausible general knowledge, and

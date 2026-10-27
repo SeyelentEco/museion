@@ -1,5 +1,3 @@
-# Generated from models/qwen3-4b-instruct-q4.yaml by scripts/yaml-to-toml.mjs. Edit the YAML, not this file, until the Rust app is retired.
-
 # The chat model for the Modest tier: CPU-only machines, or under ~6 GB of VRAM.
 #
 # Small enough to run everywhere, which is the point. Answers are noticeably

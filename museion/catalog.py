@@ -6,11 +6,9 @@ moment the network is gone must carry its own knowledge of where everything
 came from -- the checksums above all, since those are what let a library on a
 drive in a cupboard prove it is still intact years later.
 
-The Rust app compiled the YAML versions into its binary. Python reads the
-TOML versions from the folders beside the package, which travel on the drive
-with the code, so a corrected URL or a new model is an edit to a text file.
-(Until the Rust app is retired the TOML is generated from the YAML by
-scripts/yaml-to-toml.mjs; edit the YAML.)
+They are TOML, read from the folders beside the package, which travel on
+the drive with the code, so a corrected URL or a new model is an edit to a
+text file. (The Rust version compiled them into its binary, as YAML.)
 
 Every function reads the files afresh, so an edit shows at once.
 """

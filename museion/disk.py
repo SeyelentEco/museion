@@ -60,3 +60,15 @@ def volume_name(path: Path) -> str:
     if len(s) >= 2 and s[1] == ":":
         return s[:2].upper()
     return "/"
+
+
+def gb(n: int) -> str:
+    """A size in binary units, exactly as the page writes it (gb in
+    museion/ui/dom.js), so the page and the command line never quote two
+    different sizes for the same file."""
+    g = n / 1073741824
+    if g >= 1000:
+        return f"{g / 1024:.1f} TB"
+    if g >= 1:
+        return f"{g:.0f} GB" if g >= 10 else f"{g:.1f} GB"
+    return f"{round(n / 1048576)} MB"

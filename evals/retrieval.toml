@@ -1,0 +1,68 @@
+# The retrieval check: `python -m museion retrieval-eval --library <folder>`.
+#
+# These are the questions someone actually asks a library like this, and each
+# names words that a passage answering it has to contain; a case passes when
+# the passages found contain at least one of them. Ranking changes -- the
+# keyword weights, query expansion, the reranker -- are judged against this
+# rather than against whichever example was handy at the time. It needs no
+# chat model, so it is cheap to run after every change to retrieval.
+#
+# The cases are written for the Go Bag. A case with needs_rerank = true is
+# skipped when no reranker is running. find_nothing = true means the right
+# result is no passages at all: the last case is the important one, since the
+# Go Bag holds no history, and a library that answers everything is a library
+# that is making things up.
+
+[[case]]
+question = "how do I purify water without chemicals"
+expect = ["boil", "distill", "filter"]
+why = "boiling and distillation are the non-chemical methods"
+
+[[case]]
+question = "how much bleach to disinfect drinking water"
+expect = ["bleach", "hypochlorite", "drops"]
+why = "dosing guidance appears in several water documents"
+
+[[case]]
+question = "treat a deep laceration when there is no doctor"
+expect = ["wound", "bleed", "stitch", "suture", "clean"]
+why = "Where There Is No Doctor covers wound care directly"
+
+[[case]]
+question = "signs of radiation sickness after a nuclear attack"
+expect = ["radiation", "fallout", "sickness", "dose"]
+why = "Nuclear War Survival Skills is in the post-disaster archive"
+
+[[case]]
+question = "how do I tie a bowline knot"
+expect = ["bowline", "loop", "knot"]
+why = "the knots archive is small, so this tests narrow-corpus recall"
+
+[[case]]
+question = "how do I safely can green beans to avoid botulism"
+expect = ["pressure", "canner", "pounds", "headspace"]
+needs_rerank = true
+why = """REGRESSION: the procedure pages describe the method without ever saying \
+"green", "beans" or "botulism", so a per-passage coverage filter discarded them \
+and kept the book's index page instead. Must surface the pressure-canner \
+procedure, not a list of topics."""
+
+[[case]]
+question = "we have a lot of green beans and no fridge, how do I can them so nobody gets botulism"
+expect = ["pressure", "canner", "pounds", "headspace"]
+needs_rerank = true
+why = """REGRESSION: the way a person actually phrases it. "fridge" and "nobody" \
+occur nowhere in the corpus, so IDF-weighted term coverage refused the question \
+outright while the reranker had the procedure at the top. Coverage must be judged \
+by the reranker when one is available."""
+
+[[case]]
+question = "delivering a baby without a midwife"
+expect = ["birth", "labor", "labour", "deliver", "cord"]
+why = "A Book for Midwives, 544 pages of it"
+
+[[case]]
+question = "what caused the Bronze Age collapse"
+expect = []
+find_nothing = true
+why = "NEGATIVE: the Go Bag holds no history. Finding nothing is correct."

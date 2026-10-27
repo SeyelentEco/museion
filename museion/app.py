@@ -375,7 +375,7 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     p.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"port to serve the page on (default {DEFAULT_PORT})")
     p.add_argument("--no-browser", action="store_true", help="do not open a browser; just print the address")
     p.add_argument("--stay", action="store_true", help="keep running after the last Museion tab closes")
-    p.add_argument("--config-dir", type=Path, help="folder holding config.json (default: the drive Museion is on, else the Rust app's)")
+    p.add_argument("--config-dir", type=Path, help="folder holding config.json (default: the drive Museion is on, else this computer's settings folder)")
 
 
 def main(argv: list[str] | None = None) -> None:

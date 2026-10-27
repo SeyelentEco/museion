@@ -1,5 +1,3 @@
-# Generated from catalog/bundles/medicine.yaml by scripts/yaml-to-toml.mjs. Edit the YAML, not this file, until the Rust app is retired.
-
 # Everything the library holds on keeping people alive and well.
 #
 # This is the highest-value and highest-risk material here, and it is worth

@@ -14,18 +14,18 @@ only before.
 Settings › **Prepare a drive** in the app, or on the command line:
 
 ```bash
-museion prepare --dest E:\ --bundle go-bag --models qwen3-4b-instruct-q4,qwen3.6-35b-a3b-q4 --accelerators cuda,vulkan,cpu
+python -m museion prepare --dest E:\ --bundle go-bag --models qwen3-4b-instruct-q4,qwen3.6-35b-a3b-q4 --accelerators cuda,vulkan,cpu
 ```
 
 Either one lays out a drive that runs Museion on any computer: the archives, the models
 you chose, kiwix-serve and pdfium, a llama.cpp build for every kind of graphics card the
-drive may meet, the app itself as `Museion.exe`, the installer in `support\`, the WebView2
-offline installer for a machine that lacks it, the licences, a README, and a manifest of
-every file with its checksum. The index is built on the drive, so the first question on the
+drive may meet, Museion's own code with the portable Python that runs it, opencode for
+changing it, the licences, a README, and a manifest of every file with its checksum. The index is built on the drive, so the first question on the
 far end is not preceded by ten minutes of indexing. Everything is hash-checked on the way
 in and downloads resume, so a drive can be prepared over several sittings.
 
-On the far end: plug it in and open `Museion.exe`. The first start on a computer measures
+On the far end: plug it in and double-click `Museion.cmd` (`Museion.command` on a Mac).
+Museion opens in the computer's web browser. The first start on a computer measures
 its graphics card, picks the build and the model that fit, and remembers that on the
 computer, not the drive. See [portable.md](portable.md) for how the drive is laid out and
 what happens on a read-only one.
@@ -38,24 +38,27 @@ what happens on a read-only one.
 | Library | full collection, both tiers | 512 GB SSD |
 
 A flash stick works; an SSD is better. Running from the drive means llama.cpp reads the
-model from it on every start, and a 22 GB model over a slow stick is minutes. The README
-on the drive says how to install to the computer instead.
+model from it on every start, and a 22 GB model over a slow stick is minutes. A copy of
+the whole drive on the computer's own disk runs the same and starts faster.
+
+No time to prepare one? Each GitHub release has a zip of everything but the content and
+the models (see [portable.md](portable.md#c-the-release)): unzip it onto the drive, start
+it, and let the welcome screen fetch the rest into the drive.
 
 ## Or just the library, by hand
 
 On the machine that has internet, point the fetcher straight at the removable drive:
 
 ```bash
-git clone https://github.com/<you>/museion
+git clone https://github.com/SeyelentEco/museion
 cd museion
-npm install
-node scripts/fetch.js go-bag --dest /Volumes/MYDRIVE/museion-library
+python -m museion fetch go-bag --dest /Volumes/MYDRIVE/museion-library
 ```
 
 On Windows:
 
 ```bash
-node scripts/fetch.js go-bag --dest E:\museion-library
+python -m museion fetch go-bag --dest E:\museion-library
 ```
 
 Downloads resume, so unplugging the drive or losing the connection partway is recoverable —
@@ -68,8 +71,8 @@ complete one.
 Every archive has eight web mirrors, and the fetcher tries them all. If every one is
 down or unreachable from where you are, it prints the archive's torrent and magnet link
 instead — Kiwix publishes both for every file. Download it with any BitTorrent client,
-put the file in your library folder, and run `verify.js` (or press Fetch again in the
-app): it is checked against the same checksum and picked up as if it had come from a
+put the file in your library folder, and run `python -m museion verify --library` on it
+(or press Fetch again in the app): it is checked against the same checksum and picked up as if it had come from a
 mirror.
 
 Museion deliberately does not download via BitTorrent itself, and never seeds. Whether
@@ -79,8 +82,11 @@ decision for you and your own client, not one a tool should make for you.
 ## Verify on the drive, before you leave
 
 ```bash
-node scripts/verify.js --dest /Volumes/MYDRIVE/museion-library
+python -m museion verify --library /Volumes/MYDRIVE/museion-library
 ```
+
+On a drive made by Prepare a drive, `python -m museion verify --drive E:\` (or Settings ›
+This drive) checks the models too, against the drive's own manifest.
 
 Do this while you still have a connection. If a file is corrupt, this is the last moment
 re-fetching it is easy.
@@ -88,7 +94,7 @@ re-fetching it is easy.
 ## Verify again later
 
 Drives that sit in a cupboard for two years develop bad sectors, and nothing announces it.
-Re-run `verify.js` occasionally. It re-hashes every file against the catalog and tells you
+Re-run the verify occasionally. It re-hashes every file against the catalog and tells you
 exactly which command re-fetches anything that has rotted.
 
 This is the check worth running when you *don't* need the library, so that it works when

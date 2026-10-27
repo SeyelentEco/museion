@@ -29,7 +29,7 @@ from museion.pdf import PdfExtractor, sample_pdf
 
 PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 
-# The reranker's own server arguments, as models/qwen3-reranker-0.6b.yaml
+# The reranker's own server arguments, as models/qwen3-reranker-0.6b.toml
 # gives them: --reranking exposes /v1/rerank, and the large batch is what
 # stops long technical passages being rejected as too many tokens.
 RERANKER_ARGS = ["--reranking", "--pooling", "rank", "--batch-size", "2048", "--ubatch-size", "2048"]

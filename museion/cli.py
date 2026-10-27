@@ -5,6 +5,7 @@ same code the window uses, exposed so retrieval can be measured and
 regression-tested without a window in the way.
 
   python -m museion
+  python -m museion fetch  go-bag --dest E:\\museion-library
   python -m museion index  --library E:\\museion-library
   python -m museion search --library E:\\museion-library how do I purify water
   python -m museion status --library E:\\museion-library
@@ -17,12 +18,15 @@ Run `python -m museion <command> --help` for each command's options.
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 import sqlite3
 import sys
 from contextlib import closing
 from pathlib import Path
 
-from museion import app, ask, calc, catalog_add, drive_cli, evals, fit, hardware, indexer, tools, tuning
+from museion import (app, ask, calc, catalog_cli, drive_cli, evals, fit, hardware, indexer,
+                     retrieval_eval, tools, tuning)
 from museion.appstate import UiError
 from museion.index import Index
 from museion.kiwix import Kiwix, book_id_from_filename
@@ -120,6 +124,14 @@ def parser() -> argparse.ArgumentParser:
     c.add_argument("--only", help="run only this capability, horizon or case id")
     c.set_defaults(run=cmd_eval)
 
+    c = commands.add_parser("retrieval-eval", parents=[where, servers],
+                            help="check retrieval against evals/retrieval.toml, without the chat model")
+    c.add_argument("--mode", choices=["search", "gather"],
+                   help="search (keyword only) or gather (with the reranker); default gather if the reranker answers")
+    c.add_argument("--limit", type=int, default=8, help="passages searched per question (default 8)")
+    c.add_argument("--verbose", action="store_true", help="show the top passages for every case")
+    c.set_defaults(run=cmd_retrieval_eval)
+
     c = commands.add_parser("status", parents=[where], help="what the index holds")
     c.set_defaults(run=cmd_status)
 
@@ -139,16 +151,7 @@ def parser() -> argparse.ArgumentParser:
     c.add_argument("--cpu", action="store_true", help="the CPU build, whatever the GPU")
     c.set_defaults(run=cmd_tools)
 
-    c = commands.add_parser("add-source", help="add an archive in the library to the catalogue")
-    c.add_argument("file", type=Path, help="the .zim file")
-    c.add_argument("--title", required=True, help="what the Library tab shows")
-    c.add_argument("--category", required=True, choices=catalog_add.CATEGORIES,
-                   help="the Library tab's shelf for it")
-    c.add_argument("--description", default="", help="one line about it")
-    c.set_defaults(run=lambda a: print(
-        f"Added {catalog_add.add_source(a.file, a.title, a.category, a.description)}. "
-        "Reload the Library tab to see it."))
-
+    catalog_cli.add_commands(commands)
     drive_cli.add_commands(commands)
     return top
 
@@ -327,6 +330,47 @@ def cmd_eval(args) -> None:
         run = run_benchmark(args, index)
     path = evals.save_run(db.parent / "evals", run)
     print(f"\nSaved {path}\n")
+
+
+def cmd_retrieval_eval(args) -> None:
+    """Score what search (or gather) prints for each case in
+    evals/retrieval.toml. Exits 1 if any case fails."""
+    cases = retrieval_eval.cases()
+    mode = args.mode or ("gather" if not args.no_rerank and Llama(args.reranker).is_up() else "search")
+    db = db_path(args)
+    print(f"\nRetrieval check: {len(cases)} cases against {db}")
+    print("Mode: gather (retrieval and reranking)\n" if mode == "gather"
+          else "Mode: search (keyword retrieval only; no reranker)\n")
+
+    def output(question: str, limit: int) -> str:
+        buffer = io.StringIO()
+        words = question.split()
+        run_args = argparse.Namespace(**{**vars(args), "query": words, "question": words, "limit": limit})
+        with contextlib.redirect_stdout(buffer):
+            try:
+                (cmd_gather if mode == "gather" else cmd_search)(run_args)
+            except EXPECTED_ERRORS as e:
+                print(f"ERROR: {e}")
+        return buffer.getvalue()
+
+    failed = []
+    for case in cases:
+        if case.needs_rerank and mode != "gather":
+            print(f"  SKIP  {case.question}\n        needs a reranker; start one to run this case\n")
+            continue
+        ok, detail = retrieval_eval.score(case, output(case.question, args.limit))
+        print(f"  {'PASS' if ok else 'FAIL'}  {case.question}\n        {detail}")
+        if not ok or args.verbose:
+            print(f"        ({' '.join(case.why.split())})")
+        if args.verbose:
+            print("".join(f"        {line}\n" for line in output(case.question, 3).strip().splitlines()))
+        print()
+        if not ok:
+            failed.append(case.question)
+    print(f"{len(cases) - len(failed)}/{len(cases)} passed (skipped cases count as passed)\n")
+    if failed:
+        print("Failed:\n" + "".join(f"  {q}\n" for q in failed))
+        sys.exit(1)
 
 
 def run_benchmark(args, index: Index) -> evals.Run:

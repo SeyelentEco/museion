@@ -278,7 +278,7 @@ Hypatia now has two tools and decides per question:
 - **`search_library`** — retrieve and rerank, returning numbered passages. The model may
   call it more than once with different words; numbering continues across calls so
   citations stay unambiguous.
-- **`calculate`** — a small expression evaluator written in Rust: arithmetic, a few
+- **`calculate`** — a small expression evaluator (`museion/calc.py`): arithmetic, a few
   functions, and unit conversion for the units this library deals in (gallons and
   teaspoons, pounds and kilograms, °F and °C). Nothing executes. A model that reads
   "¼ teaspoon per gallon" from a source and multiplies by 55 in its head gets it wrong
@@ -384,4 +384,4 @@ Common single words return oddly few hits even on the good archives — "iron" r
 while "distillation" returns 593. Distinctive terms behave well and phrases behave well, so
 this does not block the design, but the query-expansion step should be tuned against it
 rather than assuming raw keyword hits are well-ordered. Worth measuring properly with the
-fixed question set before the reranker is tuned.
+fixed question set (`python -m museion retrieval-eval`) before the reranker is tuned.

@@ -1,5 +1,3 @@
-# Generated from tools/kiwix-tools.yaml by scripts/yaml-to-toml.mjs. Edit the YAML, not this file, until the Rust app is retired.
-
 # kiwix-tools -- serves ZIM archives over HTTP.
 #
 # Museion reads all archive content through kiwix-serve rather than through a

@@ -22,9 +22,8 @@ A drive's layout (prepare.py makes it):
     bin/               kiwix-serve, pdfium, opencode
     bin/llama/<kind>/  a llama.cpp build per kind of graphics card
 
-The Rust app put its Museion.exe at <root> beside the same marker, and the
-profile is the same file in the same place, so either app runs a drive the
-other prepared.
+The marker and the profile are the ones the Rust version used, in the same
+places, so a computer that ran a drive under it keeps that drive's profile.
 """
 
 from __future__ import annotations

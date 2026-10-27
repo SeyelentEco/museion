@@ -4,6 +4,7 @@ commands are about the library and its answers.
 
   python -m museion prepare --dest E:\\ --bundle go-bag --models qwen3-4b-instruct-q4
   python -m museion verify
+  python -m museion verify --library E:\\museion-library
   python -m museion edit
 """
 
@@ -13,7 +14,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from museion import appstate, edit, manifest, portable, prepare
+from museion import appstate, catalog_cli, edit, manifest, portable, prepare
 
 
 def add_commands(commands) -> None:
@@ -30,8 +31,10 @@ def add_commands(commands) -> None:
     c.add_argument("--skeleton", action="store_true", help="everything except content and models")
     c.set_defaults(run=cmd_prepare)
 
-    c = commands.add_parser("verify", help="check a drive's files against their checksums")
+    c = commands.add_parser("verify", help="check a drive's files, or a library's, against their checksums")
     c.add_argument("--drive", type=Path, help="the drive's folder (default: the drive Museion is on)")
+    c.add_argument("--library", type=Path, help="check this library folder's archives against the catalogue instead")
+    c.add_argument("id", nargs="?", help="with --library: only this bundle, archive or model")
     c.set_defaults(run=cmd_verify)
 
     c = commands.add_parser("edit", help="open opencode on Museion's own code, with the local chat model")
@@ -83,6 +86,11 @@ def cmd_prepare(args) -> None:
 
 
 def cmd_verify(args) -> None:
+    if args.library:
+        catalog_cli.verify_library(args.library, args.id)
+        return
+    if args.id:
+        raise ValueError("naming what to check needs --library; a drive is checked whole")
     root = args.drive
     if root is None:
         drive = portable.detect()

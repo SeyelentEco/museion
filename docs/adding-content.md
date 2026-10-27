@@ -1,23 +1,38 @@
 # Adding content
 
-Museion's catalog is plain YAML. You can add a source by hand, but you shouldn't have to,
-and you should never type a checksum yourself.
+Museion's catalogue is plain TOML, one file per archive in `catalog/sources/`. You can add
+a source by hand, but you shouldn't have to, and you should never type a checksum yourself.
+
+## Adding an archive you already have
+
+With no internet, for an archive someone copied into the library:
+
+```bash
+python -m museion add-source /path/to/library/wikipedia_en_chemistry_nopic_2026-07.zim \
+  --title "Chemistry by Wikipedia" --category reference
+```
+
+It measures the file and writes `catalog/sources/wikipedia_en_chemistry_nopic.toml` with
+its size and checksum, and nothing that cannot be known offline: no download links, so
+nothing that was never true is there to check later. An id already in the catalogue is
+refused, so an entry with real download links is never overwritten.
 
 ## Adding a ZIM from Kiwix
 
-Kiwix publishes a `.sha256`, a `.magnet` and a `.torrent` beside every archive. The sync
-tool reads all three and writes the manifest for you:
+Kiwix publishes a `.sha256`, a `.magnet` and a `.torrent` beside every archive. With
+internet, `sync-source` reads all three and writes the entry for you:
 
 ```bash
-node scripts/catalog-sync.js add \
+python -m museion sync-source \
   https://download.kiwix.org/zim/other/zimgit-knots_en_2024-08.zim \
-  --category survival \
+  --category survival --id zimgit-knots \
   --title "Knots and Rope Work"
 ```
 
-That writes `catalog/sources/zimgit-knots.yaml` containing the authentic upstream checksum,
+That writes `catalog/sources/zimgit-knots.toml` containing the authentic upstream checksum,
 the exact byte length, the torrent, and the mirror list harvested from the magnet's
-webseeds — without downloading the archive.
+webseeds — without downloading the archive. Its first lines record the command, so the
+entry can be written again from upstream rather than edited by hand.
 
 Browse what's available at [browse.library.kiwix.org](https://browse.library.kiwix.org) or
 the raw index at [download.kiwix.org/zim](https://download.kiwix.org/zim/).
@@ -27,7 +42,7 @@ grouped in the app, so pick the one a person looking for that material would rea
 
 ## Read what it prints. Filenames lie.
 
-`catalog-sync` looks the archive up in the Kiwix catalogue and prints what upstream says it
+`sync-source` looks the archive up in the Kiwix catalogue and prints what upstream says it
 actually is:
 
 ```
@@ -44,8 +59,8 @@ technical works. It is in fact a YouTube archive for the video game *Vampire Sur
 bundle, labelled "public domain works", for people to download expecting to learn how to
 make things.
 
-So the manifest's title and description come from upstream, not from whoever adds the
-entry. If the tool reports **`!! not found in the Kiwix catalogue`**, do not assume — fetch
+So the entry's title and description come from upstream, not from whoever adds it. If
+the command reports **`!! not in the Kiwix catalogue`**, do not assume — fetch
 the archive and look inside it with `zimdump list` before adding it.
 
 The `_ftindex` tag is worth noticing too: it declares whether the archive carries a usable
@@ -58,7 +73,7 @@ Kiwix reissues archives periodically and removes old dated versions, so a manife
 worked last year may point at a file that no longer exists. Check with:
 
 ```bash
-node scripts/catalog-sync.js check
+python -m museion check-sources
 ```
 
 It reports each source as current, stale (with the exact command to update it), or missing
@@ -69,43 +84,44 @@ because it fails at the moment someone is trying to build their library.
 
 A bundle is a named list of source ids:
 
-```yaml
-id: homestead
-title: Homestead
-description: Long-term self-sufficiency and repair.
-sources:
-  - wikipedia-en-nopic
-  - ifixit
-  - appropedia
+```toml
+id = "homestead"
+title = "Homestead"
+description = "Long-term self-sufficiency and repair."
+sources = [
+  "wikipedia_en_all_nopic",
+  "ifixit_en_all",
+  "appropedia_en_all_maxi",
+]
 ```
 
-Drop it in `catalog/bundles/`. It shows up in `node scripts/fetch.js --list` immediately.
+Drop it in `catalog/bundles/`. It shows up in `python -m museion fetch --list` and the
+set-up screen immediately.
 
 ## Adding content that isn't a ZIM
 
 Any file with a stable URL and a known SHA-256 works — the fetcher doesn't care what's
-inside. Write the manifest by hand:
+inside. Write the entry by hand:
 
-```yaml
-id: my-source
-title: Something Useful
-category: making
-filename: something-useful.zim
-version: "2026-01"
-size_bytes: 12345678
-sha256: <64 lowercase hex characters>
-urls:
-  - https://example.org/something-useful.zim
-license:
-  name: CC-BY-SA-4.0
-  attribution: Original authors
+```toml
+id = "my-source"
+title = "Something Useful"
+category = "making"
+filename = "something-useful.zim"
+version = "2026-01"
+size_bytes = 12345678
+sha256 = "<64 lowercase hex characters>"
+urls = [
+  "https://example.org/something-useful.zim",
+]
+license = { name = "CC-BY-SA-4.0", attribution = "Original authors" }
 ```
 
-The `id` must match the filename of the YAML file, and `sha256` must be 64 lowercase hex
-characters — validation will tell you precisely which file and field is wrong if not.
+Name the file after its `id`, and make `sha256` 64 lowercase hex characters; if anything
+is wrong, Museion names the file and the field when it reads the catalogue.
 
-Get the checksum by downloading once and running `node scripts/verify.js`, or compute it
-with `sha256sum` / `Get-FileHash`.
+Get the checksum by downloading once and running `add-source` on the file (then add the
+`urls` it leaves empty), or compute it with `sha256sum` / `Get-FileHash`.
 
 ## Licensing
 

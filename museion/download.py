@@ -1,5 +1,5 @@
-"""Resumable, verified downloads -- the Python twin of the Rust app's
-download.rs and of scripts/lib/download.js.
+"""Resumable, verified downloads, for the archives, the models and the
+helper programs alike.
 
 Same rules, for the same reasons:
 

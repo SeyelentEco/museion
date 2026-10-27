@@ -4,10 +4,8 @@ made by the Rust version (see tests/index_corpus.py)."""
 
 import json
 import math
-import os
 import shutil
 import sqlite3
-import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -25,7 +23,6 @@ from museion.index import (
 )
 from museion.pdf import Extracted, Page
 
-RUST = os.environ.get("MUSEION_RUST")
 
 FILLER = ("lorem ipsum dolor sit amet consectetur adipiscing elit sed do "
           "eiusmod tempor incididunt ut labore et dolore magna aliqua")
@@ -285,38 +282,6 @@ class RustIndexTest(unittest.TestCase):
         )
         self.assertEqual([list(b) for b in self.ix.books()], self.expected["books"])
         self.assertEqual(self.ix.processed_books(), self.expected["processed_books"])
-
-
-@unittest.skipUnless(RUST, "set MUSEION_RUST to the Rust museion program")
-class RustReadsPythonIndexTest(unittest.TestCase):
-    """The other direction: an index the Python version wrote searches the
-    same in the Rust version. Only until the Rust code is retired."""
-
-    def test_rust_searches_a_python_index_as_it_searches_its_own(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            rust_db = Path(tmp) / "rust.db"
-            python_db = Path(tmp) / "python.db"
-            shutil.copyfile(index_corpus.RUST_DB, rust_db)
-            # The same documents, written by the Python index.
-            source = sqlite3.connect(rust_db)
-            ix = Index(python_db)
-            for id, book, file, title, description, author, pages, words in source.execute(
-                    "SELECT id, book, file, title, description, author, pages, words FROM docs ORDER BY id"):
-                text = source.execute("SELECT page, body FROM pages WHERE doc_id = ? ORDER BY rowid", (id,))
-                extracted = Extracted([Page(n, body) for n, body in text], pages, words)
-                ix.add_document(book, file, title, description, author, extracted)
-            for (book,) in source.execute("SELECT book FROM books"):
-                ix.mark_book_done(book)
-            source.close()
-            ix.close()
-
-            def search(db, query, limit):
-                return subprocess.run([RUST, "search", "--db", str(db), "--limit", str(limit), query],
-                                      capture_output=True, text=True, check=True).stdout
-
-            for query, limit in index_corpus.QUERIES:
-                with self.subTest(query=query):
-                    self.assertEqual(search(python_db, query, limit), search(rust_db, query, limit))
 
 
 if __name__ == "__main__":

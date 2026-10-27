@@ -40,26 +40,49 @@ def sha256_of(path: Path) -> str:
     return h.hexdigest()
 
 
+def toml_value(value) -> str:
+    """One value as TOML, in the shapes the catalogue files use: a list one
+    item to a line, a table inline."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, str):
+        # A JSON string is a TOML basic string, escapes and all, as long as
+        # nothing outside the ASCII range is escaped: JSON writes an emoji as
+        # two \u escapes, which TOML refuses. DEL is the one character TOML
+        # wants escaped that JSON leaves alone.
+        return json.dumps(value, ensure_ascii=False).replace("\x7f", "\\u007f")
+    if isinstance(value, list):
+        if not value:
+            return "[]"
+        return "[\n" + "".join(f"  {toml_value(v)},\n" for v in value) + "]"
+    if isinstance(value, dict):
+        return "{ " + ", ".join(f"{k} = {toml_value(v)}" for k, v in value.items()) + " }"
+    raise TypeError(f"no TOML for {value!r}")
+
+
+def toml_lines(fields: dict) -> str:
+    """A catalogue entry: one `key = value` per field, in the order given."""
+    return "".join(f"{k} = {toml_value(v)}\n" for k, v in fields.items())
+
+
 def source_toml(path: Path, title: str, category: str, description: str = "") -> str:
     """The catalogue entry for one archive file, as TOML."""
     if category not in CATEGORIES:
         raise ValueError(f"category must be one of {', '.join(CATEGORIES)}, not {category!r}")
     if not title.strip():
         raise ValueError("the title is what the Library tab shows, so it cannot be empty")
-    # JSON strings are valid TOML basic strings, escapes and all.
-    q = json.dumps
-    return "\n".join([
-        "# Added from the file itself, offline: there is nowhere recorded to download it from.",
-        f"id = {q(source_id(path.name))}",
-        f"title = {q(title.strip())}",
-        f"description = {q(description.strip())}",
-        f"category = {q(category)}",
-        f"filename = {q(path.name)}",
-        f"size_bytes = {path.stat().st_size}",
-        f"sha256 = {q(sha256_of(path))}",
-        "urls = []",
-        "",
-    ])
+    return "# Added from the file itself, offline: there is nowhere recorded to download it from.\n" + toml_lines({
+        "id": source_id(path.name),
+        "title": title.strip(),
+        "description": description.strip(),
+        "category": category,
+        "filename": path.name,
+        "size_bytes": path.stat().st_size,
+        "sha256": sha256_of(path),
+        "urls": [],
+    })
 
 
 def add_source(path: Path, title: str, category: str, description: str = "",

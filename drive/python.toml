@@ -2,12 +2,11 @@
 # nothing installed on the computer (see docs/portable.md).
 #
 # Only drives carry these, so they live here rather than in tools/, which the
-# set-up screen installs on every machine. No YAML twin: the Rust app never
-# read this folder.
+# set-up screen installs on every machine.
 #
 # python-build-standalone's install_only_stripped builds: CPython with its
 # standard library, SQLite with FTS5, no debug symbols. The same archives CI
-# tests Museion on (.github/workflows/python.yml). Each unpacks into a
+# tests Museion on (.github/workflows/tests.yml). Each unpacks into a
 # folder named python/.
 
 id = "python"

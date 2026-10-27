@@ -1,9 +1,11 @@
-# The Python rewrite
+# The Python version
 
-Museion is being rewritten from Rust and TypeScript into plain Python, so that
+Museion was rewritten from Rust and TypeScript into plain Python, so that
 someone who has been offline for a long time can change it themselves with a
 local coding agent (opencode on the same local model Museion runs). The Rust
-app keeps working until the Python one matches it on the benchmark.
+and TypeScript version is kept on the
+[`archive/rust-app`](https://github.com/SeyelentEco/museion/tree/archive/rust-app)
+branch; this page says how the Python version works, and what the rewrite found.
 
 The rules the Python code keeps:
 
@@ -24,7 +26,7 @@ The rules the Python code keeps:
 | 2 | Browser UI in plain HTML and JavaScript | Done: `python -m museion` opens it (see below); every screen of the Rust app |
 | 3 | The drive: portable mode, prepare, `AGENTS.md`, opencode | Done: tested on a real PC with real models (see [The drive](#the-drive-and-changing-museion)) |
 | 4 | Rehearse offline edits with a local coding agent | Done: three tasks on a drive with the 35B, each re-run after `AGENTS.md` was fixed (see [What phase 4 found](#what-phase-4-found)) |
-| 5 | Retire the Rust code | Not started |
+| 5 | Retire the Rust code | Done: the Rust and TypeScript app moved to the `archive/rust-app` branch, the Node scripts became commands, the `.toml` files became the only data, and a release is a zip per platform (see [What phase 5 changed](#what-phase-5-changed)) |
 
 ## Running it
 
@@ -49,13 +51,13 @@ python -m museion
 ```
 
 That starts Museion and opens it in the default browser at
-`http://127.0.0.1:8070/`. It is the same window as the Rust app (Ask, Library,
-Evals, Settings, and the first-run set-up) and it reads and writes the Rust
-app's own settings, so a machine set up with one is set up for the other. See
+`http://127.0.0.1:8070/`: Ask, Library, Evals, Settings, and the first-run
+set-up, as the Rust app's window had them. It reads and writes the settings
+the Rust app wrote, so a machine set up with that is still set up. See
 [The browser page](#the-browser-page) for how it works.
 
-The command line does what the Rust `museion` program did, with the same
-commands and options:
+The command line has the Rust `museion` program's commands and options, and
+the Node scripts' jobs as commands of their own:
 
 ```bash
 python -m museion index  --library E:/museion-library --pdfium bin
@@ -66,7 +68,13 @@ python -m museion ask    --library E:/museion-library how much bleach for 55 gal
 python -m museion chat   --library E:/museion-library
 python -m museion eval   --library E:/museion-library --label "qwen3.6 q4, reranker"
 python -m museion hardware
+python -m museion retrieval-eval --library E:/museion-library
 python -m museion tools  --dest bin
+python -m museion fetch  go-bag --dest E:/museion-library
+python -m museion verify --library E:/museion-library
+python -m museion add-source E:/museion-library/<file>.zim --title "..." --category reference
+python -m museion sync-source <kiwix url> --category survival
+python -m museion check-sources
 python -m museion prepare --dest E:/ --models qwen3-4b-instruct-q4
 python -m museion verify --drive E:/
 python -m museion edit
@@ -74,8 +82,11 @@ python -m museion edit
 
 `index` needs kiwix-serve running over the library; `ask`, `chat` and `eval`
 need llama-server running the chat model (and, if it is running, use the
-reranker). Each command's `--help` lists its options. `prepare`, `verify` and
-`edit` are described in [The drive](#the-drive-and-changing-museion).
+reranker). `sync-source` and `check-sources` need the internet; everything
+else that downloads says so. Each command's `--help` lists its options.
+`prepare`, `verify --drive` and `edit` are described in
+[The drive](#the-drive-and-changing-museion); the catalogue commands in
+[adding-content.md](adding-content.md).
 
 Run the tests (offline, a few seconds):
 
@@ -86,7 +97,7 @@ python -m unittest discover -s tests -v
 Tests that need pdfium or llama-server run when `MUSEION_PDFIUM` (the folder
 holding the pdfium library) and `MUSEION_LLAMA_SERVER` (the program) are set,
 and are skipped otherwise. CI runs everything on Windows, macOS and Linux with
-the portable Python (`.github/workflows/python.yml`).
+the portable Python (`.github/workflows/tests.yml`).
 
 ## The drive and changing Museion
 
@@ -151,7 +162,7 @@ What testing on a real PC (Windows, RTX 3060 12 GB) showed:
   `&&` does not work there.
 - A USB disk whose flushes fail made SQLite fail every write; the index is
   opened with `synchronous=OFF` in such a folder (it can always be rebuilt).
-- The machine profile holds absolute paths, as the Rust app's does, so a drive
+- The machine profile holds absolute paths, as the Rust app's did, so a drive
   under a new letter looks for each one again under its new root rather than
   dropping it and running on the CPU.
 
@@ -162,7 +173,7 @@ web server on `127.0.0.1` only, and opens the page in the browser. The page is
 plain HTML, CSS and JavaScript in `museion/ui/`, with no build step: change a
 file, reload the page, and the change is there.
 
-- **Settings** are the Rust app's `config.json`: `%APPDATA%\org.museion.desktop`
+- **Settings** are `config.json`, where the Rust app kept it: `%APPDATA%\org.museion.desktop`
   on Windows, `~/Library/Application Support/org.museion.desktop` on macOS,
   `~/.config/org.museion.desktop` on Linux. `--config-dir` points elsewhere.
 - **How the page asks for things.** `POST /api/<command>` runs the Python
@@ -186,25 +197,26 @@ file, reload the page, and the change is there.
 
 ## The data files
 
-The catalogue (`catalog/`, `models/`, `tools/`), the benchmark
-(`evals/benchmark.toml`) and the prompts and limits (`museion/tuning.toml`)
-are TOML, which Python reads with no library. Until the Rust app is retired
-they are generated from the YAML files beside them, which the Rust app still
-reads: edit the YAML, then run `node scripts/yaml-to-toml.mjs` (CI runs it with
-`--check` and fails if the two disagree). In phase 5 the TOML becomes the
-source and the YAML goes.
+The catalogue (`catalog/`, `models/`, `tools/`, `drive/`), the benchmark and
+the retrieval check (`evals/`) and the prompts and limits
+(`museion/tuning.toml`) are TOML, which Python reads with no library. They are
+the source: edit them directly. (The Rust app read YAML twins of them, which
+went with it.)
 
-## Keeping it the same as the Rust version
+## What it kept from the Rust version
 
-Until the Rust code is retired, two checks hold the Python port to it:
+While both existed, a parity test asked the same question with both command
+lines, against the same index and the same scripted model, and required the
+requests sent to the model and the printed answers to be identical. It passed
+on the last commit that had both, and went with the Rust code. What stays:
 
-- `tests/test_parity_rust.py` asks the same question with both command lines,
-  against the same index and the same scripted model, and requires the
-  requests sent to the model and the printed answers to be identical. It runs
-  when `MUSEION_RUST` names the Rust program, and in CI.
 - `tests/test_index.py` opens an index the Rust indexer built
-  (`tests/fixtures/rust-index.db`) and requires the same search results, in the
-  same order; `tests/index_corpus.py` rebuilds that fixture.
+  (`tests/fixtures/rust-index.db`) and requires the search results the Rust
+  version gave (`rust-search.json`), in the same order, and
+  `tests/test_indexer.py` requires the Python indexer to build the same rows.
+  So an index someone built with the Rust app keeps working.
+- `tests/test_calc.py` holds the calculator to the Rust calculator's own
+  output, to the last bit.
 
 Where the Python version deliberately differs:
 
@@ -235,9 +247,6 @@ Not done yet:
 
 - **Linux helpers.** The catalogue has no Linux builds of llama.cpp or
   kiwix-tools, so `tools` installs nothing on Linux, as with the Rust version.
-- **`museion/tuning.toml`'s header** still describes the Rust app's
-  `tuning.yaml` override, because it is generated from that file. It is
-  rewritten when the TOML becomes the source in phase 5.
 
 ## What phase 4 found
 
@@ -297,6 +306,26 @@ Still rough:
 - Asked for a title it did not know, it ran `curl` at Wikipedia. PowerShell's
   `curl` ignores the proxy variables, so the rehearsal could not stop that; on
   a computer with no network it fails.
+
+## What phase 5 changed
+
+- The Rust and TypeScript app (`crates/`, `apps/`, Cargo and npm) moved to the
+  `archive/rust-app` branch, at the last commit where both versions lived side
+  by side, and its release job went with it.
+- The Node scripts became commands: `fetch.js` is `fetch`, `verify.js` is
+  `verify --library`, `catalog-sync.js` is `sync-source` and `check-sources`,
+  and `retrieval-eval.mjs` is `retrieval-eval`, its questions now in
+  `evals/retrieval.toml`. Written again from what Kiwix published, every entry
+  in `catalog/sources/` comes out byte for byte as the Node script wrote it; a
+  test holds it to that. `fetch-tools.mjs` was already `tools`.
+- The YAML went, and with it the "generated, edit the YAML" line at the top of
+  every `.toml`, which phase 4 showed opencode copying into a new entry.
+- A release is `prepare --skeleton`, zipped, per platform, and the drive's own
+  Python runs the drive's own tests before it is attached. A pull request that
+  changes how a drive is laid out builds and tests it too.
+- The drive's README said to unzip the undo archive over `app/`; its entries
+  start with `app/`, so it now says to unzip it into the drive's top folder, as
+  `AGENTS.md` does.
 
 ## What phase 0 found
 

@@ -1,9 +1,7 @@
-# Generated from tools/pdfium.yaml by scripts/yaml-to-toml.mjs. Edit the YAML, not this file, until the Rust app is retired.
-
 # pdfium -- Chromium's PDF engine, used to extract text when indexing.
 #
 # Extraction quality is not a detail: a retrieval system can only find what the
-# extractor could read. A lighter pure-Rust parser loses text on multi-column
+# extractor could read. A lighter parser written in pure Rust or pure Python loses text on multi-column
 # and scanned-with-text-layer documents, which is most of this corpus.
 
 id = "pdfium"

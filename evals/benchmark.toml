@@ -1,5 +1,3 @@
-# Generated from evals/benchmark.yaml by scripts/yaml-to-toml.mjs. Edit the YAML, not this file, until the Rust app is retired.
-
 # The Museion benchmark.
 #
 # Questions people would actually put to this library, grouped by what they

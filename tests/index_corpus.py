@@ -10,19 +10,14 @@ Rust Index::search_ungated returned for each of QUERIES on that database. The
 Python index must open that file and return the same hits in the same order,
 and the Python indexer must build the same rows from the same library.
 
-To rebuild the fixtures (needs the Rust code, so only until it is retired):
-
-    cargo build -p museion-core --bin museion
-    # build tests/fixtures/rust_probe.rs as described at its top, then:
-    PYTHONPATH=. python tests/index_corpus.py target/debug/museion <probe> <pdfium folder>
+The fixtures are a record, not something to rebuild: the Rust code that made
+them is on the archive/rust-app branch (with the probe that wrote
+rust-search.json, tests/fixtures/rust_probe.rs), and they are what proves an
+index a person built with the Rust version still works. If the index is
+changed on purpose so that they no longer match, say so in the change, and
+keep a test that opens the old file.
 """
 
-import json
-import os
-import shutil
-import subprocess
-import sys
-import tempfile
 import textwrap
 from pathlib import Path
 
@@ -144,29 +139,3 @@ def kiwix_entries() -> dict[str, bytes]:
         entries[f"{ARCHIVE}/files/{name}"] = pdf(pages)
     return entries
 
-
-def rebuild(museion: str, probe: str, pdfium: str) -> None:
-    from fake_kiwix import FakeKiwix
-
-    kiwix = FakeKiwix()
-    kiwix.entries.update(kiwix_entries())
-    with tempfile.TemporaryDirectory() as tmp:
-        root = Path(tmp)
-        write_library(root)
-        # Relative folders, so the stored paths read "found/Home_Canning.pdf".
-        subprocess.run(
-            [os.path.abspath(museion), "index", "--library", "library", "--extra", "found",
-             "--db", "index.db", "--kiwix", kiwix.url, "--pdfium", os.path.abspath(pdfium)],
-            cwd=root, check=True,
-        )
-        (root / "queries.json").write_text(json.dumps(QUERIES))
-        out = subprocess.run([os.path.abspath(probe), "index.db", "queries.json"],
-                             cwd=root, check=True, capture_output=True, text=True).stdout
-        FIXTURES.mkdir(exist_ok=True)
-        shutil.copyfile(root / "index.db", RUST_DB)
-        RUST_SEARCH.write_text(out)
-    kiwix.close()
-
-
-if __name__ == "__main__":
-    rebuild(*sys.argv[1:4])

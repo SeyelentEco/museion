@@ -50,16 +50,12 @@
 *.sqlite
 *.sqlite3
 
-# Toolchain output
+# Build output, from anything run in the checkout. (node_modules/ and target/
+# are what a checkout of the archived Rust app leaves behind.)
 node_modules/
 target/
 dist/
 build/
-.vite/
-
-# Tauri regenerates these from tauri.conf.json and the plugin set on every
-# build, so committing them only produces churn.
-apps/desktop/src-tauri/gen/
 
 # Local machine state
 .env

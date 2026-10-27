@@ -1,9 +1,8 @@
 """Installing the helper programs: kiwix-serve, llama-server, pdfium.
 
-The Python twin of the Rust app's tools.rs and of scripts/fetch-tools.mjs,
-so the app can do it without a repository checkout. The archives and their
-checksums come from tools/*.toml (see catalog.py); every download goes
-through download.py, so nothing unverified is ever unpacked.
+The archives and their checksums come from tools/*.toml (see catalog.py);
+every download goes through download.py, so nothing unverified is ever
+unpacked.
 
 One choice differs from the Rust app. It unpacked with whatever the system
 already had (bsdtar, which ships with Windows 10+ and macOS; GNU tar reads a

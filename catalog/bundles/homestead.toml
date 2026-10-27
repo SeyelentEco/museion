@@ -1,5 +1,3 @@
-# Generated from catalog/bundles/homestead.yaml by scripts/yaml-to-toml.mjs. Edit the YAML, not this file, until the Rust app is retired.
-
 # The Knowledge layer: how things are actually made, grown, fixed and powered.
 #
 # This is the bundle that turns a survival kit into a reference library:

@@ -1,5 +1,3 @@
-# Generated from models/qwen3.6-35b-a3b-q4.yaml by scripts/yaml-to-toml.mjs. Edit the YAML, not this file, until the Rust app is retired.
-
 # The chat model for the Capable and Generous tiers (8-24 GB of VRAM).
 #
 # A sparse mixture-of-experts: 35B parameters across 256 experts, of which

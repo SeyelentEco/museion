@@ -5,8 +5,8 @@ gigabyte to well over 250 GB, and a tool that silently fills someone's system
 drive with Wikipedia has done something rude. The path is asked for once and
 then remembered.
 
-The file is the same config.json the Rust app reads and writes, in the same
-folder, so a machine set up by one is set up for the other.
+The file is the config.json the Rust version of Museion wrote, in the same
+folder, so a machine it set up stays set up.
 """
 
 from __future__ import annotations
@@ -18,8 +18,8 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-# The Rust app's identifier, which names its folder. Kept so both apps share
-# one configuration while the Rust one is still around.
+# The Rust version's identifier, which names its folder. Kept, so a computer
+# it set up keeps its settings.
 APP_ID = "org.museion.desktop"
 
 # Fields holding a path, stored as text in the file. extra_dirs is a list of

@@ -1,0 +1,89 @@
+# The release: Museion for a drive, as one zip per platform. Each holds the
+# code (with its tests, docs and AGENTS.md), the portable Python that runs
+# it, and the helper programs (llama.cpp, kiwix-serve, pdfium, opencode and
+# ripgrep), laid out by `python -m museion prepare --skeleton`. Unzipped onto
+# a drive it runs with nothing installed, finds an empty library, and offers
+# to fetch a bundle and a model into the drive. Content and models are never
+# mirrored here; they are fetched from where they live, with the catalogue's
+# hashes. See docs/portable.md.
+#
+# On a version tag the zips are attached to a GitHub release. On a pull
+# request that changes how a drive is laid out, the drive is built and its
+# own Python runs its own tests, so a broken release is found before the tag.
+# Run by hand (workflow_dispatch), the zips are kept as the run's artifacts.
+#
+# There is no Linux zip: the catalogue has no Linux builds of llama.cpp or
+# kiwix-serve yet. The macOS zip is for Apple silicon.
+name: release
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+    paths: ['.github/workflows/release.yml', 'museion/prepare.py', 'museion/launchers.py',
+            'museion/portable.py', 'museion/tools.py', 'tools/**', 'drive/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drive:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+            accelerators: cuda,vulkan,cpu
+            python: python/python.exe
+          - os: macos-latest
+            platform: macos
+            accelerators: metal
+            python: python/bin/python3
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: bash
+    env:
+      ZIP: museion-drive-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'test' }}-${{ matrix.platform }}.zip
+    steps:
+      - uses: actions/checkout@v4
+
+      # Any Python 3.11 or newer can lay the drive out; the drive gets the
+      # pinned portable one from drive/python.toml.
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+
+      - name: Lay out the drive
+        run: python -m museion prepare --skeleton --dest drive-out --accelerators ${{ matrix.accelerators }}
+
+      - name: Zip it
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then
+            # ditto keeps the programs executable for Archive Utility.
+            ditto -c -k drive-out "$ZIP"
+          else
+            python -c "import shutil, sys; shutil.make_archive(sys.argv[1][:-4], 'zip', 'drive-out')" "$ZIP"
+          fi
+          ls -l "$ZIP"
+
+      # After zipping, so nothing the tests write ends up in the zip. From
+      # app/ on the drive, the tests find the drive's own pdfium, so this also
+      # proves the helpers landed where Museion looks for them.
+      - name: The drive's Python runs the drive's tests
+        working-directory: drive-out/app
+        run: '../${{ matrix.python }} -m unittest discover -s tests'
+
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          name: ${{ env.ZIP }}
+          path: ${{ env.ZIP }}
+          retention-days: 7
+
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: ${{ env.ZIP }}

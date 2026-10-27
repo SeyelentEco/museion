@@ -13,7 +13,7 @@ export function fmt(n) {
   return n.toLocaleString();
 }
 
-// Binary units, matching scripts/fetch.js --list, so the app and the command
+// Binary units, matching gb in museion/disk.py, so the page and the command
 // line never quote two different sizes for the same file.
 export function gb(n) {
   const g = n / 1073741824;
