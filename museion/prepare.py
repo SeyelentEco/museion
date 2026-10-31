@@ -310,8 +310,10 @@ def install_drive_tool(tool: catalog.Tool, root: Path, report: Callable[[Progres
         # Copied to the drive under a temporary name, then renamed: a copy cut
         # off partway must not pass for the real thing.
         if tool.id == "python":
-            # The archive holds one folder, python/.
-            part = fresh(root / "python.part")
+            # The archive holds one folder, python/. It is moved to a name
+            # that does not exist yet: moved into a folder, it lands inside.
+            part = root / "python.part"
+            shutil.rmtree(part, ignore_errors=True)
             shutil.move(str(unpacked / "python"), str(part))
             shutil.rmtree(root / "python", ignore_errors=True)
             part.rename(root / "python")

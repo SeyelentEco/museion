@@ -8,8 +8,10 @@ which carry no content or models.
 
 import dataclasses
 import hashlib
+import io
 import json
 import sys
+import tarfile
 import tempfile
 import unittest
 import zipfile
@@ -238,6 +240,40 @@ class ManifestTest(unittest.TestCase):
         self.assertIn("is missing", manifest.verify(self.root)[1])
         (self.root / manifest.NAME).unlink()
         self.assertIn("no manifest", manifest.verify(self.root)[0])
+
+
+class DriveToolTest(unittest.TestCase):
+    """install_drive_tool itself, with the download replaced by an archive
+    laid out as the real one is."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name) / "drive"
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def install(self, tool_id: str, members: list[str]) -> None:
+        tool = next(t for t in catalog.drive_tools() if t.id == tool_id)
+
+        def fetch(title, urls, target, size, sha256, report):
+            with tarfile.open(target, "w:gz") as tf:
+                for name in members:
+                    info = tarfile.TarInfo(name)
+                    info.size = 2
+                    tf.addfile(info, io.BytesIO(b"#!"))
+        with mock.patch("museion.prepare.fetch_verified", fetch):
+            prepare.install_drive_tool(tool, self.root, lambda p: None)
+
+    def test_the_portable_python_lands_where_the_drive_runs_it(self):
+        # What an earlier Python and an interrupted run left behind.
+        touch(self.root / "python" / "old")
+        touch(self.root / "python.part" / "half")
+        self.install("python", [prepare.python_exe(Path()).as_posix(), "python/lib/os.py"])
+        self.assertTrue(prepare.python_exe(self.root).is_file())
+        self.assertTrue((self.root / "python" / "lib" / "os.py").is_file())
+        self.assertFalse((self.root / "python" / "old").exists())
+        self.assertFalse((self.root / "python.part").exists())
 
 
 if __name__ == "__main__":
