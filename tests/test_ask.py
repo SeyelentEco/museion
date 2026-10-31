@@ -141,6 +141,12 @@ class AskTest(unittest.TestCase):
         self.assertEqual(answer.text, "Add bleach [1], or boil it [1][2].")
         self.assertEqual([h.doc_title for h in answer.sources], ["Bleach", "Boiling water"])
 
+    def test_a_number_that_names_no_passage_does_not_move_the_real_citations(self):
+        chat = ScriptedChat(says("Boil water [9]. Add bleach [2]."))
+        answer = asker(chat).ask("purify water")
+        self.assertEqual(answer.text, "Boil water. Add bleach [1].")
+        self.assertEqual([h.doc_title for h in answer.sources], ["Bleach"])
+
     def test_an_answer_citing_nothing_is_asked_once_to_cite_or_stand(self):
         chat = ScriptedChat(says("Boil it."), says("Boil it, from what I know."))
         answer = asker(chat).ask("purify water")

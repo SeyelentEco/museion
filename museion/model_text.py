@@ -60,15 +60,14 @@ def strip_citations(text: str) -> str:
 def renumber_citations(text: str, cited: list[int]) -> str:
     """Rewrite [n] markers so the kept sources number 1..k in citation order.
     The reader sees a source list that matches the markers, with no gaps for
-    passages the model was handed and never used."""
-    if not cited:
-        return text
+    passages the model was handed and never used. A marker naming none of
+    them goes: it would be a citation of nothing."""
     return renumber_or_strip(text, cited)
 
 
 def renumber_or_strip(text: str, cited: list[int] | None) -> str:
-    """Shared walker: with `cited` it renumbers markers, without it removes
-    them."""
+    """Shared walker: with `cited` it renumbers markers and removes those
+    naming nothing cited, without it removes them all."""
     out = ""
     rest = text
     while (start := rest.find("[")) != -1:
@@ -81,12 +80,14 @@ def renumber_or_strip(text: str, cited: list[int] | None) -> str:
             break
         inner = after[1:end]
         is_marker = bool(inner) and set(inner) <= _MARKER_CHARS and bool(set(inner) & _DIGITS)
-        if not is_marker:
-            out += after[:end + 1]
-        elif cited is not None:
+        mapped = []
+        if is_marker and cited is not None:
             numbers = [int(t) for t in (t.strip() for t in inner.split(",")) if t and set(t) <= _DIGITS]
             mapped = [str(cited.index(n) + 1) for n in numbers if n in cited]
-            out += f"[{', '.join(mapped)}]" if mapped else after[:end + 1]
+        if not is_marker:
+            out += after[:end + 1]
+        elif mapped:
+            out += f"[{', '.join(mapped)}]"
         elif out.endswith(" ") and after[end + 1:end + 2] in (".", ",", ";", ":"):
             # Stripped, and the space it leaves before a full stop goes too.
             out = out[:-1]

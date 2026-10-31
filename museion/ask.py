@@ -411,7 +411,10 @@ class Asker:
             # whether the answer *cites* it: a passage the model was handed and
             # ignored did not ground anything. Only cited sources are kept, in
             # citation order, and the label follows.
-            cited = cited_numbers(text)
+            # Only numbers that name a passage count. A made-up [9], or a year
+            # in brackets, would otherwise take a place in the renumbering and
+            # move every real citation after it onto the wrong source.
+            cited = [n for n in cited_numbers(text) if n <= len(sources)]
             leaked = looks_like_leaked_tool_call(text)
             if not repaired and (leaked or (not cited and sources)):
                 # One more turn, tools withheld: cite the passages, or answer
@@ -424,7 +427,7 @@ class Asker:
                 round = tuning.max_rounds + 1
                 continue
 
-            used = [sources[n - 1] for n in cited if n <= len(sources)]
+            used = [sources[n - 1] for n in cited]
             if used:
                 basis = LIBRARY_AND_CALCULATION if calculations else LIBRARY
             else:
