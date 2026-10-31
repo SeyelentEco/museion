@@ -138,14 +138,16 @@ def _index_library(library, extra_dirs, db, kiwix_url, pdfium_dir, force, report
     index = Index(db)
     try:
         dirs = [library, *extra_dirs]
-        found_any = False
+        listings = []
         for dir in dirs:
             try:
-                entries = sorted(os.listdir(dir))
+                listings.append((dir, sorted(os.listdir(dir))))
             except OSError as e:
                 print(f"  (skipping {dir}: {e})", file=sys.stderr)
-                continue
-
+        if len(listings) == len(dirs):
+            forget_departed(index, library, listings)
+        found_any = False
+        for dir, entries in listings:
             # Archives.
             for filename in entries:
                 if not filename.endswith(".zim"):
@@ -189,9 +191,15 @@ def _index_library(library, extra_dirs, db, kiwix_url, pdfium_dir, force, report
                 continue
             found_any = True
             book = folder_book_id(dir)
+            # A folder is redone when its PDFs change: one dropped in later
+            # was otherwise never indexed. An index from before this kept no
+            # list, and takes the folder as it is now.
+            files = "\n".join(pdfs)
             if index.has_book(book) and not force:
-                report(Skipped(book))
-                continue
+                if index.folder_files(book) in (None, files):
+                    index.set_folder_files(book, files)
+                    report(Skipped(book))
+                    continue
             index.start_book(book)
             total = len(pdfs)
             report(Archive(book, total))
@@ -212,6 +220,7 @@ def _index_library(library, extra_dirs, db, kiwix_url, pdfium_dir, force, report
                 done.tally(outcome)
                 report(Document(book, title, i + 1, total, outcome))
             index.mark_book_done(book)
+            index.set_folder_files(book, files)
             report(done)
 
         if not found_any:
@@ -221,6 +230,22 @@ def _index_library(library, extra_dirs, db, kiwix_url, pdfium_dir, force, report
         return index.stats()
     finally:
         index.close()
+
+
+def forget_departed(index: Index, library, listings) -> None:
+    """Drop what the index holds for archives and folders that are gone. An
+    archive replaced by a newer release otherwise stayed, every document of
+    the new one was a duplicate of it, and citations pointed at a file
+    kiwix-serve no longer had. Only called when every folder could be read:
+    a drive that is merely unplugged does not lose its index."""
+    present = set()
+    for dir, entries in listings:
+        present |= {book_id_from_filename(n) for n in entries if n.endswith(".zim")}
+        if Path(dir) != Path(library) and any(n.lower().endswith(".pdf") for n in entries):
+            present.add(folder_book_id(dir))
+    for book in index.processed_books():
+        if book not in present:
+            index.forget_book(book)
 
 
 def fetch_document(kiwix: Kiwix, book: str, file: str) -> bytes:

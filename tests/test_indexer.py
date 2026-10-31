@@ -186,6 +186,43 @@ class IndexLibraryTest(LibraryTestCase):
         finally:
             ix.close()
 
+    def test_a_pdf_added_to_a_folder_later_is_indexed(self):
+        self.index()
+        name, pages = next(iter(index_corpus.ARCHIVE_PDFS.items()))
+        (self.found / "Added_Later.pdf").write_bytes(index_corpus.pdf(pages))
+        _, events = self.index()
+        self.assertIn(Archive(FOLDER, 7), events)
+        self.assertIn("Added Later", [e.title for e in events if isinstance(e, Document)])
+        _, events = self.index()
+        self.assertIn(Skipped(FOLDER), events)
+
+    def test_an_archive_replaced_by_a_newer_release_leaves_the_index(self):
+        self.index()
+        newer = "zimgit-water_en_2024-08"
+        (self.library / f"{ARCHIVE}.zim").rename(self.library / f"{newer}.zim")
+        for key, value in index_corpus.kiwix_entries().items():
+            self.kiwix.entries[key.replace(ARCHIVE, newer)] = value
+        _, events = self.index()
+        # Indexed as its own, not as duplicates of the release that is gone.
+        self.assertIn(ArchiveDone(newer, indexed=2, failed=1), events)
+        ix = Index(self.db)
+        try:
+            self.assertNotIn(ARCHIVE, ix.processed_books())
+        finally:
+            ix.close()
+
+    def test_nothing_is_forgotten_while_a_folder_cannot_be_read(self):
+        self.index()
+        (self.library / f"{ARCHIVE}.zim").unlink()
+        with redirect_stderr(io.StringIO()):
+            index_library(self.library, [self.found, self.found.parent / "unplugged"], self.db,
+                          self.kiwix.url, "unused")
+        ix = Index(self.db)
+        try:
+            self.assertIn(ARCHIVE, ix.processed_books())
+        finally:
+            ix.close()
+
     def test_a_missing_folder_is_skipped(self):
         err = io.StringIO()
         with redirect_stderr(err):

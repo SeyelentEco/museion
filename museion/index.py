@@ -126,6 +126,8 @@ class IndexStats:
 # What add_document did with a document.
 # The meta key, before an archive's name, of an archive being indexed.
 UNFINISHED = "unfinished:"
+# The meta key, before a folder's book id, of the PDFs it held when indexed.
+FOLDER_FILES = "files:"
 
 INDEXED = "indexed"
 IMAGE_ONLY = "image_only"
@@ -263,7 +265,15 @@ class Index:
             )
             self.conn.execute("DELETE FROM docs WHERE book = ?", (book,))
             self.conn.execute("DELETE FROM books WHERE book = ?", (book,))
-            self.conn.execute("DELETE FROM meta WHERE key = ?", (UNFINISHED + book,))
+            self.conn.execute("DELETE FROM meta WHERE key IN (?, ?)", (UNFINISHED + book, FOLDER_FILES + book))
+
+    def folder_files(self, book: str) -> str | None:
+        """The PDFs a folder held when it was indexed, one name a line."""
+        row = self.conn.execute("SELECT value FROM meta WHERE key = ?", (FOLDER_FILES + book,)).fetchone()
+        return row[0] if row else None
+
+    def set_folder_files(self, book: str, files: str) -> None:
+        self.conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", (FOLDER_FILES + book, files))
 
     def _duplicate_of(self, sha: str) -> str | None:
         """The title of a document with identical extracted text, if one is
