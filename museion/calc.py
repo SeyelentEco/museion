@@ -22,7 +22,9 @@ exist because Python's math module raises exceptions in those cases instead.
 
 from __future__ import annotations
 
+import decimal
 import math
+import re
 
 # Ways a person opens a question that is otherwise only arithmetic.
 _PREFIXES = ("what is ", "what's ", "calculate ")
@@ -90,7 +92,22 @@ def looks_like_arithmetic(q: str) -> bool:
 def normalise(q: str) -> str:
     """Normalise the informal spellings a person types."""
     t = _strip_question(q)
-    return t.replace("×", "*").replace("x", "*").replace("÷", "/").replace(",", "")
+    return _NUMBER_WITH_COMMAS.sub(_read_commas, t.replace("×", "*").replace("x", "*").replace("÷", "/"))
+
+
+_NUMBER_WITH_COMMAS = re.compile(r"\d+(?:,\d+)+")
+
+
+def _read_commas(m: re.Match) -> str:
+    """3,000 is three thousand; 2,5 and 0,25 are decimals, as much of the
+    world writes them. Reading every comma as a thousands separator made
+    "2,5 * 4" a hundred. Anything else is left for the parser to refuse."""
+    whole, *groups = m.group(0).split(",")
+    if whole != "0" and all(len(g) == 3 for g in groups):
+        return whole + "".join(groups)
+    if len(groups) == 1:
+        return f"{whole}.{groups[0]}"
+    return m.group(0)
 
 
 def _is_digit(c: str) -> bool:
@@ -227,9 +244,12 @@ class _Parser:
                     raise ValueError(f"expected ',' or ')' in {name}(...)")
 
         def one() -> float:
-            # Functions of one value use the first argument and ignore the rest.
+            # An extra value is refused, not ignored: round(5/12, 2) once
+            # came back as 0, a whole number, and was reported as exact.
             if not args:
                 raise ValueError(f"{name} needs an argument")
+            if len(args) > 1:
+                raise ValueError(f"{name} takes one value, not {len(args)}")
             return args[0]
 
         if name == "sqrt":
@@ -237,6 +257,8 @@ class _Parser:
         if name == "abs":
             return abs(one())
         if name == "round":
+            if len(args) == 2:
+                return _round_to(args[0], args[1])
             return _round_half_away(one())
         if name == "floor":
             return _whole(one(), math.floor)
@@ -384,6 +406,19 @@ def _round_half_away(a: float) -> float:
     if abs(a) - whole >= 0.5:
         whole += 1
     return math.copysign(float(whole), a)
+
+
+def _round_to(a: float, places: float) -> float:
+    """round(x, n): x to n decimal places, halves away from zero, as a person
+    rounds: 2.675 to two places is 2.68, although the float nearest 2.675 is
+    a hair below it."""
+    if places != math.trunc(places) or not 0 <= places <= 12:
+        raise ValueError("round(x, n) needs n to be a whole number from 0 to 12")
+    if not math.isfinite(a):
+        return a
+    exact = decimal.Decimal(repr(a)).quantize(decimal.Decimal(1).scaleb(-int(places)),
+                                              rounding=decimal.ROUND_HALF_UP)
+    return math.copysign(float(exact), a)
 
 
 def _fmin(a: float, b: float) -> float:

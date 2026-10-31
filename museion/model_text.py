@@ -6,6 +6,7 @@ tool call written out as text instead of made.
 from __future__ import annotations
 
 import re
+import unicodedata
 
 _DIGITS = set("0123456789")
 _MARKER_CHARS = set("0123456789, ")
@@ -117,6 +118,10 @@ def has_prose_arithmetic(text: str) -> bool:
             spaced += c
 
     def is_number(token: str) -> bool:
+        # ¼, ½ and the like count as digits: the sources write doses so, and
+        # "55 × ¼ tsp = 339 ml" is as much a sum done in prose as "55 × 0.25".
+        token = "".join("1" if not c.isascii() and unicodedata.numeric(c, None) is not None else c
+                        for c in token)
         t = _EDGES.sub("", token).replace(",", "")
         return bool(_NUMBER.fullmatch(t))
 

@@ -129,7 +129,7 @@ TOOLS = [
     llama.tool(
         "calculate",
         "Evaluate an arithmetic expression exactly. Supports + - * / ^ %, parentheses, "
-        "sqrt, abs, round, floor, ceil, min, max, pow, pi, and "
+        "sqrt, abs, round (round(x) or round(x, decimals)), floor, ceil, min, max, pow, pi, and "
         "convert(value, from_unit, to_unit) for volume (gallon, liter, quart, pint, "
         "cup, floz, tbsp, tsp, drop, ml), mass (kg, g, lb, oz), length (km, m, cm, mm, "
         "mile, yard, foot, inch) and temperature (c, f, k). Example: "

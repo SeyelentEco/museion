@@ -54,6 +54,22 @@ class CalcTest(unittest.TestCase):
         self.assertEqual(calc.format_number(67.772672), "67.77")
         self.assertEqual(calc.format_number(343.75), "343.8")
         self.assertEqual(calc.format_number(1.0 / 3.0), "0.3333")
+        # A comma before three digits groups thousands; any other is a
+        # decimal comma.
+        self.assertEqual(calc.normalise("2,5 * 4"), "2.5 * 4")
+        self.assertEqual(calc.normalise("0,25 x 55"), "0.25 * 55")
+        self.assertEqual(calc.normalise("0,250 * 4"), "0.250 * 4")
+        self.assertEqual(calc.normalise("3,000 ÷ 4"), "3000 / 4")
+        self.assertEqual(calc.normalise("1,234,567 + 1"), "1234567 + 1")
+        with self.assertRaises(ValueError):
+            calc.evaluate(calc.normalise("1,23,4 + 1"))
+        # round(x, n) rounds to n places, halves away from zero.
+        self.assertEqual(calc.format_number(calc.evaluate("round(5/12, 2)")), "0.42")
+        self.assertEqual(calc.format_number(calc.evaluate("round(convert(0.25*55, tsp, ml), 1)")), "67.8")
+        self.assertEqual(calc.evaluate("round(2.675, 2)"), 2.68)
+        self.assertEqual(calc.evaluate("round(-1.005, 2)"), -1.01)
+        with self.assertRaises(ValueError):
+            calc.evaluate("round(1, 1.5)")
         # Small results keep three significant figures, not four decimals.
         self.assertEqual(calc.format_number(0.00004), "0.00004")
         self.assertEqual(calc.format_number(0.00005), "0.00005")
@@ -133,7 +149,6 @@ RUST_RESULTS = [
     ("log10(0.01)", -2.0, "-2"),
     ("min(4, -2, 9)", -2.0, "-2"),
     ("pow(2, 10)", 1024.0, "1024"),
-    ("sqrt(9, 100)", 3.0, "3"),
     ("PI*2", 6.283185307179586, "6.28"),
     ("2*pi", 6.283185307179586, "6.28"),
     ("e^2", 7.3890560989306495, "7.39"),
@@ -183,6 +198,9 @@ RUST_RESULTS = [
 
 # (expression, Rust's error message)
 RUST_ERRORS = [
+    # Rust ignored a second value here and answered 3; it is refused now,
+    # since round(5/12, 2) the same way gave 0 and passed for exact.
+    ("sqrt(9, 100)", "sqrt takes one value, not 2"),
     ("max()", "result is not a finite number"),
     ("min()", "result is not a finite number"),
     ("pow(2)", "pow needs two arguments"),
