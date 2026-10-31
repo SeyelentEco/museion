@@ -118,13 +118,15 @@ def pick_tier(accel: Accelerator, system_ram_mb: int) -> str:
     vram = accelerator_memory_mb(accel)
 
     if accel.kind == METAL:
-        # Unified memory is shared with the whole system, so the usable share
-        # is smaller than the number suggests.
-        if vram >= 32_000:
+        # Unified memory is shared with the whole system, and macOS lets the
+        # GPU use only about two thirds to three quarters of it. The tiers
+        # once matched the 37 GB Q8 model to a 32 GB Mac and the 22 GB Q4 to
+        # a 24 GB one: neither fits beside macOS and a browser.
+        if vram >= 60_000:
             return AMPLE
-        if vram >= 24_000:
+        if vram >= 45_000:
             return GENEROUS
-        if vram >= 16_000:
+        if vram >= 32_000:
             return CAPABLE
         return MODEST
 
@@ -176,16 +178,20 @@ def nvidia_smi(run: Run = run) -> tuple[str, int] | None:
 
 
 def other_gpu(adapters: list[tuple[str, int]]) -> tuple[str, int] | None:
-    """The first display adapter with a name and some memory, as (name, MB).
+    """The display adapter with the most memory, as (name, MB). Not the
+    first: a processor's own graphics is usually installed first, and judging
+    a PC with a 16 GB Radeon by its 128 MB of integrated graphics fetched the
+    smallest model.
 
     The Rust version asked wmic, whose AdapterRAM is a 32-bit field that wraps
     above 4 GB, so it could only establish that a GPU existed. The registry
     holds the true size in a 64-bit value on current drivers, so an AMD or
     Intel card with more than 4 GB is now judged on its real memory."""
-    for name, size in adapters:
-        if name.strip() and size > 0:
-            return name.strip(), size // 1024 // 1024
-    return None
+    usable = [(size, name.strip()) for name, size in adapters if name.strip() and size > 0]
+    if not usable:
+        return None
+    size, name = max(usable, key=lambda a: a[0])
+    return name, size // 1024 // 1024
 
 
 def windows_adapters() -> list[tuple[str, int]]:

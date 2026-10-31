@@ -52,7 +52,7 @@ than the biggest dense model that fits.
 | 0 | CPU only, or under 6 GB VRAM | ~4B dense, Q4_K_M |
 | 1 | 8–12 GB VRAM | ~30B-A3B-class MoE, Q4_K_M, experts offloaded |
 | 2 | 16–24 GB VRAM | Same MoE, more layers resident, larger context |
-| 3 | Apple Silicon, 32 GB+ unified | Larger MoE |
+| 3 | Apple Silicon: 32 GB+ unified for the 35B at Q4, 64 GB+ for Q8; less gets tier 0 | Larger MoE |
 
 Detection: `nvidia-smi` on Windows, falling back to WMI/DXGI for AMD and Intel (Vulkan
 build), else CPU. On macOS, architecture plus `sysctl hw.memsize` selects the Metal build

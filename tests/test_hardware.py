@@ -45,7 +45,8 @@ class TierTest(unittest.TestCase):
         def m(mb):
             return Accelerator(hardware.METAL, "Apple M3", mb)
         self.assertEqual(hardware.pick_tier(m(8_000), 8_000), MODEST)
-        self.assertEqual(hardware.pick_tier(m(18_000), 18_000), CAPABLE)
+        self.assertEqual(hardware.pick_tier(m(18_000), 18_000), MODEST)
+        self.assertEqual(hardware.pick_tier(m(36_864), 36_864), CAPABLE)
         self.assertEqual(hardware.pick_tier(m(64_000), 64_000), AMPLE)
 
     def test_gpu_tier_boundaries(self):
@@ -68,8 +69,8 @@ class TierTest(unittest.TestCase):
                     self.assertEqual(hardware.pick_tier(Accelerator(kind, "card", vram), ram), tier)
 
     def test_unified_memory_boundaries_ignore_system_ram(self):
-        for mb, tier in [(32_000, AMPLE), (31_999, GENEROUS), (24_000, GENEROUS),
-                         (23_999, CAPABLE), (16_000, CAPABLE), (15_999, MODEST)]:
+        for mb, tier in [(65_536, AMPLE), (60_000, AMPLE), (49_152, GENEROUS), (36_864, CAPABLE),
+                         (32_768, CAPABLE), (24_576, MODEST), (16_384, MODEST)]:
             with self.subTest(mb=mb):
                 self.assertEqual(hardware.pick_tier(Accelerator(hardware.METAL, "Apple M2", mb), 0), tier)
 
@@ -118,7 +119,8 @@ class DetectTest(unittest.TestCase):
         hw = hardware.detect("darwin", run, NO_MEMINFO)
         self.assertEqual(hw.accelerator, Accelerator(hardware.METAL, "Apple M3", 16_384))
         self.assertEqual(hw.system_ram_mb, 16_384)
-        self.assertEqual(hw.tier, CAPABLE)
+        # The 22 GB model does not fit in 16 GB shared with macOS.
+        self.assertEqual(hw.tier, MODEST)
         # A Mac never asks for an NVIDIA card.
         self.assertNotIn(NVIDIA_SMI, run.asked)
 
@@ -139,6 +141,11 @@ class DetectTest(unittest.TestCase):
             ("AMD Radeon RX 7800 XT", 16 * 1024**3),
             ("Intel(R) UHD Graphics 770", 128 * 1024**2),
         ]
+        accel = hardware.detect_accelerator("win32", fake_run({}), lambda: adapters)
+        self.assertEqual(accel, Accelerator(hardware.VULKAN, "AMD Radeon RX 7800 XT", 16_384))
+
+    def test_windows_judges_by_the_largest_adapter_not_the_first(self):
+        adapters = [("Intel(R) UHD Graphics 770", 128 * 1024**2), ("AMD Radeon RX 7800 XT", 16 * 1024**3)]
         accel = hardware.detect_accelerator("win32", fake_run({}), lambda: adapters)
         self.assertEqual(accel, Accelerator(hardware.VULKAN, "AMD Radeon RX 7800 XT", 16_384))
 
