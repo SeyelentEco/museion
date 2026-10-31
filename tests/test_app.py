@@ -303,6 +303,17 @@ class AppServerTest(unittest.TestCase):
                                   headers={"Sec-Fetch-Site": "cross-site"})
         self.assertEqual(res.status, 404)
 
+    def test_a_pdf_cited_from_where_its_folder_used_to_be_still_opens(self):
+        # Indexed when the drive was E:, opened now that it is somewhere else.
+        from urllib.parse import quote
+        for old in ("E:\\found\\Guide.pdf", "/Volumes/MUSEION/found/Guide.pdf"):
+            with self.subTest(old=old):
+                res, body = self.app.request("GET", "/file?path=" + quote(old))
+                self.assertEqual(res.status, 200)
+                self.assertTrue(body.startswith(b"%PDF"))
+        res, _ = self.app.request("GET", "/file?path=" + quote("E:\\elsewhere\\Guide.pdf"))
+        self.assertEqual(res.status, 404)
+
     def test_names_on_another_computer_are_refused_without_looking_them_up(self):
         # On Windows, merely looking up \\host\share\x connects to that host
         # and offers it the person's login, so these never reach the disk.

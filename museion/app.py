@@ -35,6 +35,7 @@ import inspect
 import json
 import os
 import queue
+import re
 import select
 import socket
 import sqlite3
@@ -316,10 +317,12 @@ class Handler(BaseHTTPRequestHandler):
         # offers it the person's Windows login, and any site could ask for
         # one with an <img>. For the same reason another site's page may not
         # ask at all; the reader frame is this page's own.
+        extra_dirs = self.server.state.config().extra_dirs
         file = Path(os.path.abspath(path)) if path else None
-        folders = {same_path(d) for d in self.server.state.config().extra_dirs}
+        if file is not None and same_path(file.parent) not in {same_path(d) for d in extra_dirs}:
+            file = moved_pdf(path, extra_dirs)
         ok = (self.headers.get("Sec-Fetch-Site") != "cross-site" and file is not None
-              and file.suffix.lower() == ".pdf" and same_path(file.parent) in folders)
+              and file.suffix.lower() == ".pdf")
         try:
             ok = ok and file.is_file()
         except OSError:
@@ -346,6 +349,21 @@ def plain_relative(name: str) -> bool:
     """Is this a plain name inside a folder: no drive, no share, no root and
     no "..", read the Windows way and the Unix way alike?"""
     return not any(p.anchor or ".." in p.parts for p in (PureWindowsPath(name), PurePosixPath(name)))
+
+
+def moved_pdf(path: str, extra_dirs: list[Path]) -> Path | None:
+    """The PDF a citation names, in the content folder of the same name, when
+    the path in the index is from where the folder used to be. The index
+    keeps the whole path; a drive that comes up as F: instead of E:, or a
+    copy of it on the computer's disk, moves the folder under it."""
+    parts = re.split(r"[\\/]", path)
+    if len(parts) < 2 or not parts[-2] or parts[-1] in ("", ".", ".."):
+        return None
+    folder, name = parts[-2], parts[-1]
+    for d in extra_dirs:
+        if os.path.normcase(d.name) == os.path.normcase(folder):
+            return d / name
+    return None
 
 
 def same_path(p: Path) -> str:
