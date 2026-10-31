@@ -58,7 +58,11 @@ def format_number(v: float) -> str:
     if math.isfinite(v) and v == math.trunc(v) and abs(v) < 1e15:
         return str(int(v))
     a = abs(v)
-    decimals = 1 if a >= 100.0 else 2 if a >= 1.0 else 4
+    if a < 1e-6:
+        return f"{v:.3g}"
+    # Below 1, at least three significant figures: a fixed four decimals
+    # showed 0.00004 as 0, and one drop in litres (0.00005) as twice that.
+    decimals = 1 if a >= 100.0 else 2 if a >= 1.0 else max(4, 2 - math.floor(math.log10(a)))
     s = f"{v:.{decimals}f}"
     return s.rstrip("0").rstrip(".")
 

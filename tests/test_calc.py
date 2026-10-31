@@ -54,6 +54,13 @@ class CalcTest(unittest.TestCase):
         self.assertEqual(calc.format_number(67.772672), "67.77")
         self.assertEqual(calc.format_number(343.75), "343.8")
         self.assertEqual(calc.format_number(1.0 / 3.0), "0.3333")
+        # Small results keep three significant figures, not four decimals.
+        self.assertEqual(calc.format_number(0.00004), "0.00004")
+        self.assertEqual(calc.format_number(0.00005), "0.00005")
+        self.assertEqual(calc.format_number(0.0123456), "0.0123")
+        self.assertEqual(calc.format_number(0.00123456), "0.00123")
+        self.assertEqual(calc.format_number(-0.000254), "-0.000254")
+        self.assertEqual(calc.format_number(2.5e-9), "2.5e-09")
 
     def test_never_runs_code(self):
         # Python's eval() would run these; the calculator only parses.
@@ -215,7 +222,9 @@ RUST_ERRORS = [
     ("1\u001c+1", "unexpected '\u001c' at position 2"),
 ]
 
-# (value, Rust's calc::format of it)
+# (value, Rust's calc::format of it). The two small values are the exception:
+# Rust printed 1e-05 as "0" and -4.9e-05 as "-0", which hid a dose, so they
+# now keep three significant figures.
 RUST_FORMATS = [
     (100.0, "100"),
     (2.5, "2.5"),
@@ -232,9 +241,9 @@ RUST_FORMATS = [
     (0.03125, "0.0312"),
     (100.25, "100.2"),
     (1.005, "1"),
-    (1e-05, "0"),
+    (1e-05, "0.00001"),
     (-1.5, "-1.5"),
-    (-4.9e-05, "-0"),
+    (-4.9e-05, "-0.000049"),
     (99.995, "100"),
     (0.5, "0.5"),
     (math.inf, "inf"),
