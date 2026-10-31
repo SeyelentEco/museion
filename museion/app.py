@@ -33,6 +33,7 @@ from __future__ import annotations
 import argparse
 import inspect
 import json
+import os
 import queue
 import select
 import socket
@@ -45,7 +46,7 @@ import urllib.parse
 import urllib.request
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 from museion import commands, drives, library, services, sidecar
 from museion.appstate import AppState, UiError, open_state
@@ -282,6 +283,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def send_ui_file(self, path: str) -> None:
         name = urllib.parse.unquote(path).lstrip("/") or "index.html"
+        # Refused as text, before anything touches the disk: on Windows even
+        # looking up a name like \\host\share\x connects to that host and
+        # offers it the person's Windows login.
+        if not plain_relative(name):
+            return self.send_json(404, {"error": f"no such file: {path}"})
         file = (UI_DIR / name).resolve()
         if not file.is_relative_to(UI_DIR.resolve()) or not file.is_file():
             return self.send_json(404, {"error": f"no such file: {path}"})
@@ -305,10 +311,17 @@ class Handler(BaseHTTPRequestHandler):
     def send_content_file(self, path: str) -> None:
         """A PDF from an extra content folder -- the only files served from
         outside museion/ui -- so it opens in the reader at the cited page."""
-        file = Path(path)
-        folders = [d.resolve() for d in self.server.state.config().extra_dirs]
+        # The folder is checked as text before the disk is touched: on
+        # Windows, looking up \\host\share\x.pdf connects to that host and
+        # offers it the person's Windows login, and any site could ask for
+        # one with an <img>. For the same reason another site's page may not
+        # ask at all; the reader frame is this page's own.
+        file = Path(os.path.abspath(path)) if path else None
+        folders = {same_path(d) for d in self.server.state.config().extra_dirs}
+        ok = (self.headers.get("Sec-Fetch-Site") != "cross-site" and file is not None
+              and file.suffix.lower() == ".pdf" and same_path(file.parent) in folders)
         try:
-            ok = file.suffix.lower() == ".pdf" and file.resolve().parent in folders and file.is_file()
+            ok = ok and file.is_file()
         except OSError:
             ok = False
         if not ok:
@@ -327,6 +340,17 @@ class Handler(BaseHTTPRequestHandler):
                     self.wfile.write(chunk)
         except OSError:
             pass
+
+
+def plain_relative(name: str) -> bool:
+    """Is this a plain name inside a folder: no drive, no share, no root and
+    no "..", read the Windows way and the Unix way alike?"""
+    return not any(p.anchor or ".." in p.parts for p in (PureWindowsPath(name), PurePosixPath(name)))
+
+
+def same_path(p: Path) -> str:
+    """A path as text to compare with another, without asking the disk."""
+    return os.path.normcase(os.path.abspath(p))
 
 
 def already_running(port: int) -> bool:

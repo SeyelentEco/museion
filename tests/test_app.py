@@ -298,6 +298,42 @@ class AppServerTest(unittest.TestCase):
             with self.subTest(path=path):
                 res, _ = self.app.request("GET", "/file?path=" + quote(str(path)))
                 self.assertEqual(res.status, 404)
+        # Another site's page may not load one, even with an <img>.
+        res, _ = self.app.request("GET", "/file?path=" + quote(str(self.app.found / "Guide.pdf")),
+                                  headers={"Sec-Fetch-Site": "cross-site"})
+        self.assertEqual(res.status, 404)
+
+    def test_names_on_another_computer_are_refused_without_looking_them_up(self):
+        # On Windows, merely looking up \\host\share\x connects to that host
+        # and offers it the person's login, so these never reach the disk.
+        for name in ("\\\\host\\share\\x.pdf", "//host/share/x.pdf", "C:/Windows/win.ini", "C:x",
+                     "../museion/app.py", "ui/../../cli.py"):
+            with self.subTest(name=name):
+                self.assertFalse(app.plain_relative(name))
+        self.assertTrue(app.plain_relative("index.html"))
+        self.assertTrue(app.plain_relative("img/logo.svg"))
+
+    def test_a_share_named_in_a_request_is_never_looked_up(self):
+        from unittest import mock
+        from urllib.parse import quote
+        looked_up = []
+
+        def watch(real):
+            def look(path, *a, **k):
+                if os.fspath(path).replace("\\", "/").startswith("//host"):
+                    looked_up.append(path)
+                return real(path, *a, **k)
+            return look
+        with (mock.patch("os.stat", watch(os.stat)), mock.patch("os.lstat", watch(os.lstat)),
+              mock.patch("os.path.realpath", watch(os.path.realpath))):
+            for url in ("/file?path=" + quote("//host/share/x.pdf"),
+                        "/file?path=" + quote("\\\\host\\share\\x.pdf"),
+                        "/" + quote("\\\\host\\share\\x"),
+                        "/%2F%2Fhost/share/x"):
+                with self.subTest(url=url):
+                    res, _ = self.app.request("GET", url)
+                    self.assertEqual(res.status, 404)
+        self.assertEqual(looked_up, [])
 
     def test_tuning_override_is_written_once_from_the_defaults(self):
         info = self.app.call("tuning_info")
