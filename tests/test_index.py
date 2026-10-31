@@ -53,6 +53,23 @@ class IndexTest(unittest.TestCase):
         page: its weight is zero, and the topic gate refuses the question."""
         self.ix.add_document("rope", "r.pdf", "Knots", "", "", doc(["tie a bowline in the rope"]))
 
+    def test_an_index_that_cannot_be_written_is_still_read(self):
+        # A locked SD card, or a Windows drive on a Mac: opening it the usual
+        # way fails, since even reading a WAL database wants a file beside it.
+        self.add_unrelated()
+        self.ix.add_document("water", "w.pdf", "Water", "", "", doc(["boil the water for one minute"]))
+        self.ix.close()
+        real = sqlite3.connect
+
+        def refuses_writing(target, *args, **kwargs):
+            if not kwargs.get("uri"):
+                raise sqlite3.OperationalError("attempt to write a readonly database")
+            return real(target, *args, **kwargs)
+        with mock.patch("museion.index.sqlite3.connect", refuses_writing):
+            self.ix = Index(self.path)
+        hits, _ = self.ix.search_ungated("boil water", 5)
+        self.assertEqual([h.doc_title for h in hits], ["Water"])
+
     def test_a_disk_that_cannot_flush_still_gets_an_index(self):
         # A Seagate USB disk failed every fsync, and so every SQLite write
         # with "disk I/O error". The index is rebuildable, so it goes

@@ -141,6 +141,23 @@ class AddOutcome:
 
 
 @functools.lru_cache(maxsize=None)
+def read_only(path: Path | str) -> sqlite3.Connection | None:
+    """The index on a drive that cannot be written to -- a locked SD card, a
+    Windows drive on a Mac -- opened for reading, or None. The index is kept
+    in WAL mode, and SQLite cannot even read such a file normally where it
+    cannot make the -shm file beside it; "immutable" tells it nothing else
+    will write either, so it needs none."""
+    p = Path(path)
+    if not p.is_file():
+        return None
+    try:
+        conn = sqlite3.connect(p.resolve().as_uri() + "?immutable=1", uri=True, isolation_level=None)
+        conn.execute("SELECT COUNT(*) FROM docs").fetchone()
+        return conn
+    except (sqlite3.Error, ValueError):
+        return None
+
+
 def can_flush(folder: Path) -> bool:
     """Whether files in `folder` can be flushed to the disk. Some USB disks
     refuse (Windows' FlushFileBuffers fails on a Seagate Backup Plus), and
@@ -210,7 +227,9 @@ class Index:
             self.conn.execute(f"PRAGMA synchronous = {sync}")
             self.conn.executescript(SCHEMA)
         except sqlite3.Error as e:
-            raise RuntimeError(f"opening index at {path}: {e}") from e
+            self.conn = read_only(path)
+            if self.conn is None:
+                raise RuntimeError(f"opening index at {path}: {e}") from e
 
     def close(self) -> None:
         self.conn.close()
