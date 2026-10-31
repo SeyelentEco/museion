@@ -2,9 +2,11 @@
 Range, hang up part-way, or serve the wrong bytes."""
 
 import hashlib
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from fake_http import FakeServer
 from museion import download
@@ -98,6 +100,30 @@ class DownloadVerifiedTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, f"size mismatch: expected {len(BODY)} bytes, got 1000"):
             self.get("/short")
         self.assertEqual(self.part.read_bytes(), BODY[:1000])
+
+    def test_a_complete_file_left_unrenamed_is_kept_not_fetched_again(self):
+        # The rename failed last time: Windows refuses while a virus scanner
+        # has the new file open.
+        self.write_part(BODY)
+        self.get("/file")
+        self.assertEqual(self.server.requests, [])
+        self.assertEqual(self.dest.read_bytes(), BODY)
+        self.assertFalse(self.part.exists())
+
+    def test_a_rename_refused_for_a_moment_is_tried_again(self):
+        real = os.replace
+        refused = []
+
+        def busy_once(src, dst):
+            if not refused:
+                refused.append(src)
+                raise PermissionError("in use by another process")
+            return real(src, dst)
+        with mock.patch("os.replace", busy_once):
+            self.get("/file")
+        self.assertEqual(len(refused), 1)
+        self.assertEqual(self.server.requests, [("/file", None)])
+        self.assertEqual(self.dest.read_bytes(), BODY)
 
     def test_an_oversized_partial_file_is_discarded(self):
         self.write_part(BODY + b"extra")

@@ -93,13 +93,18 @@ def write_text(path: Path, text: str) -> None:
             os.fsync(f.fileno())
         except OSError:
             pass  # some USB disks refuse it; the replace below still helps
-    for attempt in range(10):
+    replace(temp, path)
+
+
+def replace(src: Path, dst: Path, attempts: int = 10) -> None:
+    """os.replace, tried again for a moment when Windows refuses because
+    another program -- a virus scanner, the search indexer -- has one of the
+    files open just then."""
+    for attempt in range(attempts):
         try:
-            os.replace(temp, path)
+            os.replace(src, dst)
             return
         except PermissionError:
-            # Windows refuses while another program (a virus scanner, an
-            # editor) has the file open for a moment.
-            if attempt == 9:
+            if attempt == attempts - 1:
                 raise
-            time.sleep(0.1)
+            time.sleep(0.2)

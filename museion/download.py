@@ -23,6 +23,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from museion import disk
+
 CHUNK = 1 << 20
 # Giving up on a dead mirror quickly lets the next one have its turn; a live
 # but slow one may pause far longer between reads.
@@ -115,8 +117,18 @@ def _attempt(url: str, spec: Spec, dest: Path, part: Path, report: Callable[[Pro
         if 0 < have < spec.size_bytes:
             _hash_file(part, hasher, lambda read: report(Progress(read, have, resuming=True)))
             offset = have
-        elif have >= spec.size_bytes:
-            # Oversized or complete-but-unrenamed: start clean rather than guess.
+        elif have == spec.size_bytes:
+            # Complete but not renamed: the rename failed last time, perhaps
+            # while a virus scanner held the file. Checked, it is the file;
+            # thrown away, Wikipedia is a hundred gigabytes to fetch again.
+            _hash_file(part, hasher, lambda read: report(Progress(read, have, resuming=True)))
+            if hasher.hexdigest() == spec.sha256.lower():
+                disk.replace(part, dest)
+                return
+            part.unlink()
+            hasher = hashlib.sha256()
+        else:
+            # Oversized: start clean rather than guess.
             part.unlink()
 
     headers = {"Range": f"bytes={offset}-"} if offset > 0 else {}
@@ -150,7 +162,7 @@ def _attempt(url: str, spec: Spec, dest: Path, part: Path, report: Callable[[Pro
     if digest != spec.sha256.lower():
         part.unlink(missing_ok=True)
         raise RuntimeError(f"checksum mismatch\n    expected {spec.sha256}\n    got      {digest}")
-    os.replace(part, dest)
+    disk.replace(part, dest)
 
 
 def fetch_unverified(url: str, dest: Path, on_progress: Callable[[int, int], None] | None = None) -> None:
