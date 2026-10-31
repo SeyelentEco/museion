@@ -235,12 +235,22 @@ def run(plan: Plan, report: Callable[[Progress], None] = lambda p: None) -> Path
             report(Progress(NOTE, {tools.UNPACKING: f"Unpacking {s.tool}", tools.DONE: f"{s.tool} ready"}
                             .get(s.kind, f"{s.tool}: {s.reason}")))
 
+    # Each helper is unpacked beside where it goes and moved in only once
+    # all of it is there, since its program being present is what counts as
+    # installed. Unpacked in place, a drive pulled out between a CUDA build
+    # and its runtime counted as done, and the chat model never started.
     if tools.find_exe(bin_dir, "kiwix-serve") is None:
-        tools.install_selected("cpu", bin_dir, ["kiwix-tools", "pdfium"], on_tool)
+        part = fresh(bin_dir / ".kiwix.part")
+        tools.install_selected("cpu", part, ["kiwix-tools", "pdfium"], on_tool)
+        server = tools.find_exe(part, "kiwix-serve")
+        move_in(part, bin_dir, last=server.name if server else "")
     for a in plan.accelerators:
         folder = bin_dir / "llama" / a
         if tools.find_exe(folder, "llama-server") is None:
-            tools.install_selected(a, folder, ["llama.cpp"], on_tool)
+            part = fresh(folder.with_name(f"{a}.part"))
+            tools.install_selected(a, part, ["llama.cpp"], on_tool)
+            shutil.rmtree(folder, ignore_errors=True)
+            part.rename(folder)
     for t in catalog.drive_tools():
         if carried(plan, t) and not drive_tool_present(root, t):
             install_drive_tool(t, root, report)
@@ -297,18 +307,43 @@ def install_drive_tool(tool: catalog.Tool, root: Path, report: Callable[[Progres
         report(Progress(NOTE, f"Unpacking {tool.name}"))
         unpacked = staging / "unpacked"
         tools.extract(archive, unpacked)
+        # Copied to the drive under a temporary name, then renamed: a copy cut
+        # off partway must not pass for the real thing.
         if tool.id == "python":
             # The archive holds one folder, python/.
-            shutil.move(str(unpacked / "python"), str(root / "python"))
+            part = fresh(root / "python.part")
+            shutil.move(str(unpacked / "python"), str(part))
+            shutil.rmtree(root / "python", ignore_errors=True)
+            part.rename(root / "python")
         else:
             name = exe(tool.provides[0])
             program = next((p for p in unpacked.rglob(name) if p.is_file()), None)
             if program is None:
                 raise RuntimeError(f"no {name} in {v.file}")
             target = root / "bin" / program.name
-            shutil.move(str(program), str(target))
-            target.chmod(0o755)
+            part = target.with_name(target.name + ".part")
+            shutil.move(str(program), str(part))
+            part.chmod(0o755)
+            part.replace(target)
     report(Progress(NOTE, f"{tool.name} ready"))
+
+
+def fresh(folder: Path) -> Path:
+    """An empty folder, emptied of what an interrupted run left there."""
+    shutil.rmtree(folder, ignore_errors=True)
+    folder.mkdir(parents=True)
+    return folder
+
+
+def move_in(part: Path, into: Path, last: str) -> None:
+    """Move what was unpacked in `part` into `into`, the file named `last`
+    after everything else, then remove `part`."""
+    for entry in sorted(part.iterdir(), key=lambda e: e.name == last):
+        target = into / entry.name
+        if target.is_dir() and not target.is_symlink():
+            shutil.rmtree(target)
+        entry.replace(target)
+    part.rmdir()
 
 
 def copy_app(root: Path, report: Callable[[Progress], None]) -> None:

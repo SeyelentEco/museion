@@ -164,6 +164,31 @@ class PrepareTest(unittest.TestCase):
         notes = [p.item for p in self.progress if p.kind == prepare.NOTE]
         self.assertIn("app/ already there; left as it is", notes)
 
+    def test_a_helper_cut_off_while_unpacking_is_installed_again(self):
+        # The program unpacked, its runtime not yet: the network dropped.
+        real = self.install_selected
+
+        def cut_off(accel, dest, only=(), on_step=None):
+            if accel == "cuda" and not cut:
+                cut.append(dest)
+                touch(Path(dest) / exe("llama-server"))
+                raise OSError("connection reset while fetching cudart")
+            real(accel, dest, only, on_step)
+        cut = []
+        plan = prepare.Plan(dest=self.root, accelerators=["cuda"], skeleton=True, build_index=False)
+        # No platform the tests run on has every build in the catalogue.
+        room = mock.Mock(free_bytes=1 << 50, remaining=0)
+        with mock.patch("museion.tools.install_selected", cut_off), \
+             mock.patch("museion.prepare.estimate", return_value=room), \
+             mock.patch("museion.prepare.install_drive_tool", self.install_drive_tool):
+            with self.assertRaises(OSError):
+                prepare.run(plan, self.progress.append)
+            self.assertIsNone(prepare.tools.find_exe(self.root / "bin" / "llama" / "cuda", "llama-server"))
+            prepare.run(plan, self.progress.append)
+        self.assertIn(("cuda", ("llama.cpp",)), self.installed)
+        self.assertTrue((self.root / "bin" / "llama" / "cuda" / exe("llama-server")).exists())
+        self.assertFalse((self.root / "bin" / "llama" / "cuda.part").exists())
+
     def test_without_opencode_neither_it_nor_ripgrep_is_carried(self):
         self.run_prepare(opencode=False)
         self.assertFalse((self.root / "bin" / exe("opencode")).exists())
