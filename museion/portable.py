@@ -186,7 +186,12 @@ class MachineProfile:
         if root is not None:
             for name in ("llama_exe", "chat_model"):
                 old = getattr(self, name)
-                if old is not None and not old.exists() and (new := rebase(old, root)):
+                # Outside the drive, but found on it, counts as moved too: a
+                # copy of the drive on the computer's disk shares the stick's
+                # profile, and loaded the model from the stick still plugged
+                # in, slowly, and fell over when it was pulled out.
+                if (old is not None and (not old.exists() or not old.is_relative_to(root))
+                        and (new := rebase(old, root)) and new != old):
                     setattr(self, name, new)
                     moved = True
         if self.llama_exe and self.llama_exe.exists():

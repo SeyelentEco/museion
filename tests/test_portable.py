@@ -126,6 +126,16 @@ class DriveTest(Drive):
         # Nothing moved the second time.
         self.assertFalse(p.apply(Config(), self.root))
 
+    def test_a_copy_of_the_drive_uses_its_own_files_while_the_stick_is_still_in(self):
+        stick = self.root.parent / "E-stick"
+        p = MachineProfile("pc", touch(stick / "bin" / "llama" / "cuda" / exe("llama-server")),
+                           touch(stick / "models" / SMALL), ["-c", "8192"], 41, True)
+        llama = touch(self.root / "bin" / "llama" / "cuda" / exe("llama-server"))
+        model = touch(self.root / "models" / SMALL)
+        cfg = Config()
+        self.assertTrue(p.apply(cfg, self.root))
+        self.assertEqual((cfg.llama_exe, cfg.chat_model), (llama, model))
+
     def test_rebasing_needs_more_than_a_file_name(self):
         touch(self.root / "llama-server")
         self.assertIsNone(portable.rebase(self.root.parent / "gone" / "llama-server", self.root))
