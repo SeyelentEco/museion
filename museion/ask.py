@@ -37,6 +37,12 @@ RERANK_CHARS = 1200
 # Characters of a page quoted to the chat model.
 CONTEXT_CHARS = 2400
 
+# For keeping a conversation inside the model's context: characters per token,
+# erring low (English prose runs nearer four), and tokens kept free for the
+# tool definitions and the chat template around the messages.
+CHARS_PER_TOKEN = 3.5
+RESERVED_TOKENS = 1500
+
 # Candidates pulled per rewritten seed search. They join the question's own
 # forty in one pool that is reranked once; the prompt still holds the usual
 # eight passages. Every other arrangement tried put twelve to thirty passages
@@ -374,7 +380,15 @@ class Asker:
         repaired = False
         math_repaired = False
         round = 0
+        room = self.room_for_searches()
         while True:
+            # Another search must fit beside everything already here, or the
+            # server refuses the whole conversation and the answer is lost:
+            # at a 16k context, two or three searches did that. Without the
+            # room, the model answers from what it has.
+            if round < tuning.max_rounds and room is not None and prompt_chars(messages) > room:
+                mark("context nearly full; answering from what was found")
+                round = tuning.max_rounds
             # On the last round the tools are withheld so the model must answer.
             last = round >= tuning.max_rounds
             if round == tuning.max_rounds:
@@ -491,6 +505,16 @@ class Asker:
             return f"{expr} = {result}. Report this figure exactly; do not convert or rescale it.", False
         return f"Unknown tool {name}.", False
 
+    def room_for_searches(self) -> int | None:
+        """How many characters of conversation still leave room for one more
+        search's passages and the answer, or None if the server does not say
+        how much context it has."""
+        size = getattr(self.chat, "context_size", lambda: None)()
+        if size is None:
+            return None
+        search = self.tuning.keep * (CONTEXT_CHARS + 200)
+        return int((size - self.tuning.answer_tokens - RESERVED_TOKENS) * CHARS_PER_TOKEN) - search
+
     def seed_queries(self, question: str, history: Sequence[Exchange]) -> list[str]:
         """The plain subjects behind a question, as up to three short library
         searches, written by the model with the earlier exchanges in view so
@@ -524,13 +548,21 @@ def render_search(hits: list[Hit], sources: list[Hit]) -> str:
         # shown under the first one's number and could never be cited.)
         number = next((i + 1 for i, s in enumerate(sources)
                        if (s.book, s.page, s.file) == (h.book, h.page, h.file)), 0)
-        if not number:
-            sources.append(h)
-            number = len(sources)
         who = f", {h.author}" if h.author else ""
         where = f" (page {h.page})" if h.page > 0 else f" ({h.book})"
+        if number:
+            # Shown in full once is enough; repeating it filled the context.
+            out += f"[{number}] {h.doc_title}{who}{where}: shown above\n\n"
+            continue
+        sources.append(h)
+        number = len(sources)
         out += f"[{number}] {h.doc_title}{who}{where}\n{truncate_chars(h.body, CONTEXT_CHARS)}\n\n"
     return out
+
+
+def prompt_chars(messages: list[dict]) -> int:
+    """The size of a conversation, in characters, as the model will read it."""
+    return sum(len(m.get("content") or "") + len(json.dumps(m.get("tool_calls") or "")) for m in messages)
 
 
 def recent(history: Sequence[Exchange], n: int) -> list[Exchange]:

@@ -42,6 +42,9 @@ class LlamaServerTest(unittest.TestCase):
     def test_reports_the_model(self):
         self.assertIn("museion-tiny-test", self.client.model_id())
 
+    def test_reports_its_context(self):
+        self.assertEqual(self.client.context_size(), 512)
+
     def test_streams_an_answer_until_the_token_limit(self):
         seen = []
         turn = self.client.turn([llama.system("Be brief."), llama.user("Say hello.")],

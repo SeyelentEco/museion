@@ -87,6 +87,16 @@ class Llama:
         except ConnectionError:
             return False
 
+    def context_size(self) -> int | None:
+        """Tokens of context the server gives one conversation, or None if it
+        does not say."""
+        try:
+            with urllib.request.urlopen(f"{self.base}/props", timeout=4) as res:
+                n = json.load(res).get("default_generation_settings", {}).get("n_ctx")
+        except (OSError, ValueError, AttributeError):
+            return None
+        return n if isinstance(n, int) and n > 0 else None
+
     def turn(
         self,
         messages: list[dict],

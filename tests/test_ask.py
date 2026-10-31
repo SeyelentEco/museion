@@ -188,10 +188,25 @@ class AskTest(unittest.TestCase):
         chat = ScriptedChat(calls("search_library", {"query": "bleach"}), says("Boil [1] or bleach [2]."))
         answer = asker(chat, index).ask("purify water")
         result = chat.calls[1][0][-1]["content"]
-        # The page found again keeps its number; the new one gets the next.
-        self.assertTrue(result.startswith("[1] Boiling water"))
+        # The page found again keeps its number, and is not quoted twice;
+        # the new one gets the next.
+        self.assertTrue(result.startswith("[1] Boiling water (page 1): shown above\n"))
+        self.assertNotIn("All about boiling water", result)
         self.assertIn("[2] Bleach (page 4)", result)
         self.assertEqual([h.doc_title for h in answer.sources], ["Boiling water", "Bleach"])
+
+    def test_no_more_searches_are_offered_once_another_would_not_fit(self):
+        class SmallContext(ScriptedChat):
+            def context_size(self):
+                return 4096
+        chat = SmallContext(says("Boil it [1]."))
+        asker(chat).ask("purify water")
+        messages, tools = chat.calls[0]
+        self.assertIsNone(tools)
+        self.assertEqual(messages[-1]["content"], ask.NO_MORE_TOOLS)
+        roomy = type("Roomy", (ScriptedChat,), {"context_size": lambda self: 32768})(says("Boil it [1]."))
+        asker(roomy).ask("purify water")
+        self.assertIsNotNone(roomy.calls[0][1])
 
     def test_an_unknown_tool_is_named(self):
         chat = ScriptedChat(calls("delete_files", {}), says("Boil it [1]."))
