@@ -17,6 +17,8 @@ from __future__ import annotations
 import os
 import sqlite3
 import sys
+import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path, PurePath
@@ -34,6 +36,15 @@ FAILED = "failed"
 # (sqlite3.Error). One bad document is counted and skipped; anything else is a
 # bug and stops the run, so it gets seen.
 DOCUMENT_ERRORS = (OSError, ValueError, sqlite3.Error)
+
+# One build at a time in this program: a second one (Build index pressed
+# while a fetched archive is being indexed) waits for the first, then finds
+# its work done. Two at once would share pdfium and the index.
+_BUILDING = threading.Lock()
+
+# How long a build waits for kiwix-serve to come back when it stops answering
+# mid-archive: adding a folder or fetching an archive restarts it.
+KIWIX_RETURN_SECONDS = 30.0
 
 
 # Progress reports, one class per kind of event.
@@ -115,6 +126,11 @@ def index_library(
     `extra_dirs` are further folders of content: .zim archives (served by
     kiwix-serve, so they must be among the files it was started with) and
     loose PDFs."""
+    with _BUILDING:
+        return _index_library(library, extra_dirs, db, kiwix_url, pdfium_dir, force, report)
+
+
+def _index_library(library, extra_dirs, db, kiwix_url, pdfium_dir, force, report) -> IndexStats:
     kiwix = Kiwix(kiwix_url)
     if not kiwix.is_up():
         raise ConnectionError(f"no kiwix-serve at {kiwix_url}. Start it over the library first.")
@@ -143,15 +159,16 @@ def index_library(
                 if kind.kind == FULL_TEXT_INDEXED:
                     report(Native(book))
                     continue
-                if force:
-                    index.forget_book(book)
+                # Afresh, and marked unfinished until the last document: a
+                # run that stops partway is redone next time, not skipped.
+                index.start_book(book)
                 total = len(kind.docs)
                 report(Archive(book, total))
                 done = ArchiveDone(book)
                 for i, d in enumerate(kind.docs):
                     title = d.title or d.file
                     try:
-                        data = kiwix.content(book, f"files/{d.file}")
+                        data = fetch_document(kiwix, book, d.file)
                         added = index.add_document(
                             book, d.file, title, d.description, d.author, extractor.extract(data)
                         )
@@ -175,8 +192,7 @@ def index_library(
             if index.has_book(book) and not force:
                 report(Skipped(book))
                 continue
-            if force:
-                index.forget_book(book)
+            index.start_book(book)
             total = len(pdfs)
             report(Archive(book, total))
             done = ArchiveDone(book)
@@ -205,6 +221,26 @@ def index_library(
         return index.stats()
     finally:
         index.close()
+
+
+def fetch_document(kiwix: Kiwix, book: str, file: str) -> bytes:
+    """One PDF from an archive. If kiwix-serve has stopped answering -- it is
+    restarted when a folder is added or an archive fetched -- wait for it and
+    ask again; if it does not come back, stop the build, since every document
+    after this one would fail too and the archive would pass for done. A
+    document that fails a second time, with the server answering, is that
+    document's fault."""
+    try:
+        return kiwix.content(book, f"files/{file}")
+    except ConnectionError:
+        pass
+    deadline = time.monotonic() + KIWIX_RETURN_SECONDS
+    while not kiwix.is_up():
+        if time.monotonic() > deadline:
+            raise RuntimeError(f"the content server stopped while {book} was being indexed. "
+                               "Start services and build the index again to finish it.")
+        time.sleep(1.0)
+    return kiwix.content(book, f"files/{file}")
 
 
 def title_from_filename(name: str) -> str:

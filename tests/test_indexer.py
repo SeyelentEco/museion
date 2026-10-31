@@ -122,6 +122,70 @@ class IndexLibraryTest(LibraryTestCase):
         self.assertEqual(events, FIRST_RUN)
         self.assertEqual(again, first)
 
+    def test_an_archive_left_unfinished_is_redone_not_skipped(self):
+        # Museion closed, or the computer slept, partway through an archive.
+        real = FakeExtractor.extract
+        calls = []
+
+        def stops_on_the_second(extractor, data):
+            calls.append(data)
+            if len(calls) == 2:
+                raise KeyboardInterrupt
+            return real(extractor, data)
+        with mock.patch.object(FakeExtractor, "extract", stops_on_the_second), self.assertRaises(KeyboardInterrupt):
+            self.index()
+        ix = Index(self.db)
+        try:
+            self.assertFalse(ix.has_book(ARCHIVE))
+        finally:
+            ix.close()
+        stats, events = self.index()
+        self.assertEqual(events, FIRST_RUN)
+        self.assertEqual(stats, IndexStats(documents=6, pages=14, words=347, image_only=1))
+
+    def test_a_content_server_restart_mid_archive_loses_nothing(self):
+        from museion.kiwix import Kiwix
+        real = Kiwix.content
+        refused = []
+
+        def refuses_once(kiwix, book, path):
+            if path.startswith("files/") and not refused:
+                refused.append(path)
+                raise ConnectionError("connection refused")
+            return real(kiwix, book, path)
+        with mock.patch.object(Kiwix, "content", refuses_once):
+            _, events = self.index()
+        self.assertEqual(refused, ["files/Emergency Preparedness (1).pdf"])
+        self.assertEqual(events, FIRST_RUN)
+
+    def test_a_content_server_that_stays_away_stops_the_build_unfinished(self):
+        from museion import indexer
+        from museion.kiwix import Kiwix
+        real_up = Kiwix.is_up
+        asked = []
+
+        def gone_after_the_first(kiwix):
+            asked.append(1)
+            return len(asked) == 1 and real_up(kiwix)
+
+        def refused(kiwix, book, path):
+            if path.startswith("files/"):
+                raise ConnectionError("connection refused")
+            return real_content(kiwix, book, path)
+        real_content = Kiwix.content
+        with (mock.patch.object(Kiwix, "is_up", gone_after_the_first),
+              mock.patch.object(Kiwix, "content", refused),
+              mock.patch.object(indexer, "KIWIX_RETURN_SECONDS", 0.0),
+              mock.patch("museion.indexer.time.sleep"),
+              self.assertRaises(RuntimeError) as stopped):
+            self.index()
+        self.assertIn("build the index again", str(stopped.exception))
+        ix = Index(self.db)
+        try:
+            self.assertFalse(ix.has_book(ARCHIVE))
+        finally:
+            ix.close()
+
     def test_a_missing_folder_is_skipped(self):
         err = io.StringIO()
         with redirect_stderr(err):

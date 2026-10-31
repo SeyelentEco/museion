@@ -124,6 +124,9 @@ class IndexStats:
 
 
 # What add_document did with a document.
+# The meta key, before an archive's name, of an archive being indexed.
+UNFINISHED = "unfinished:"
+
 INDEXED = "indexed"
 IMAGE_ONLY = "image_only"
 DUPLICATE = "duplicate"
@@ -221,13 +224,23 @@ class Index:
         self.conn.execute("COMMIT")
 
     def has_book(self, book: str) -> bool:
-        """Has this archive already been processed?"""
+        """Has this archive already been processed, to the end? One that was
+        started and never finished -- Museion closed, the computer slept --
+        has some of its documents, and must not pass for done."""
         (n,) = self.conn.execute(
-            "SELECT (SELECT COUNT(*) FROM books WHERE book = ?1)"
-            " + (SELECT COUNT(*) FROM docs WHERE book = ?1)",
-            (book,),
+            "SELECT ((SELECT COUNT(*) FROM books WHERE book = ?1)"
+            " + (SELECT COUNT(*) FROM docs WHERE book = ?1))"
+            " * NOT EXISTS (SELECT 1 FROM meta WHERE key = ?2)",
+            (book, UNFINISHED + book),
         ).fetchone()
         return n > 0
+
+    def start_book(self, book: str) -> None:
+        """Begin processing an archive afresh: whatever an earlier,
+        unfinished run left of it goes, and it counts as unfinished until
+        mark_book_done."""
+        self.forget_book(book)
+        self.conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, '1')", (UNFINISHED + book,))
 
     def processed_books(self) -> list[str]:
         """Archives this index holds content for. Anything else in the
@@ -239,7 +252,9 @@ class Index:
 
     def mark_book_done(self, book: str) -> None:
         """Record that an archive has been fully processed."""
-        self.conn.execute("INSERT OR REPLACE INTO books (book) VALUES (?)", (book,))
+        with self._transaction():
+            self.conn.execute("INSERT OR REPLACE INTO books (book) VALUES (?)", (book,))
+            self.conn.execute("DELETE FROM meta WHERE key = ?", (UNFINISHED + book,))
 
     def forget_book(self, book: str) -> None:
         with self._transaction():
@@ -248,6 +263,7 @@ class Index:
             )
             self.conn.execute("DELETE FROM docs WHERE book = ?", (book,))
             self.conn.execute("DELETE FROM books WHERE book = ?", (book,))
+            self.conn.execute("DELETE FROM meta WHERE key = ?", (UNFINISHED + book,))
 
     def _duplicate_of(self, sha: str) -> str | None:
         """The title of a document with identical extracted text, if one is
