@@ -18,7 +18,7 @@ import json
 import re
 from pathlib import Path
 
-from museion import catalog
+from museion import catalog, disk
 
 # The shelves the Library tab has headings for (museion/ui/library.js).
 CATEGORIES = ("survival", "medicine", "making", "reference")
@@ -99,5 +99,5 @@ def add_source(path: Path, title: str, category: str, description: str = "",
         raise ValueError(f"{target.name} is already in the catalogue")
     text = source_toml(path, title, category, description)
     # Unix line endings on every system, as the other entries have them.
-    target.write_text(text, encoding="utf-8", newline="\n")
+    disk.write_text(target, text)
     return target

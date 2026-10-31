@@ -55,6 +55,21 @@ class DiskTest(unittest.TestCase):
     def test_dir_size_of_a_missing_folder_is_zero(self):
         self.assertEqual(disk.dir_size(Path(tempfile.gettempdir(), "museion-no-such-folder")), 0)
 
+    def test_a_file_written_safely_is_the_old_one_or_the_new_one(self):
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp, "deeper", "config.json")
+            disk.write_text(path, '{\n  "a": 1\n}')
+            self.assertEqual(path.read_bytes(), b'{\n  "a": 1\n}')  # LF on Windows too
+            # Cut off before the new file takes the old one's place: the old
+            # one is still whole.
+            with mock.patch("os.replace", side_effect=OSError("drive pulled out")), self.assertRaises(OSError):
+                disk.write_text(path, '{"a": 2}')
+            self.assertEqual(path.read_bytes(), b'{\n  "a": 1\n}')
+            disk.write_text(path, '{"a": 3}')
+            self.assertEqual(path.read_text(encoding="utf-8"), '{"a": 3}')
+            self.assertEqual(sorted(p.name for p in path.parent.iterdir()), ["config.json"])
+
     def test_volume_names(self):
         self.assertEqual(disk.volume_name(Path(r"E:\museion-library")), "E:")
         self.assertEqual(disk.volume_name(Path("/home/x")), "/")

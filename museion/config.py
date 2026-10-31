@@ -18,6 +18,8 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from museion import disk
+
 # The Rust version's identifier, which names its folder. Kept, so a computer
 # it set up keeps its settings.
 APP_ID = "org.museion.desktop"
@@ -128,8 +130,7 @@ class Config:
             for name in PATH_FIELDS:
                 out[name] = rel(out[name])
             out["extra_dirs"] = [rel(d) for d in out["extra_dirs"]]
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(out, indent=2), encoding="utf-8")
+        disk.write_text(path, json.dumps(out, indent=2))
 
     def resolved(self, base: Path) -> Config:
         """This config with every relative path made absolute against `base`:

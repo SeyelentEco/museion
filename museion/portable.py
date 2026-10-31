@@ -35,7 +35,7 @@ import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from museion import catalog, config, hardware
+from museion import catalog, config, disk, hardware
 from museion.config import Config
 
 MARKER = "museion-portable"
@@ -159,8 +159,7 @@ class MachineProfile:
         out = asdict(self)
         for name in ("llama_exe", "chat_model"):
             out[name] = str(out[name]) if out[name] is not None else None
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(out, indent=2), encoding="utf-8")
+        disk.write_text(path, json.dumps(out, indent=2))
 
     def absorb(self, cfg: Config) -> None:
         """Take the machine-specific fields from a config. A different chat

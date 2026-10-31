@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import time
 from pathlib import Path
 
 
@@ -72,3 +73,33 @@ def gb(n: int) -> str:
     if g >= 1:
         return f"{g:.0f} GB" if g >= 10 else f"{g:.1f} GB"
     return f"{round(n / 1048576)} MB"
+
+
+def write_text(path: Path, text: str) -> None:
+    """Write a small text file so that it is either the old file or the new
+    one, never half of each: the text goes to a temporary file beside it,
+    which then replaces it. A drive pulled out or filled up during a plain
+    write left config.json empty, and every setting with it.
+
+    Line endings are Unix ones on every system, so a drive or a checkout
+    reads the same on Windows and on a Mac."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_name(path.name + ".tmp")
+    with open(temp, "wb") as f:
+        f.write(text.encode("utf-8"))
+        f.flush()
+        try:
+            os.fsync(f.fileno())
+        except OSError:
+            pass  # some USB disks refuse it; the replace below still helps
+    for attempt in range(10):
+        try:
+            os.replace(temp, path)
+            return
+        except PermissionError:
+            # Windows refuses while another program (a virus scanner, an
+            # editor) has the file open for a moment.
+            if attempt == 9:
+                raise
+            time.sleep(0.1)
