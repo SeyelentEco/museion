@@ -87,6 +87,18 @@ NO_MORE_TOOLS = (
 # kangarooing and all -- with no [n] anywhere, and was labelled general
 # knowledge. The model is asked to point at its sources, and told plainly that
 # an answer that owes them nothing may stand as it is.
+# Said once to a tool call that came back as text, while tools are still on
+# offer. Withholding them instead, as before, meant a calculation written out
+# as text was never made, and the next turn did the sum in prose unchecked.
+CALL_AGAIN = (
+    "That tool call came through as text and did not run. Make the call again "
+    "with the tool, or answer if you have what you need."
+)
+
+# What is shown when the model's last word was still a tool call written out
+# as text: that is not an answer.
+NO_ANSWER = "The model did not manage an answer to this. Try asking again, perhaps in other words."
+
 CITE_OR_STAND = (
     "Your answer cites no passages. Every claim taken from the passages above must "
     "carry that passage's number, like [2]. Rewrite the answer with those citations, "
@@ -379,6 +391,7 @@ class Asker:
 
         repaired = False
         math_repaired = False
+        leak_repaired = False
         round = 0
         room = self.room_for_searches()
         while True:
@@ -430,6 +443,12 @@ class Asker:
             # move every real citation after it onto the wrong source.
             cited = [n for n in cited_numbers(text) if n <= len(sources)]
             leaked = looks_like_leaked_tool_call(text)
+            if leaked and not leak_repaired and round < tuning.max_rounds:
+                leak_repaired = True
+                on_token(DISCARD)
+                messages.append(llama.assistant(text))
+                messages.append(llama.user(CALL_AGAIN))
+                continue
             if not repaired and (leaked or (not cited and sources)):
                 # One more turn, tools withheld: cite the passages, or answer
                 # at all if what came back was a tool call as text. What was
@@ -441,6 +460,10 @@ class Asker:
                 round = tuning.max_rounds + 1
                 continue
 
+            if leaked:
+                on_token(DISCARD)
+                on_token(NO_ANSWER)
+                return Answer(NO_ANSWER, [], reranked, GENERAL_KNOWLEDGE, calculations)
             used = [sources[n - 1] for n in cited]
             if used:
                 basis = LIBRARY_AND_CALCULATION if calculations else LIBRARY

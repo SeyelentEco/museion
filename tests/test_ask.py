@@ -156,11 +156,23 @@ class AskTest(unittest.TestCase):
         self.assertEqual(answer.basis, ask.GENERAL_KNOWLEDGE)
         self.assertEqual(answer.sources, [])
 
-    def test_a_tool_call_returned_as_text_is_told_to_answer(self):
-        chat = ScriptedChat(says("<tool_call>\n<function=search_library>"), says("Boil it [1]."))
-        answer = asker(chat).ask("purify water")
-        self.assertEqual(chat.calls[1][0][-1]["content"], ask.NO_MORE_TOOLS)
-        self.assertEqual(answer.text, "Boil it [1].")
+    def test_a_tool_call_returned_as_text_is_asked_for_again_with_the_tools(self):
+        leak = says('<tool_call>\n{"name": "calculate", "arguments": {"expression": "55*0.25"}}')
+        chat = ScriptedChat(leak, calls("calculate", {"expression": "55*0.25"}), says("Use 13.75 tsp [2]."))
+        answer = asker(chat).ask("bleach for 55 gallons")
+        messages, tools = chat.calls[1]
+        self.assertEqual(messages[-1]["content"], ask.CALL_AGAIN)
+        self.assertIsNotNone(tools, "the calculator must still be on offer")
+        self.assertEqual([(c.expression, c.result) for c in answer.calculations], [("55*0.25", "13.75")])
+
+    def test_a_model_that_keeps_writing_tool_calls_as_text_gives_no_answer_not_the_call(self):
+        leak = says("<tool_call>\n<function=search_library>")
+        chat = ScriptedChat(leak, leak, leak)
+        seen = []
+        answer = asker(chat).ask("purify water", on_token=seen.append)
+        self.assertEqual(chat.calls[2][0][-1]["content"], ask.NO_MORE_TOOLS)
+        self.assertEqual(answer.text, ask.NO_ANSWER)
+        self.assertEqual(seen[-2:], [ask.DISCARD, ask.NO_ANSWER])
 
     def test_narration_before_a_tool_call_is_discarded_and_the_calculator_is_ground_truth(self):
         chat = ScriptedChat(
