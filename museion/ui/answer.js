@@ -110,15 +110,28 @@ export function renderAnswer(container, text) {
   flushPara();
 }
 
+// The italic match needs lookbehind, which Safari before 16.4 cannot compile;
+// as a regex literal it stopped the whole page from loading there. Built at
+// run time, a browser without it draws no italics and everything else works.
+const INLINE = (() => {
+  const bold = String.raw`\*\*[^*]+\*\*`;
+  const code = '`[^`]+`';
+  const italic = String.raw`(?<![*\w])\*(?![\s*])[^*\n]+(?<![\s*])\*(?!\w)`;
+  const cites = String.raw`\[\d+(?:\]\s*,?\s*\[\d+)*\]|\[\d+(?:,\s*\d+)*\]`;
+  try {
+    return new RegExp(`(${bold}|${code}|${italic}|${cites})`, 'g');
+  } catch {
+    return new RegExp(`(${bold}|${code}|${cites})`, 'g');
+  }
+})();
+
 /**
  * Inline markup: **bold**, *italic*, `code`, and [n] citation chips. An
  * italic span may not start or end with a space, so the multiplication in
  * "17 * 23 = **391**" stays a multiplication.
  */
 function inline(target, text) {
-  const tokens = text.split(
-    /(\*\*[^*]+\*\*|`[^`]+`|(?<![*\w])\*(?![\s*])[^*\n]+(?<![\s*])\*(?!\w)|\[\d+(?:\]\s*,?\s*\[\d+)*\]|\[\d+(?:,\s*\d+)*\])/g,
-  );
+  const tokens = text.split(INLINE);
   for (const t of tokens) {
     if (!t) continue;
     if (t.startsWith('**') && t.endsWith('**')) {
