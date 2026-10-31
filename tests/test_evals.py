@@ -46,8 +46,14 @@ class ScoreTest(unittest.TestCase):
         self.assertTrue(evals.score(c, "Do this:\n1. water\n2. shelter\n3. food\n", "library", [], [])[0].passed)
         self.assertFalse(evals.score(c, "Just one paragraph.", "library", [], [])[0].passed)
 
-    def test_prose_numbers_with_thousands_separators(self):
-        self.assertEqual(evals.numbers_in("about 1,622 gallons and 2.5 days."), [1622.0, 2.5])
+    def test_a_number_only_in_the_prose_is_not_a_calculation(self):
+        c = case(expect_number=evals.NumberCheck(41.84, 0.1))
+        self.assertFalse(evals.score(c, "26 miles is about 41.8 kilometres.", "general_knowledge", [], [])[0].passed)
+
+    def test_a_source_page_number_is_not_a_wrong_figure_in_the_answer(self):
+        c = case(must_not_contain=["343"])
+        results = evals.score(c, "Add 67.8 ml [1].", "library", ["Water Treatment (p.343) [zimgit]"], [])
+        self.assertTrue(results[0].passed, results)
 
     def test_basis_alternatives_and_sources(self):
         c = case(expect_basis="library | library_and_calculation", source_from="where there is no doctor", min_sources=1)

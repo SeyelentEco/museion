@@ -183,15 +183,16 @@ def score(case: Case, answer: str, basis: str, sources: list[str], calcs: list[C
         out.append(CheckResult("expect_basis", basis in wanted, f"wanted {case.expect_basis}, got {basis}"))
     if case.expect_number is not None:
         n = case.expect_number
-        # The calculator's results are the trustworthy place to look; fall
-        # back to numbers in the prose so a pre-checked "17 * 23 = 391" counts.
+        # Only the calculator's results count, as the benchmark says: a
+        # number in the prose passed "26 miles is about 41.8 km" with no
+        # calculation at all, which is the failure this check exists to find.
+        # A question that is nothing but arithmetic logs its calculation too.
         found = []
         for c in calcs:
             try:
                 found.append(float(c.result))
             except ValueError:
                 pass
-        found += numbers_in(answer)
         ok = any(abs(v - n.value) <= n.tolerance + 1e-9 for v in found)
         out.append(CheckResult("expect_number", ok, f"wanted {n.value} ± {n.tolerance}, results {found[:6]}"))
     if case.min_sources is not None:
@@ -206,7 +207,9 @@ def score(case: Case, answer: str, basis: str, sources: list[str], calcs: list[C
         out.append(CheckResult("source_from", ok,
                                f"{'a' if ok else 'no'} source matches {json.dumps(case.source_from)}"))
     if case.must_not_contain:
-        bad = [t for t in case.must_not_contain if t.lower() in hay]
+        # The answer alone: a source cited at "(p.343)" is not the wrong
+        # figure "343" in the answer.
+        bad = [t for t in case.must_not_contain if t.lower() in answer.lower()]
         out.append(CheckResult("must_not_contain", not bad, f"found {bad}" if bad else "clean"))
     if not out:
         out.append(CheckResult("answered", bool(answer.strip()), "no checks declared"))
@@ -217,25 +220,6 @@ def is_step(line: str) -> bool:
     """A bulleted or numbered line: "- ", "* ", "• ", or "3. ..."."""
     t = line.lstrip()
     return t.startswith(("- ", "* ", "• ")) or (t[:1].isascii() and t[:1].isdigit() and "." in t)
-
-
-def numbers_in(text: str) -> list[float]:
-    """The numbers written in prose, reading "1,622" as one thousand six
-    hundred and twenty-two."""
-    out = []
-    current = ""
-    for c in text + " ":
-        if "0" <= c <= "9" or (c == "." and current):
-            current += c
-        elif c == "," and current:
-            continue  # thousands separator
-        elif current:
-            try:
-                out.append(float(current.rstrip(".")))
-            except ValueError:
-                pass
-            current = ""
-    return out
 
 
 def save_run(directory: Path, run: Run) -> Path:
