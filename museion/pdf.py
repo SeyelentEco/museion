@@ -140,7 +140,12 @@ def _page_text(lib: ctypes.CDLL, doc: int, index: int) -> str:
 def normalise(raw: str) -> str:
     """Collapse the whitespace and hyphenation artefacts that PDF extraction
     leaves behind, so that indexed terms match what a person would type."""
-    dehyphenated = raw.replace("-\r\n", "").replace("-\n", "")
+    # pdfium hands back a word hyphenated across a line break as
+    # "purifi\ufffecation", with U+FFFE in place of the hyphen and the break.
+    # Left in, it split every such word in two for the index, so a search for
+    # "purification" missed the page.
+    dehyphenated = (raw.replace("\ufffe\r\n", "").replace("\ufffe\n", "").replace("\ufffe", "")
+                    .replace("-\r\n", "").replace("-\n", ""))
     return " ".join(dehyphenated.split())
 
 

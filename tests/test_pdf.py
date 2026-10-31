@@ -15,6 +15,9 @@ class NormaliseTest(unittest.TestCase):
     def test_joins_words_split_across_lines(self):
         self.assertEqual(normalise("purifi-\ncation of water"), "purification of water")
         self.assertEqual(normalise("purifi-\r\ncation of water"), "purification of water")
+        # How pdfium itself marks a hyphen at a line break.
+        self.assertEqual(normalise("purifi\ufffecation of water"), "purification of water")
+        self.assertEqual(normalise("purifi\ufffe\r\ncation of water"), "purification of water")
 
     def test_collapses_runs_of_whitespace(self):
         self.assertEqual(normalise("boil   the\t\twater\n\n"), "boil the water")
@@ -43,6 +46,10 @@ class ExtractTest(unittest.TestCase):
         got = self.extractor.extract(sample_pdf(["first", "", "third"]))
         self.assertEqual(got.page_count, 3)
         self.assertEqual([p.number for p in got.pages], [1, 3])
+
+    def test_a_word_hyphenated_across_lines_comes_out_whole(self):
+        got = self.extractor.extract(sample_pdf(["Use purifi-) Tj 0 -16 Td (cation tablets"]))
+        self.assertEqual(got.pages[0].text, "Use purification tablets")
 
     def test_a_file_that_is_not_a_pdf_says_so(self):
         with self.assertRaisesRegex(ValueError, "not a PDF"):
