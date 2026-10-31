@@ -141,9 +141,11 @@ def start_chat(state: AppState, cfg: Config, model: Path, extra: list[str], gpu_
         # model still loaded, until Stop and then Start were pressed.
         sup.stop(CHAT)
         time.sleep(2)
-    if sup.adopt(CHAT, cfg.chat_port, health, model):
-        return
-    sup.start_llama(CHAT, cfg.llama_exe, model, cfg.chat_port, gpu_layers, flags)
+    if not sup.adopt(CHAT, cfg.chat_port, health, model):
+        sup.start_llama(CHAT, cfg.llama_exe, model, cfg.chat_port, gpu_layers, flags)
+    # Waited for even when already running: one still loading after an
+    # earlier Start timed out (a big model from a slow USB stick) was
+    # otherwise announced as ready at once.
     sup.wait_ready(CHAT, health, 600)
 
 
