@@ -16,7 +16,7 @@ from pathlib import Path
 from museion import catalog, fit, hardware
 from museion.appstate import AppState, UiError, file_name, local
 from museion.config import Config
-from museion.sidecar import CHAT, KIWIX, RERANKER, llama_args
+from museion.sidecar import CHAT, KIWIX, RERANKER, kiwix_args, llama_args
 
 KIWIX_HEALTH = "/catalog/v2/entries"
 LLAMA_HEALTH = "/v1/models"
@@ -64,6 +64,11 @@ def start_services(state: AppState) -> None:
 
     sup = state.supervisor
     kiwix_health = local(cfg.kiwix_port) + KIWIX_HEALTH
+    # A helper started over other settings -- the library moved to a bigger
+    # disk, another reranker chosen -- is restarted, not kept as it was.
+    started = sup.started_with(KIWIX)
+    if started and started != kiwix_args(cfg.kiwix_exe, cfg.content_dirs(), cfg.kiwix_port):
+        sup.stop(KIWIX)
     if sup.adopt(KIWIX, cfg.kiwix_port, kiwix_health):
         say("Content server already running; using it.")
     else:
@@ -72,15 +77,25 @@ def start_services(state: AppState) -> None:
         sup.wait_ready(KIWIX, kiwix_health, 60)
 
     reranker_health = local(cfg.reranker_port) + LLAMA_HEALTH
+    started = sup.started_with(RERANKER)
+    if started and (not cfg.reranker_model or
+                    started != llama_args(cfg.llama_exe, cfg.reranker_model, cfg.reranker_port, 0, RERANKER_ARGS)):
+        sup.stop(RERANKER)
     if cfg.reranker_model:
         if sup.adopt(RERANKER, cfg.reranker_port, reranker_health, cfg.reranker_model):
             say("Reranker already running; using it.")
         else:
             say("Starting the reranker…")
-            # GPU layers deliberately 0: on a 12 GB card the chat model wants
-            # all of it, and this costs only seconds on CPU.
-            sup.start_llama(RERANKER, cfg.llama_exe, cfg.reranker_model, cfg.reranker_port, 0, RERANKER_ARGS)
-            sup.wait_ready(RERANKER, reranker_health, 180)
+            try:
+                # GPU layers deliberately 0: on a 12 GB card the chat model
+                # wants all of it, and this costs only seconds on CPU.
+                sup.start_llama(RERANKER, cfg.llama_exe, cfg.reranker_model, cfg.reranker_port, 0, RERANKER_ARGS)
+                sup.wait_ready(RERANKER, reranker_health, 180)
+            except (RuntimeError, OSError) as e:
+                # The reranker sharpens answers; it is not needed for one.
+                # Failing here kept the chat model from starting at all.
+                sup.stop(RERANKER)
+                say(f"The reranker did not start ({e}). Answering without it.")
 
     if not cfg.chat_model:
         raise UiError("no chat model configured")

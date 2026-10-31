@@ -113,6 +113,35 @@ class MeasureFitTest(Settings):
         self.assertEqual(layers, 41)
 
 
+class StartServicesTest(Settings):
+    def test_a_reranker_that_will_not_start_does_not_stop_the_chat_model(self):
+        cfg = self.state.config()
+        cfg.kiwix_exe = self.dir / "kiwix-serve"
+        cfg.library_dir = self.dir
+        cfg.reranker_model = self.dir / self.small.filename
+        self.state.save_config(cfg)
+        said = []
+        self.state.emit = lambda event, message: said.append(message)
+
+        class Sup(FakeSupervisor):
+            def adopt(sup, role, port, health_url, expect_model=None):
+                return role == sidecar.KIWIX
+
+            def start_llama(sup, role, exe, model, port, gpu_layers=0, extra=None):
+                if role == sidecar.RERANKER:
+                    raise RuntimeError("port 8081 is in use by another program")
+                super().start_llama(role, exe, model, port, gpu_layers, extra)
+
+            def started_with(sup, role):
+                return None
+        self.state.supervisor = Sup()
+        with mock.patch.object(services, "fit_if_due"):
+            services.start_services(self.state)
+        self.assertIn(("start", self.small.filename, 37), self.state.supervisor.calls)
+        self.assertTrue(any("Answering without it" in m for m in said), said)
+        self.assertEqual(said[-1], "Ready.")
+
+
 class StartChatTest(Settings):
     def test_a_chat_model_running_as_configured_is_kept(self):
         self.start()

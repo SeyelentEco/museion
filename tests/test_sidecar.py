@@ -7,6 +7,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 from pathlib import Path
 
 from museion import sidecar
@@ -99,6 +100,23 @@ class AdoptTest(unittest.TestCase):
         # Leaving the app does not kill a server that was not ours.
         sup.release_all()
         self.assertTrue(sidecar.port_open(self.port))
+
+    def test_another_program_on_the_port_is_named_not_taken_for_the_helper(self):
+        sup = sidecar.Supervisor()
+        with mock.patch.object(sidecar, "PORT_RELEASE_SECONDS", 0.5), \
+                self.assertRaisesRegex(RuntimeError, f"port {self.port} is in use by another program"):
+            sup.start(sidecar.CHAT, [sys.executable, "-c", "pass"], self.port)
+        self.assertFalse(sup.is_running(sidecar.CHAT))
+
+    def test_an_adopted_server_with_another_model_is_not_kept(self):
+        url = f"http://127.0.0.1:{self.port}/"
+        sup = sidecar.Supervisor()
+        self.assertTrue(sup.adopt(sidecar.CHAT, self.port, url, Path("qwen-chat.gguf")))
+        # Settings chose another model since.
+        with mock.patch.object(sidecar.Sidecar, "kill") as killed:
+            self.assertFalse(sup.adopt(sidecar.CHAT, self.port, url, Path("other-model.gguf")))
+        killed.assert_called_once()
+        self.assertFalse(sup.is_running(sidecar.CHAT))
 
 
 @unittest.skipIf(sys.platform == "darwin", "macOS offers no way to tie a child to its parent's life")

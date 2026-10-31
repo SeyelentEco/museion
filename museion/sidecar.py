@@ -97,6 +97,20 @@ def keep_services() -> bool:
     return os.environ.get("MUSEION_KEEP_SERVICES", "").lower() in ("1", "true")
 
 
+# How long a port may stay taken after its helper was stopped before starting
+# another helper there is refused.
+PORT_RELEASE_SECONDS = 5.0
+
+
+def kiwix_args(exe: Path, dirs: list[Path], port: int) -> list[str]:
+    """kiwix-serve's command line, over every archive in the given folders."""
+    zims = sorted(p for d in dirs if d.is_dir() for p in d.iterdir() if p.suffix == ".zim")
+    if not zims:
+        shown = ", ".join(str(d) for d in dirs)
+        raise RuntimeError(f"no .zim archives in {shown}. Fetch some content first.")
+    return [str(exe), "--port", str(port), *map(str, zims)]
+
+
 def port_open(port: int) -> bool:
     """Is anything accepting connections on the port? A quick TCP connect; no
     request is made, so a server mid-load still counts as present."""
@@ -142,7 +156,11 @@ def kill_listener(port: int) -> None:
                 )
     else:
         try:
-            out = subprocess.run(["lsof", "-ti", f":{port}"], capture_output=True, text=True).stdout
+            # The server listening, only: "-ti :PORT" also listed every
+            # program connected to it, and the browser showing an article
+            # from kiwix-serve was sent SIGTERM along with it.
+            out = subprocess.run(["lsof", "-nP", "-t", f"-iTCP:{port}", "-sTCP:LISTEN"],
+                                 capture_output=True, text=True).stdout
         except FileNotFoundError:
             return
         for pid in out.split():
@@ -202,7 +220,15 @@ class Supervisor:
         not adopted. This is what makes a restart of the app cost seconds
         instead of a model reload, when the servers were left up."""
         if self.is_running(role):
-            return True
+            if expect_model is None or self.started_with(role) is not None:
+                return True
+            # Adopted earlier: still the model wanted? If Settings chose
+            # another since, this one goes, rather than "Ready." with the old
+            # model loaded.
+            body = http_ok(health_url)
+            if body is not None and expect_model.name.lower() in body.lower():
+                return True
+            self.stop(role)
         body = http_ok(health_url)
         if body is None:
             return False
@@ -218,11 +244,7 @@ class Supervisor:
         """Start kiwix-serve over every archive in the given folders."""
         if self.is_running(KIWIX):
             return
-        zims = sorted(p for d in dirs if d.is_dir() for p in d.iterdir() if p.suffix == ".zim")
-        if not zims:
-            shown = ", ".join(str(d) for d in dirs)
-            raise RuntimeError(f"no .zim archives in {shown}. Fetch some content first.")
-        self.start(KIWIX, [str(exe), "--port", str(port), *map(str, zims)], port)
+        self.start(KIWIX, kiwix_args(exe, dirs, port), port)
 
     def start_llama(
         self, role: str, exe: Path, model: Path, port: int,
@@ -242,6 +264,18 @@ class Supervisor:
 
     def start(self, role: str, args: list[str], port: int) -> None:
         """Start any helper from a full command line and supervise it."""
+        # Another program on the port would answer the health check in the
+        # moment before this helper fails to bind and exits: "Ready." with
+        # someone else's server, or a wrong guess about memory. A helper just
+        # stopped may hold the port for a moment longer, so wait for that.
+        deadline = time.monotonic() + PORT_RELEASE_SECONDS
+        while port_open(port):
+            if time.monotonic() > deadline:
+                raise RuntimeError(
+                    f"port {port} is in use by another program, so {LABELS.get(role, role)} cannot "
+                    f"start there. Close that program, or give Museion another port in config.json."
+                )
+            time.sleep(0.25)
         owned = not keep_services()
         try:
             process = self._spawner.submit(_spawn, args, owned).result()
