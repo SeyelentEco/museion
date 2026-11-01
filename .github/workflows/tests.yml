@@ -1,0 +1,96 @@
+# Museion's tests, on the portable Python that is carried on the drive, with
+# the same pinned helper programs, on all three platforms.
+#
+# The tests use a tiny model written by museion/tiny_gguf.py, so nothing large
+# is downloaded. What they prove is the plumbing: the portable Python has
+# SQLite FTS5, pdfium loads through ctypes, llama-server starts, answers and
+# stops, and a helper dies when Museion is killed outright (except on macOS,
+# which has no way to do that).
+name: tests
+on:
+  pull_request:
+    paths-ignore: ['docs/**', '**.md']
+  push:
+    branches: [main]
+    paths-ignore: ['docs/**', '**.md']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: cpython-3.12.12+20251014-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz
+            python_sha256: c74addcd1b033a6e4d60ead3ab47fcc995569027e01d3061c4a934f363c4a0cf
+            pdfium: pdfium-linux-x64.tgz
+            pdfium_sha256: 685f7930cd184ea22cd77afe707c1cf53b173d18118b6e16cb213c9277d7cdc3
+            llama: llama-b10712-bin-ubuntu-x64.tar.gz
+            llama_sha256: 2ab07b8e85b4f00109ad00f4eb713b7265b2efc2e34664c10fb0e876d06c0d8e
+          - os: windows-latest
+            python: cpython-3.12.12+20251014-x86_64-pc-windows-msvc-install_only_stripped.tar.gz
+            python_sha256: 3c8b9b10a933909c98b9916297e2093b24a9c2abaa23df1c2622c2bfe052cb94
+            pdfium: pdfium-win-x64.tgz
+            pdfium_sha256: adac8ce034015427b5daa81f8eeddfcc8e84bc2a9f036f007890ff18bd4388c4
+            llama: llama-b10712-bin-win-cpu-x64.zip
+            llama_sha256: d7275c1aacf7f795d13e48ce006b73bea6d92352199a204d097fae2d6831f3cf
+          - os: macos-latest
+            python: cpython-3.12.12+20251014-aarch64-apple-darwin-install_only_stripped.tar.gz
+            python_sha256: 84cb7acbf75264982c8bdd818bfa1ff0f1eb76007b48a5f3e01d28633b46afdf
+            pdfium: pdfium-mac-arm64.tgz
+            pdfium_sha256: 994600fa28974ce09a1c51c35039e808a6bc8ea3839050322c101ab229ad5c96
+            llama: llama-b10712-bin-macos-arm64.tar.gz
+            llama_sha256: 8b20c140a04c932596d91bc6b6c23c0f3e67f939b5d621000d4194bfb6ad48fc
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch the portable Python and the helper programs
+        env:
+          PY: ${{ matrix.python }}
+          PY_SHA: ${{ matrix.python_sha256 }}
+          PDFIUM: ${{ matrix.pdfium }}
+          PDFIUM_SHA: ${{ matrix.pdfium_sha256 }}
+          LLAMA: ${{ matrix.llama }}
+          LLAMA_SHA: ${{ matrix.llama_sha256 }}
+        run: |
+          set -euo pipefail
+          # The runner's own Python only checks hashes and unzips; Museion
+          # itself runs on the portable one.
+          HOST_PY=$(command -v python3 || command -v python)
+          fetch() {
+            curl -fsSL --retry 3 -o "$2" "$1"
+            "$HOST_PY" -c "import hashlib,sys; d=hashlib.sha256(open(sys.argv[1],'rb').read()).hexdigest(); sys.exit(0 if d==sys.argv[2] else 'sha256 mismatch for '+sys.argv[1]+': '+d)" "$2" "$3"
+          }
+          mkdir -p .ci && cd .ci
+          fetch "https://github.com/astral-sh/python-build-standalone/releases/download/20251014/${PY//+/%2B}" python.tar.gz "$PY_SHA"
+          fetch "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium/8021/$PDFIUM" pdfium.tgz "$PDFIUM_SHA"
+          fetch "https://github.com/ggml-org/llama.cpp/releases/download/b10712/$LLAMA" "$LLAMA" "$LLAMA_SHA"
+          tar xzf python.tar.gz
+          mkdir pdfium && tar xzf pdfium.tgz -C pdfium
+          mkdir llama
+          case "$LLAMA" in
+            *.zip) "$HOST_PY" -m zipfile -e "$LLAMA" llama ;;
+            *) tar xzf "$LLAMA" -C llama ;;
+          esac
+          # Native Windows programs need D:/a/... paths, not Git Bash's /d/a/...
+          ROOT=$(cygpath -m "$PWD" 2>/dev/null || pwd)
+          if [ -f python/python.exe ]; then PYTHON="$ROOT/python/python.exe"; else PYTHON="$ROOT/python/bin/python3"; fi
+          SERVER=$(find llama -type f \( -name llama-server -o -name llama-server.exe \) | head -n 1)
+          echo "MUSEION_PYTHON=$PYTHON" >> "$GITHUB_ENV"
+          echo "MUSEION_PDFIUM=$ROOT/pdfium" >> "$GITHUB_ENV"
+          echo "MUSEION_LLAMA_SERVER=$ROOT/$SERVER" >> "$GITHUB_ENV"
+          echo "python: $PYTHON"; echo "llama-server: $ROOT/$SERVER"
+
+      - name: Tests
+        run: '"$MUSEION_PYTHON" -m unittest discover -s tests -v'
+
+      - name: Doctor
+        run: '"$MUSEION_PYTHON" -m museion.doctor --pdfium "$MUSEION_PDFIUM" --llama-server "$MUSEION_LLAMA_SERVER"'

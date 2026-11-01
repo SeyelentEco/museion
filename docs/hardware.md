@@ -6,22 +6,21 @@ model that fits, and you can always override the choice.
 Check what it sees on your machine with:
 
 ```bash
-museion hardware
+python -m museion hardware
 ```
 
 On the machine this was developed against that reports an RTX 3060, 12,288 MB of VRAM,
 65,276 MB of system RAM, and the Capable tier.
 
-Detection, tiering, and the offload fit are implemented — "Fit model to this machine" on
-the Library tab, or `museion fit --model <gguf>` from the command line. Each tier has a
-model manifest under `models/` with an upstream checksum, fetched like any other content:
+Detection, tiering, and the offload fit are implemented — "Fit model to this machine"
+under Settings, or `python -m museion fit --model <gguf>` from the command line. Each tier
+has a model manifest under `models/` with an upstream checksum. The set-up screen picks
+the model for the detected tier and fetches it; by hand, `python -m museion hardware`
+names the tier and this fetches its model like any other content:
 
 ```bash
-node scripts/fetch.js qwen3.6-35b-a3b-q4 --dest /path/to/models
+python -m museion fetch qwen3.6-35b-a3b-q4 --dest /path/to/models
 ```
-
-Choosing and fetching the model *automatically* from the detected tier is still to come;
-for now `museion hardware` tells you the tier and you pick the matching manifest.
 
 ## The counterintuitive part
 
@@ -53,7 +52,7 @@ than the biggest dense model that fits.
 | 0 | CPU only, or under 6 GB VRAM | ~4B dense, Q4_K_M |
 | 1 | 8–12 GB VRAM | ~30B-A3B-class MoE, Q4_K_M, experts offloaded |
 | 2 | 16–24 GB VRAM | Same MoE, more layers resident, larger context |
-| 3 | Apple Silicon, 32 GB+ unified | Larger MoE |
+| 3 | Apple Silicon: 32 GB+ unified for the 35B at Q4, 64 GB+ for Q8; less gets tier 0 | Larger MoE |
 
 Detection: `nvidia-smi` on Windows, falling back to WMI/DXGI for AMD and Intel (Vulkan
 build), else CPU. On macOS, architecture plus `sysctl hw.memsize` selects the Metal build

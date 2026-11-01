@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Museion</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <!--
+      The Museion window. Plain HTML; the behaviour is in main.js and the
+      files it imports, one per tab. Served by museion/app.py, which also
+      answers the commands the page sends (see api.js).
+    -->
+    <div id="app">
+      <header>
+        <div class="brand">
+          <span class="mark"></span>
+          <span class="name">Museion</span>
+        </div>
+        <nav>
+          <button class="tab" data-tab="ask" aria-current="true">Ask</button>
+          <button class="tab" data-tab="library">Library</button>
+          <button class="tab" data-tab="evals">Evals</button>
+          <button class="tab" data-tab="setup">Settings</button>
+        </nav>
+        <div id="service-state" class="service-state" title="Local services — green running, amber starting, grey stopped">
+          <span class="dot" data-svc="kiwix" title="Content server (kiwix-serve): stopped"></span>
+          <span class="dot" data-svc="chat" title="Chat model (llama-server): stopped"></span>
+          <span class="dot" data-svc="rerank" title="Reranker (llama-server): stopped"></span>
+        </div>
+        <button id="quit" class="quit" type="button" title="Stop Museion and the helpers it started">Quit</button>
+      </header>
+
+      <main>
+        <!-- Ask -->
+        <section id="panel-ask" class="panel active">
+          <div id="transcript" class="transcript">
+            <div id="boot-status" class="boot-status" hidden></div>
+            <div class="empty" id="ask-empty">
+              <h1>Ask the library</h1>
+              <p>
+                Answers come only from the archives on this disk, with citations you can open
+                and read yourself. If the library doesn't cover something, it will say so.
+              </p>
+              <ul class="examples" id="examples">
+                <li>How much bleach makes a gallon of water safe to drink?</li>
+                <li>How do I safely can green beans to avoid botulism?</li>
+                <li>Treating a deep wound when there is no doctor</li>
+                <li>How do I tie a bowline?</li>
+              </ul>
+            </div>
+          </div>
+          <form id="ask-form" class="composer">
+            <input
+              id="question"
+              type="text"
+              autocomplete="off"
+              placeholder="Ask a question…"
+              aria-label="Question"
+            />
+            <button id="ask-send" type="submit">Ask</button>
+          </form>
+        </section>
+
+        <!-- Library: what you have, what you could have, and the reader -->
+        <section id="panel-library" class="panel">
+          <div class="library">
+            <aside class="shelf">
+              <div class="space" id="shelf-space" hidden></div>
+              <h2>In your library</h2>
+              <div id="shelf-have"><p class="empty-note">Loading…</p></div>
+              <h2>Available to fetch</h2>
+              <div id="shelf-get"></div>
+              <div class="progress" id="cat-progress" hidden>
+                <div class="bar"><div class="fill" id="cat-fill"></div></div>
+                <div class="label" id="cat-label"></div>
+              </div>
+            </aside>
+            <div class="reader">
+              <div class="browse-bar" id="browse-bar" hidden>
+                <button id="browse-back" type="button" title="Back to the previous page in the reader">Back</button>
+                <button id="browse-home" type="button">Library home</button>
+                <span id="browse-where" class="muted"></span>
+              </div>
+              <div id="browse-unavailable" class="empty">
+                <h1>Read the archives</h1>
+                <p>The content server isn't running yet. Start the services from Settings.</p>
+              </div>
+              <iframe id="browse-frame" title="Library" hidden></iframe>
+            </div>
+          </div>
+        </section>
+
+        <!-- Evals -->
+        <section id="panel-evals" class="panel">
+          <div class="setup evals">
+            <h1>Evals</h1>
+            <p class="lede">
+              A fixed set of questions people would put to this library — by what they test and
+              by when after a disaster they come up — scored by machine against the basis, the
+              sources and the calculator's log. Run it to compare models and settings.
+            </p>
+
+            <div class="card">
+              <h2>Run the benchmark</h2>
+              <div class="field">
+                <label for="eval-model">Chat model to test</label>
+                <span class="what">Your configured model, or any other <code>.gguf</code>. A different model is fitted to the GPU, swapped in for the run, and your configured model put back afterwards.</span>
+                <div class="row">
+                  <select id="eval-model" aria-label="Chat model"></select>
+                  <button id="eval-pick-model" type="button">Choose…</button>
+                </div>
+              </div>
+              <div class="row">
+                <input id="eval-label" type="text" placeholder="Label for this run (defaults to the model's name)" />
+                <select id="eval-only" aria-label="Subset">
+                  <option value="">All cases</option>
+                  <optgroup label="Capability">
+                    <option value="retrieve_pdf">Retrieve from PDFs</option>
+                    <option value="retrieve_article">Retrieve from articles</option>
+                    <option value="calculate">Calculate</option>
+                    <option value="reason">Reason</option>
+                    <option value="plan">Plan</option>
+                    <option value="refuse">Refuse / label</option>
+                  </optgroup>
+                  <optgroup label="Horizon">
+                    <option value="month">First month</option>
+                    <option value="six_months">Six months</option>
+                    <option value="year">A year</option>
+                    <option value="five_years">Five years</option>
+                  </optgroup>
+                </select>
+                <button id="eval-run" type="button" class="primary">Run</button>
+              </div>
+              <div class="progress" id="eval-progress" hidden>
+                <div class="bar"><div class="fill" id="eval-fill"></div></div>
+                <div class="label" id="eval-status"></div>
+              </div>
+              <p class="hint" id="eval-hint">Each case is a full question to the model; a complete run takes several minutes.</p>
+            </div>
+
+            <div class="card">
+              <h2>Runs</h2>
+              <div class="row">
+                <select id="eval-a" aria-label="Run A"></select>
+                <select id="eval-b" aria-label="Compare with"></select>
+              </div>
+              <div id="eval-summary"></div>
+            </div>
+
+            <div class="card" id="eval-detail-card" hidden>
+              <h2 id="eval-detail-title"></h2>
+              <div id="eval-detail"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Settings -->
+        <section id="panel-setup" class="panel">
+          <div class="setup">
+            <h1>Settings</h1>
+            <p id="portable-note" class="hint" hidden></p>
+
+            <div class="card" id="card-hardware">
+              <h2>This machine</h2>
+              <dl id="hardware"><dd class="muted">Detecting…</dd></dl>
+            </div>
+
+            <div class="card">
+              <h2>Content</h2>
+              <p class="muted" id="library-summary">No library configured.</p>
+              <div class="field">
+                <label for="library-dir">Library folder</label>
+                <span class="what">Where fetched archives and the search index live.</span>
+                <div class="row">
+                  <input id="library-dir" type="text" placeholder="Path to a folder with room" />
+                  <button id="pick-library" type="button">Choose…</button>
+                </div>
+              </div>
+              <p class="hint">
+                Museion has no default location: content runs from under a gigabyte to well over
+                250&nbsp;GB, so where it lives is your choice.
+              </p>
+            </div>
+
+            <div class="card folders">
+              <h2>Other content folders</h2>
+              <p class="muted">
+                Found something that isn't in the catalogue? Add the folder it's in. Archives
+                (<code>.zim</code>) in it are served and searched like everything else; PDFs in
+                it are indexed by page and cited like the rest. The catalogue is a starting
+                point, not a boundary.
+              </p>
+              <div id="extra-dirs"></div>
+              <div class="actions">
+                <button id="add-dir" type="button">Add folder…</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <h2>Models</h2>
+              <div class="field">
+                <label for="chat-model">Chat model</label>
+                <span class="what">Writes the answers. Chosen for your hardware tier; holds most of the GPU while running.</span>
+                <div class="row">
+                  <input id="chat-model" type="text" placeholder="Path to a .gguf file" />
+                  <button id="pick-chat" type="button">Choose…</button>
+                </div>
+              </div>
+              <div class="field">
+                <label for="reranker-model">Reranker <span class="opt">optional</span></label>
+                <span class="what">Reads each retrieved passage against your question and orders them by relevance. Small; runs on the CPU. Without it, answers still work but are ordered by keyword match alone.</span>
+                <div class="row">
+                  <input id="reranker-model" type="text" placeholder="Path to a .gguf file" />
+                  <button id="pick-reranker" type="button">Choose…</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <h2>Helper programs</h2>
+              <div class="field">
+                <label for="kiwix-exe">Content server <code>kiwix-serve</code></label>
+                <span class="what">Serves the archives for reading and searching. From the Kiwix project.</span>
+                <div class="row">
+                  <input id="kiwix-exe" type="text" placeholder="Path to kiwix-serve" />
+                  <button id="pick-kiwix" type="button">Choose…</button>
+                </div>
+              </div>
+              <div class="field">
+                <label for="llama-exe">Inference server <code>llama-server</code></label>
+                <span class="what">Runs the chat model and the reranker. From llama.cpp; <code>llama-fit-params</code> is expected beside it.</span>
+                <div class="row">
+                  <input id="llama-exe" type="text" placeholder="Path to llama-server" />
+                  <button id="pick-llama" type="button">Choose…</button>
+                </div>
+              </div>
+              <p class="hint">
+                Two separate projects, so they are pointed at separately — if you already have
+                either installed, use the copy you have.
+              </p>
+            </div>
+
+            <div class="actions">
+              <button id="save-config" type="button" class="primary">Save</button>
+              <button id="start-services" type="button">Start services</button>
+              <button id="stop-services" type="button">Stop services</button>
+            </div>
+            <label class="check">
+              <input id="autostart" type="checkbox" />
+              Start services when Museion opens
+              <span class="hint">The chat model holds most of the GPU while running.</span>
+            </label>
+            <div class="card">
+              <h2>Maintenance</h2>
+              <p class="muted">
+                Fetching content and adding folders already do both of these. They are here for
+                what happens outside the app.
+              </p>
+              <div class="field">
+                <label for="build-index">Build index</label>
+                <span class="what">Indexes anything in your library or extra folders that isn't indexed yet — for archives or PDFs you copied in by hand, or a set-up that stopped before this step. Skips what's already done. Needs the services running.</span>
+                <button id="build-index" type="button">Build index</button>
+              </div>
+              <div class="field">
+                <label for="rebuild-index">Rebuild index</label>
+                <span class="what">Reads everything again, replacing what was indexed before — after Museion's code for indexing has been changed, or if search results look wrong. Needs the services running.</span>
+                <button id="rebuild-index" type="button">Rebuild index</button>
+              </div>
+              <div class="field">
+                <label for="fit-model">Fit model to this machine</label>
+                <span class="what">Measures the chat model against your GPU and stores the layer split. Set-up did this once; run it again after changing the GPU or the chat model. Stops the chat model to measure, so start services afterwards.</span>
+                <button id="fit-model" type="button">Fit model to this machine</button>
+              </div>
+            </div>
+            <div class="card" id="card-drive" hidden>
+              <h2>This drive</h2>
+              <p class="muted">
+                The drive's manifest lists every archive and model on it with its checksum. Checking
+                reads each one through, so a damaged file is found before it is needed.
+              </p>
+              <button id="drive-verify" type="button">Check the drive's files</button>
+              <p id="drive-verify-status" class="status" role="status"></p>
+            </div>
+            <div class="card" id="card-prepare">
+              <h2>Prepare a drive</h2>
+              <p class="muted">
+                Everything Museion needs on one removable drive: the archives, the models, the
+                helper programs for any graphics card, and Museion itself with the Python that
+                runs it. It runs from the drive on any computer, whatever letter the drive comes
+                up under, with nothing installed and no internet there. Downloads resume, so a
+                drive can be prepared over several sittings.
+              </p>
+              <div class="field">
+                <label for="prep-dest">Destination</label>
+                <span class="what">The drive's root, or any empty folder that will be copied to one. Use exFAT for a drive that must work on a Mac too.</span>
+                <div class="row">
+                  <input id="prep-dest" type="text" placeholder="The drive: E:\ or /Volumes/MUSEION" />
+                  <button id="prep-pick" type="button">Choose…</button>
+                </div>
+              </div>
+              <div class="field">
+                <label for="prep-bundle">Content</label>
+                <select id="prep-bundle"></select>
+              </div>
+              <div class="field">
+                <label>Chat models to carry</label>
+                <span class="what">Each computer picks the one that fits it. The small one runs anywhere, slowly; the large ones want a graphics card with 8 GB or more.</span>
+                <div id="prep-models" class="checks"></div>
+              </div>
+              <div class="field">
+                <label>Helper builds to carry</label>
+                <span class="what">One per kind of graphics card the drive may meet. All three is 700 MB.</span>
+                <div id="prep-accels" class="checks"></div>
+              </div>
+              <div class="field">
+                <label>Changing Museion</label>
+                <div class="checks">
+                  <label class="check">
+                    <input id="prep-opencode" type="checkbox" checked />
+                    <span id="prep-opencode-label">Carry opencode</span>
+                    <span class="hint">A coding assistant that changes Museion's own code with the chat model on the drive, opened by Edit Museion on the drive. It needs one of the large models: the small one cannot be relied on to change code.</span>
+                  </label>
+                </div>
+              </div>
+              <p id="prep-estimate" class="muted"></p>
+              <button id="prep-start" type="button">Prepare the drive</button>
+              <p id="prep-progress" class="status" role="status"></p>
+            </div>
+            <div class="card">
+              <h2>Advanced</h2>
+              <p class="muted">
+                The assistant's instructions and limits — the system prompt, how many passages it
+                reads, how long an answer may run — are plain text. Museion reads the file below
+                before every question, so an edit shows in the very next answer with no restart.
+                Fields you leave out keep their defaults; a file that won't parse is ignored.
+              </p>
+              <div class="field">
+                <label for="tuning-open">Prompts and limits</label>
+                <span class="what" id="tuning-path">…</span>
+                <button id="tuning-open" type="button">Create and open the override file</button>
+              </div>
+            </div>
+            <p id="setup-status" class="status" role="status"></p>
+
+            <p class="hint" id="rerun-setup-row">
+              Need to set up a new machine, or start over?
+              <a href="#" id="rerun-setup">Run first-time set-up again</a>
+            </p>
+          </div>
+        </section>
+
+        <!-- Welcome: first run only -->
+        <section id="panel-welcome" class="panel">
+          <div class="setup">
+            <h1>Welcome to Museion</h1>
+            <p class="lede">
+              An offline reference library with a librarian who answers from it — and says so
+              when it can't. Setting up needs internet once. After that, nothing does.
+            </p>
+
+            <div class="card wizard" id="card-wizard">
+              <h2>Set up this machine</h2>
+              <p class="muted">
+                Museion never chooses where things go — pick folders with room. It will show
+                what it plans to fetch, and how large each piece is, before anything downloads.
+              </p>
+              <div class="row">
+                <input id="wiz-library" type="text" placeholder="Folder for the library (archives + index)" />
+                <button id="wiz-pick-library" type="button">Choose…</button>
+              </div>
+              <div class="row">
+                <input id="wiz-models" type="text" placeholder="Folder for models (2–37 GB)" />
+                <button id="wiz-pick-models" type="button">Choose…</button>
+              </div>
+              <div class="row">
+                <input id="wiz-tools" type="text" placeholder="Folder for helper programs" />
+                <button id="wiz-pick-tools" type="button">Choose…</button>
+              </div>
+              <dl id="wiz-plan"><dd class="muted">Working out what this machine needs…</dd></dl>
+              <div class="row">
+                <select id="wiz-bundle" aria-label="Content bundle"></select>
+                <button id="wiz-go" type="button" class="primary">Set up this machine</button>
+              </div>
+              <div class="progress" id="wiz-progress" hidden>
+                <div class="bar"><div class="fill" id="wiz-fill"></div></div>
+                <div class="label" id="wiz-label"></div>
+              </div>
+            </div>
+
+            <p class="hint">
+              Already have archives and models from another machine? Point the folders at
+              them — anything present and verified is skipped, not re-downloaded.
+              <a href="#" id="welcome-skip">Skip set-up and configure by hand</a>
+            </p>
+          </div>
+        </section>
+      </main>
+
+      <!-- Choose…: a folder or file on this computer (chooser.js) -->
+      <div id="chooser" class="chooser" hidden>
+        <div class="box" role="dialog" aria-modal="true" aria-labelledby="chooser-title">
+          <h2 id="chooser-title">Choose</h2>
+          <div class="roots" id="chooser-roots"></div>
+          <div class="row">
+            <button id="chooser-up" type="button" title="The folder above">Up</button>
+            <input id="chooser-path" type="text" aria-label="Folder" />
+            <button id="chooser-go" type="button">Go</button>
+          </div>
+          <div class="list" id="chooser-list"></div>
+          <div class="actions">
+            <button id="chooser-cancel" type="button">Cancel</button>
+            <button id="chooser-pick" type="button" class="primary">Choose this folder</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="main.js"></script>
+  </body>
+</html>

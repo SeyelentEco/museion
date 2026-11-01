@@ -1,0 +1,30 @@
+# An alternative chat model for the Capable and Generous tiers, beside Qwen.
+#
+# The same shape as the Qwen MoE -- 25B parameters, 3.8B active -- so it runs
+# the same way on an 8-12 GB card: attention on the GPU, experts spilling to
+# system RAM. Added September 2026 after it tied Qwen3.6 35B-A3B on the
+# Artificial Analysis small-model index and led it on tool use; the Evals
+# tab decides which one a library actually does better with.
+#
+# The plain UD-Q4_K_XL rather than the QAT build: Unsloth's note is that QAT
+# helps non-Latin languages, and the standard Q4_K_XL is the better pick for
+# English tool calling, which is what the retrieval loop leans on.
+
+id = "gemma-4-26b-a4b-q4"
+title = "Gemma 4 26B-A4B (Q4_K_XL)"
+role = "chat"
+tiers = ["Capable", "Generous"]
+filename = "gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf"
+size_bytes = 17010980576
+sha256 = "ef728c8e0c337fd1067b947af006e38a9ef2419e56feced4fd29b4bf0636e30c"
+quant = "UD-Q4_K_XL"
+context = 262144
+urls = [
+  "https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/main/gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf",
+]
+requires = { system_ram_mb = 24000 }
+server_args = [
+  "--ctx-size",
+  "32768",
+]
+license = { name = "Apache-2.0", attribution = "Google DeepMind; GGUF quantisation by Unsloth" }

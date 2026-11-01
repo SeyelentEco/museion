@@ -6,10 +6,10 @@ model or a setting can be judged against the last one rather than against a feel
 Run it from the Evals tab, or:
 
 ```bash
-museion eval --db /path/to/library/museion-index.db --label "Qwen3.6-35B Q4, reranker on"
-museion eval --db ... --only calculate        # a capability
-museion eval --db ... --only month            # a horizon
-museion eval --db ... --only bleach-drum      # one case
+python -m museion eval --db /path/to/library/museion-index.db --label "Qwen3.6-35B Q4, reranker on"
+python -m museion eval --db ... --only calculate        # a capability
+python -m museion eval --db ... --only month            # a horizon
+python -m museion eval --db ... --only bleach-drum      # one case
 ```
 
 **Comparing models.** The Evals tab has a *Chat model to test* picker: every `.gguf` in
@@ -18,7 +18,7 @@ model swaps it in for the run — it is stopped, the candidate is fitted to the 
 `llama-fit-params`, loaded, benchmarked — and the configured model is put back when the
 run ends, whatever happened. The run records the model's id, so two runs with two models
 compare directly in the table. From the command line, point `llama-server` at the other
-model yourself and run `museion eval --label "…"`.
+model yourself and run `python -m museion eval --label "…"`.
 
 Each run is saved under `<library>/evals/run-<timestamp>.json` with the model id, whether
 the reranker was present, every case's answer, sources, calculations, timing, and the
@@ -27,8 +27,8 @@ horizon, compares any two side by side per case, and opens any answer.
 
 ## What it measures
 
-Cases live in [`evals/benchmark.yaml`](../evals/benchmark.yaml) and are compiled into the
-app. Each carries two tags.
+Cases live in [`evals/benchmark.toml`](../evals/benchmark.toml), read afresh at every run.
+Each carries two tags.
 
 **Capability** — what the case tests:
 
@@ -88,8 +88,17 @@ library_and_calculation, got computed"*, *"3 steps, wanted at least 4"*.
 
 ## Adding a case
 
-Add an entry to `evals/benchmark.yaml` with a unique `id`, a capability, a horizon, and
+Add an entry to `evals/benchmark.toml` with a unique `id`, a capability, a horizon, and
 at least one check. Prefer checks on the basis, a number, or a source over long term
 lists; a case that can only be judged by reading the prose is a case that will be judged
 differently next month. The suite's own test asserts every case has a known capability and
 horizon and a unique id.
+
+## Retrieval alone
+
+`python -m museion retrieval-eval --library <library>` asks only the retrieval half: for
+each question in [`evals/retrieval.toml`](../evals/retrieval.toml) it runs the search (or,
+with a reranker running, the search and the reranking) and checks that the passages found
+contain a word a right answer needs. It loads no chat model, so it takes seconds and is
+the one to run after every change to ranking. The last case asks about the Bronze Age
+collapse, which the Go Bag does not cover; finding nothing is the pass.

@@ -1,0 +1,24 @@
+# Everything. Plan for a dedicated drive.
+#
+# Wikipedia without images plus Project Gutenberg is the bulk of it: the
+# encyclopedia for reference and history, and roughly seventy thousand books
+# for everything an encyclopedia summarises but does not contain.
+
+id = "library"
+title = "Library"
+description = "The full reference collection. Wikipedia, Gutenberg, and all the rest."
+sources = [
+  "zimgit-post-disaster",
+  "zimgit-water",
+  "zimgit-food-preparation",
+  "zimgit-knots",
+  "zimgit-medicine",
+  "appropedia_en_all_maxi",
+  "ifixit_en_all",
+  "wikibooks_en_all_nopic",
+  "mdwiki_en_all_maxi",
+  "wikipedia_en_medicine_nopic",
+  "wikipedia_en_chemistry_nopic",
+  "wikipedia_en_all_nopic",
+  "gutenberg_en_all",
+]

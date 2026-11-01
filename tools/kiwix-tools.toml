@@ -1,0 +1,40 @@
+# kiwix-tools -- serves ZIM archives over HTTP.
+#
+# Museion reads all archive content through kiwix-serve rather than through a
+# ZIM library binding. That is a deliberate choice: zimdump on Windows writes
+# extracted files in text mode and corrupts every binary it touches, while the
+# HTTP route returns byte-exact data. See docs/retrieval.md.
+#
+# Kiwix publishes no checksums for these archives, so the hashes below were
+# computed by downloading each one. Re-verify them if you bump the version.
+
+id = "kiwix-tools"
+name = "kiwix-tools"
+version = "3.8.2"
+provides = ["kiwix-serve", "kiwix-manage", "kiwix-search"]
+license = { name = "GPL-3.0", attribution = "Kiwix" }
+
+[variants.windows-x64]
+platform = "windows"
+# Windows lags the other platforms; 3.8.2 is macOS/Linux only.
+version = "3.8.1"
+file = "kiwix-tools_win-x86_64-3.8.1.zip"
+url = "https://download.kiwix.org/release/kiwix-tools/kiwix-tools_win-x86_64-3.8.1.zip"
+size_bytes = 18301924
+sha256 = "fcd01ed2b93e9a68632c7863c83b9f66bf64406a66357be1df7b8b75596f3e45"
+
+[variants.macos-arm64]
+platform = "darwin"
+arch = "arm64"
+file = "kiwix-tools_macos-arm64-3.8.2.tar.gz"
+url = "https://download.kiwix.org/release/kiwix-tools/kiwix-tools_macos-arm64-3.8.2.tar.gz"
+size_bytes = 10283222
+sha256 = "5c64d43176627e558a117146b02ea36b7da2b0cd3a332cbff075cde05d9585f9"
+
+[variants.macos-x64]
+platform = "darwin"
+arch = "x64"
+file = "kiwix-tools_macos-x86_64-3.8.2.tar.gz"
+url = "https://download.kiwix.org/release/kiwix-tools/kiwix-tools_macos-x86_64-3.8.2.tar.gz"
+size_bytes = 10817537
+sha256 = "ae341280e97ad5902e7a4282a24340eac7d7061c267661c0ef2a88a34547f247"

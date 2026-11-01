@@ -2,7 +2,7 @@
 
 **An offline knowledge library with a local AI assistant, for when the internet is gone.**
 
-Museion is a desktop app that keeps a curated reference library on your own disk — survival
+Museion is a program that keeps a curated reference library on your own disk — survival
 and post-disaster guidance, medicine, practical making and repair, and general reference —
 and runs a language model locally on top of it. You ask a question in plain language; it
 finds the relevant pages in your library and answers **from them, with citations you can
@@ -40,33 +40,38 @@ is silent, Hypatia is built to say so rather than invent something — see
 
 ## Status
 
-Working end to end: fetch a library, index it, ask it questions, get cited answers.
+Working end to end: fetch a library, index it, ask it questions, get cited answers. All
+it needs is Python 3.11 or newer; it uses nothing outside Python's standard library.
 
 ```bash
-npm install
-
-# 1. Helper programs — kiwix-serve, llama-server, pdfium.
-#    Picks the right build for your machine (CUDA / Vulkan / Metal / CPU).
-node scripts/fetch-tools.mjs --dest ./bin
-
-# 2. Content (822 MB, verified against upstream checksums)
-node scripts/fetch.js go-bag --dest /path/to/library
-
-# 3. Build the search index (needs kiwix-serve running over the library)
-cargo build --release
-./target/release/museion index --library /path/to/library --pdfium ./bin
-
-# 4. Ask
-./target/release/museion ask --db /path/to/library/museion-index.db \
-  "how much bleach makes a gallon of water safe to drink?"
+git clone https://github.com/SeyelentEco/museion
+cd museion
+python -m museion
 ```
 
-You still supply a chat model yourself — any GGUF llama.cpp can load. `museion hardware`
-says which class of model your machine should run and why.
+That opens Museion in your web browser. On a machine that isn't set up, the page shows a
+welcome screen and nothing else: it detects your hardware, shows exactly what it would
+fetch and how large each piece is — helper programs, the reranker, the chat model for
+your tier, the content bundle you pick — then downloads it all (resumable, verified),
+fits the model to your GPU, starts the services and builds the index. Then it gets out of
+the way, leaving Ask, Library, Evals and Settings.
 
-The desktop app builds too — `cd apps/desktop && npm install && npx tauri build` — with an
-Ask tab, a Browse tab over the raw archives, and a Library tab that detects your hardware
-and supervises the local services.
+Or skip the clone: each [release](https://github.com/SeyelentEco/museion/releases) is a
+zip for Windows or macOS holding Museion, the portable Python that runs it and every
+helper program. Unzip it onto a drive, double-click `Museion.cmd` (`Museion.command` on a
+Mac), and the same welcome screen fetches the library into the drive. Nothing is
+installed on the computer.
+
+Everything the page does, the command line does too:
+
+```bash
+python -m museion tools --dest bin                         # kiwix-serve, llama-server, pdfium
+python -m museion fetch go-bag --dest /path/to/library     # 822 MB, checked against upstream
+python -m museion index --library /path/to/library --pdfium bin
+python -m museion ask --library /path/to/library "how much bleach makes a gallon of water safe to drink?"
+```
+
+[docs/setup.md](docs/setup.md) goes through it step by step.
 
 **What it answers like.** Asked about bleach dosing, it gives ¼ teaspoon per gallon [1],
 notes the 16-drops alternative [4][5], and warns to use only unscented bleach, to filter
@@ -84,24 +89,34 @@ unverified*. Asked what caused the Bronze Age collapse, it answers from general
 knowledge under that last label; asked anything medical or safety-critical the library
 doesn't hold, it says so and stops. See [docs/retrieval.md](docs/retrieval.md).
 
-On a machine that isn't set up, the app opens to a welcome screen and nothing else: it
-detects your hardware, shows exactly what it would fetch and how large each piece is —
-helper programs, the reranker, the chat model for your tier, the content bundle you pick
-— then downloads it all (resumable, verified), fits the model to your GPU, starts the
-services and builds the index. Then it gets out of the way. The catalogue is compiled
-into the app, so an installed copy knows where everything comes from without the repo.
-Everything the flow does, `museion` does from the command line too.
+---
+
+## Changing it, offline
+
+Museion is written to be changed by the person who has it, years after the last
+download, with no internet. It is plain Python in short files, each with comments that
+say why. A prepared drive carries [opencode](https://opencode.ai), a coding agent, set up
+to use the chat model on the same drive: double-click `Edit Museion` and say what you
+want changed. [AGENTS.md](AGENTS.md) is what it reads first, and what a person should
+read first too. With Qwen3.6 35B on a 12 GB graphics card it has added an archive to the
+catalogue, added a rule to the assistant's instructions, and found and fixed a bug from
+its symptom alone; the small 4B model cannot be relied on for this. See
+[docs/python.md](docs/python.md).
+
+Museion was first written in Rust and TypeScript, as a Tauri desktop app. That version is
+kept on the [`archive/rust-app`](https://github.com/SeyelentEco/museion/tree/archive/rust-app)
+branch; the Python version reads the indexes and settings it wrote.
 
 ---
 
 ## Design
 
-Three local processes, no Docker, no Python runtime to package:
+Three local processes, no Docker, nothing to install:
 
 ```
-┌─ Museion (Tauri v2: Rust shell + web UI) ────────────────┐
-│  hardware detection · sidecar supervision · downloader   │
-│  retrieval · chat · article browser                      │
+┌─ Museion (Python standard library) ──────────────────────┐
+│  the page in your browser · hardware detection           │
+│  helper supervision · downloader · retrieval · chat      │
 └──────────────┬──────────────────────┬────────────────────┘
                │                      │
      ┌─────────▼─────────┐  ┌─────────▼──────────────────┐
@@ -110,6 +125,11 @@ Three local processes, no Docker, no Python runtime to package:
      │ full-text index   │  │ CUDA / Vulkan / Metal      │
      └───────────────────┘  └────────────────────────────┘
 ```
+
+The heavy work is done by pinned native programs — llama.cpp, kiwix-serve, pdfium,
+SQLite's FTS5 — fetched from their publishers and checked against the catalogue's
+hashes. Python only drives them, so the part a person might want to change is the part
+that is easy to read.
 
 ### Why there is no embedding step
 
@@ -160,7 +180,7 @@ In the app, the **Library** tab shows what you have and what you could fetch, by
 with sizes; click to read, click to fetch — verified, served, and indexed, so it's askable
 straight away. Found something that isn't in the catalogue? Add its folder under
 **Settings**: archives are served and searched, loose PDFs are indexed by page. Adding
-sources to the catalogue itself is a YAML file and one command — see
+sources to the catalogue itself is one command — see
 [docs/adding-content.md](docs/adding-content.md).
 
 Museion ships no content itself. Everything it fetches is freely licensed, mostly CC BY-SA;
@@ -169,7 +189,7 @@ citation.
 
 ## Evals
 
-The Evals tab (or `museion eval`) runs a fixed benchmark — questions grouped by what they
+The Evals tab (or `python -m museion eval`) runs a fixed benchmark — questions grouped by what they
 test (retrieval from PDFs and articles, calculation, reasoning, planning, refusing) and by
 when after a disaster they come up (the first month, six months, a year, five years) —
 scored by machine against the basis label, the cited sources and the calculator's log.
