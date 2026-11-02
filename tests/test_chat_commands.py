@@ -13,7 +13,7 @@ from unittest import mock
 
 from museion import agent_commands, chat_commands, hardware
 from museion.appstate import AppState, UiError
-from tests.fake_llama import FakeLlama, call_fragment, text
+from fake_llama import FakeLlama, call_fragment, text
 
 
 def port_of(url: str) -> int:

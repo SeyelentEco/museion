@@ -11,7 +11,7 @@ from museion.agents import AgentSpec
 from museion.harness import Harness, Person, Setting, Stopped
 from museion.index import Hit
 from museion.runs import RunLog, read_log
-from tests.agent_fakes import ScriptedChat, calls, says
+from agent_fakes import ScriptedChat, calls, says
 
 
 def spec(**kw) -> AgentSpec:

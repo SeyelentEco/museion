@@ -7,7 +7,7 @@ from pathlib import Path
 from museion import agents, evals, hardware
 from museion.agent_run import Agents, CaseRunner, save_case
 from museion.runs import ChatStore, title_from
-from tests.agent_fakes import ScriptedChat, calls, says
+from agent_fakes import ScriptedChat, calls, says
 
 
 class ChatStoreTest(unittest.TestCase):

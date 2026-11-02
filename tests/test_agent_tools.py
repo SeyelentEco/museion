@@ -5,7 +5,7 @@ import unittest
 
 from museion.agent_tools import RISKS, ToolError, all_tools, check_args
 from museion.index import Hit
-from tests.agent_fakes import FakeRun
+from agent_fakes import FakeRun
 
 
 def tool(name):
