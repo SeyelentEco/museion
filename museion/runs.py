@@ -19,6 +19,7 @@ import json
 import os
 import re
 import secrets
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -95,6 +96,20 @@ class Chat:
                 "updated": self.updated, "messages": len(self.messages)}
 
 
+_last_saved = 0.0
+_saved_lock = threading.Lock()
+
+
+def later_than_last() -> float:
+    """Now, but always after the last chat saved. Windows' clock moves in
+    steps of about 15 ms, so two chats saved one after the other could get
+    the same time and the newest would not reliably come first."""
+    global _last_saved
+    with _saved_lock:
+        _last_saved = max(time.time(), _last_saved + 1e-6)
+        return _last_saved
+
+
 class ChatStore:
     def __init__(self, folder: Path) -> None:
         self.folder = Path(folder)
@@ -118,7 +133,7 @@ class ChatStore:
 
     def save(self, chat: Chat) -> None:
         self.folder.mkdir(parents=True, exist_ok=True)
-        chat.updated = time.time()
+        chat.updated = later_than_last()
         path = self.path(chat.id)
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(chat.__dict__, ensure_ascii=False, indent=1), encoding="utf-8")
