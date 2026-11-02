@@ -123,6 +123,21 @@ class HarnessTest(unittest.TestCase):
         self.assertEqual(person.questions, ["How many people?"])
         self.assertEqual(answer.text, "Plan for four.")
 
+    def test_questions_that_end_with_a_promise_are_asked_with_the_card_too(self):
+        # What the 35B wrote: the question mark is not on the last line.
+        prose = ("I need to know your household.\n\n1. How many adults are there?\n2. Any children?\n\n"
+                 "Once I have these numbers, I can calculate the total.")
+        chat = ScriptedChat(says(prose), calls(("ask_person", {"question": "How many?"})), says("Plan for four."))
+        answer = Harness(spec(tools=["ask_person"], guards=[]), Setting(chat=chat, person=Approving())).run("plan")
+        self.assertEqual(chat.calls[1][0][-1]["content"], guards.ASK_BY_CARD)
+        self.assertEqual(answer.text, "Plan for four.")
+
+    def test_a_cited_answer_that_asks_on_the_way_stands(self):
+        text = "Boil it for a minute [1]. Is the water cloudy? Filter it first [1]."
+        chat = ScriptedChat(says(text))
+        Harness(spec(tools=["ask_person"], guards=[]), Setting(chat=chat)).run("water")
+        self.assertEqual(len(chat.calls), 1, "not sent back")
+
     def test_without_ask_person_a_question_stands(self):
         chat = ScriptedChat(says("How many people are you?"))
         answer = Harness(spec(tools=["calculate"], guards=[]), Setting(chat=chat)).run("plan")

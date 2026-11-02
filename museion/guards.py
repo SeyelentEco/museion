@@ -83,6 +83,10 @@ ASK_BY_CARD = (
     "If you can finish without asking, finish it now."
 )
 
+# Longer than this, an uncited answer with a question in it is an answer that
+# also asks something, not a list of questions instead of one.
+QUESTION_CHARS = 1500
+
 
 class RunView(Protocol):
     """What a guard may look at: the run so far."""
@@ -139,10 +143,19 @@ def ends_with_question(text: str) -> bool:
     return bool(lines) and lines[-1].rstrip("*_ )").endswith("?")
 
 
+def only_asks(text: str, run: RunView) -> bool:
+    """A short answer that holds a question and nothing found or worked out.
+    The 35B's prose questions mostly end "Once I know that, I can ...", not
+    with the question mark, so ends_with_question alone missed them."""
+    return "?" in text and len(text) < QUESTION_CHARS and not cited_numbers(text) and not run.calculations
+
+
 def ask_by_card(text: str, run: RunView) -> Push | None:
-    """An answer that ends with a question to the person is sent back to ask
-    it with ask_person, which keeps the run going until the work is done."""
-    if "ask_person" in run.tools and run.round < run.max_rounds and ends_with_question(text) \
+    """An answer that ends with a question to the person, or is nothing but
+    questions, is sent back to ask it with ask_person, which keeps the run
+    going until the work is done."""
+    if "ask_person" in run.tools and run.round < run.max_rounds \
+            and (ends_with_question(text) or only_asks(text, run)) \
             and not looks_like_leaked_tool_call(text):
         return Push(ASK_BY_CARD)
     return None
