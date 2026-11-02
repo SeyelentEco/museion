@@ -14,6 +14,10 @@ max_rounds_used = 4
 
 [[cases]]
 id = "scale-from-library"
-prompt = "How much bleach for 10 gallons of water, using the dose in the library, in teaspoons?"
-expect_number = { value = 2.5, tolerance = 0.1 }
+# The library gives several bleach doses (2 tsp for 10 gallons, a scant 1 tsp,
+# 1/8 tsp per gallon), so the prompt names the one to scale; the case checks
+# that it is found, cited and scaled by the calculator.
+prompt = "The library gives a bleach dose of 1/8 teaspoon per gallon of clear water. Find it and scale it to 10 gallons, in teaspoons."
+expect_number = { value = 1.25, tolerance = 0.05 }
 expect_basis = "library_and_calculation"
+expect_tool = ["calculate"]

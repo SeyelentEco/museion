@@ -24,7 +24,7 @@ person or by a coding agent on the local model.
 | `name`, `goal` | Shown in the page; the goal is one sentence |
 | `min_tier` | The smallest computer it is offered on: `Modest`, `Capable`, `Generous`, `Ample` (see `docs/hardware.md`) |
 | `tools` | Tool names it may use |
-| `guards` | Checks on its answers: `calculate_first`, `call_again`, `cite_or_stand` (`museion/guards.py`) |
+| `guards` | Checks on its answers: `calculate_first`, `call_again`, `cite_or_stand` (`museion/guards.py`). An agent with `ask_person` also gets `ask_by_card`, which sends a question written in the answer back to be asked with the tool |
 | `max_rounds` | Most tool rounds before it must answer |
 | `answer_tokens` | Most tokens in one model turn |
 | `max_history`, `history_chars` | How many earlier exchanges of the chat it sees, and how long each may be |
@@ -92,7 +92,8 @@ Beyond the benchmark's checks (`expect_any`, `must_not_contain`,
 
 Cases run in a scratch folder, so they never touch the agent's real files.
 Run them with the agent's Test button, or
-`python -m museion agent test <id>`; results are kept in
+`python -m museion agent test <id> --library <library folder>` while the
+services are running (open the page to start them); results are kept in
 `agent-work/<id>/tests/` and the Agents tab shows what changed since the last
 run. Any run in the Agents tab can be saved as a new case.
 

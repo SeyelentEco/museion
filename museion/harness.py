@@ -191,7 +191,7 @@ class Harness:
                 continue
 
             text = self.finish(turn, messages, on_token)
-            objection = guards.check(spec.guards, text, self, fired)
+            objection = guards.check(self.guard_names(), text, self, fired)
             if objection is not None:
                 name, push = objection
                 fired.add(name)
@@ -213,6 +213,11 @@ class Harness:
             return Answer(renumber_citations(text, cited), used, self.reranked,
                           basis_of(bool(used), bool(self.calculations), self.used), self.calculations,
                           self.used, self.round, self.files)
+
+    def guard_names(self) -> list[str]:
+        """The agent's guards, plus those it gets for having a tool."""
+        extra = [g for g, tool in guards.AUTOMATIC.items() if tool in self.tools and g not in self.spec.guards]
+        return list(self.spec.guards) + extra
 
     def seed(self, goal: str, history: Sequence[Exchange], messages: list[dict]) -> None:
         """The library is searched before the model says a word, for the

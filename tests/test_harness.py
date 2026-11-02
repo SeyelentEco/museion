@@ -113,6 +113,21 @@ class HarnessTest(unittest.TestCase):
         Harness(spec(), Setting(chat=chat, person=person)).run("plan")
         self.assertEqual(person.questions, ["How many?"])
 
+    def test_a_question_in_prose_is_asked_with_the_card(self):
+        person = Approving()
+        chat = ScriptedChat(says("How many people are in your household?"),
+                            calls(("ask_person", {"question": "How many people?"})), says("Plan for four."))
+        s = spec(tools=["ask_person"], guards=[])
+        answer = Harness(s, Setting(chat=chat, person=person)).run("plan")
+        self.assertEqual(chat.calls[1][0][-1]["content"], guards.ASK_BY_CARD)
+        self.assertEqual(person.questions, ["How many people?"])
+        self.assertEqual(answer.text, "Plan for four.")
+
+    def test_without_ask_person_a_question_stands(self):
+        chat = ScriptedChat(says("How many people are you?"))
+        answer = Harness(spec(tools=["calculate"], guards=[]), Setting(chat=chat)).run("plan")
+        self.assertEqual(answer.text, "How many people are you?")
+
     def test_guard_fires_once_and_withholding_ends_tools(self):
         lib = FakeLibrary()
         chat = ScriptedChat(calls(("search_library", {"query": "water"})), says("Boil it."),

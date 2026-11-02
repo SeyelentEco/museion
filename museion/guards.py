@@ -72,6 +72,18 @@ CITE_OR_STAND = (
 )
 
 
+# Said once to an answer that ends by asking the person something, when the
+# agent has ask_person. On Qwen3.6-35B the water planner, the repair helper
+# and the 72-hour planner all asked "how many people are you?" in prose and
+# stopped: the work was never finished, and the page labelled the question
+# general knowledge.
+ASK_BY_CARD = (
+    "You ended by asking the person a question in your answer, which stops the work. "
+    "Ask it with the ask_person tool instead, wait for the reply, then finish the work. "
+    "If you can finish without asking, finish it now."
+)
+
+
 class RunView(Protocol):
     """What a guard may look at: the run so far."""
 
@@ -79,6 +91,7 @@ class RunView(Protocol):
     max_rounds: int
     sources: list
     calculations: list
+    tools: dict
 
 
 @dataclass
@@ -121,18 +134,36 @@ def cite_or_stand(text: str, run: RunView) -> Push | None:
     return None
 
 
+def ends_with_question(text: str) -> bool:
+    lines = [line.strip() for line in text.strip().splitlines() if line.strip()]
+    return bool(lines) and lines[-1].rstrip("*_ )").endswith("?")
+
+
+def ask_by_card(text: str, run: RunView) -> Push | None:
+    """An answer that ends with a question to the person is sent back to ask
+    it with ask_person, which keeps the run going until the work is done."""
+    if "ask_person" in run.tools and run.round < run.max_rounds and ends_with_question(text) \
+            and not looks_like_leaked_tool_call(text):
+        return Push(ASK_BY_CARD)
+    return None
+
+
 Guard = Callable[[str, RunView], "Push | None"]
 
 GUARDS: dict[str, Guard] = {
     "calculate_first": calculate_first,
     "call_again": call_again,
     "cite_or_stand": cite_or_stand,
+    "ask_by_card": ask_by_card,
 }
+
+# Guards every agent gets when it has the tool they need, listed or not.
+AUTOMATIC = {"ask_by_card": "ask_person"}
 
 # The order the ask loop always used. An agent that names guards gets them
 # in this order whatever order it lists them in, because the order matters:
 # a sum in prose is fixed before citations are asked for.
-ORDER = ["calculate_first", "call_again", "cite_or_stand"]
+ORDER = ["calculate_first", "call_again", "ask_by_card", "cite_or_stand"]
 
 
 def check(names: list[str], text: str, run: RunView, fired: set[str]) -> tuple[str, Push] | None:
