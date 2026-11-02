@@ -249,8 +249,7 @@ def problems_of(spec: AgentSpec) -> list[str]:
 def tier_problem(spec: AgentSpec, tier: str) -> str | None:
     """Why this agent cannot run on a computer of this tier, or None."""
     if spec.min_tier in hardware.TIERS and hardware.TIERS.index(tier) < hardware.TIERS.index(spec.min_tier):
-        return (f"{spec.name} needs a {spec.min_tier} computer or better "
-                f"({hardware.describe_tier(spec.min_tier)}); this one is {tier}.")
+        return f"Needs a {spec.min_tier} computer or better; this one is {tier}."
     return None
 
 

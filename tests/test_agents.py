@@ -107,7 +107,7 @@ answer_tokens = 900
         spec = self.load()
         spec.min_tier = hardware.CAPABLE
         self.assertIsNone(agents.tier_problem(spec, hardware.GENEROUS))
-        self.assertIn("needs a Capable computer", agents.tier_problem(spec, hardware.MODEST))
+        self.assertIn("Needs a Capable computer", agents.tier_problem(spec, hardware.MODEST))
 
     def test_workspace(self):
         spec = self.load()
