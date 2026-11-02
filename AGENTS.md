@@ -64,6 +64,22 @@ invented one (if the file name does not make it plain, ask). The shelf is one
 of `survival`, `medicine`, `making`, `reference`. It shows when the Library
 tab is reloaded; no bundle or index change is needed.
 
+## Changing an agent
+
+Agents (the librarian, the stores keeper, the 72-hour planner...) are folders
+in `agents/`: `agent.toml` (settings), `prompt.md` (what it is told),
+`cases.toml` (its tests). `docs/agents.md` explains every setting. To change
+what an agent does, change its `prompt.md` or `agent.toml`; to add one, run
+`python -m museion agent new <id>`; to add a tool, run
+`python -m museion agent new-tool <name>`. Then run:
+
+```
+python -m museion agent check            every agent and tool loads
+python -m museion agent test <id>        its cases (needs the services running)
+```
+
+and the unit tests. A change shows in a new chat; no restart is needed.
+
 ## Where things are
 
 | You want to change | Look in |
@@ -79,11 +95,12 @@ tab is reloaded; no bundle or index change is needed.
 | Running from a drive, preparing one | `museion/portable.py`, `prepare.py`, `manifest.py`, `launchers.py` |
 | This editing set-up | `museion/edit.py` |
 | The benchmark of questions and expected answers | `evals/benchmark.toml`, `museion/evals.py`; retrieval alone: `evals/retrieval.toml`, `retrieval_eval.py` |
+| Agents: the harness, its tools, chats | `agents/` (one folder each), `museion/harness.py`, `agent_tools/` (one tool per file), `agents.py` (settings), `chat_commands.py`, `agent_commands.py`; see `docs/agents.md` |
 | The command line | `museion/cli.py`, `catalog_cli.py`, `drive_cli.py` |
 
 `docs/` explains the design: `retrieval.md` (how search works and why),
 `python.md` (how this Python version works), `portable.md` (drives),
-`evals.md`, `adding-content.md`. Comments that say what "the Rust version" did
+`evals.md`, `adding-content.md`, `agents.md`. Comments that say what "the Rust version" did
 describe the program Museion was before it was Python, kept on purpose: the
 indexes and settings it wrote still work.
 
@@ -98,7 +115,8 @@ Three helper programs do the heavy work, started and stopped by
 `sidecar.py`: kiwix-serve serves the archives, one llama-server runs the chat
 model and another the reranker. A question goes through `ask.py`: search the
 index, rerank the passages, give the best to the chat model with tools for
-searching more and calculating, then check the answer's citations.
+searching more and calculating, then check the answer's citations. The model
+and its tools are driven by `harness.py`, the same loop every agent runs on.
 
 ## Undoing changes
 

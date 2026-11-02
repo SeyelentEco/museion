@@ -4,7 +4,7 @@ from museion.agent_tools import READ, Tool
 
 
 def run(args: dict, run) -> str:
-    answer = run.person.ask(run.spec.id, args["question"])
+    answer = run.person.ask(run.spec.name, args["question"])
     return f"The person answered: {answer}"
 
 

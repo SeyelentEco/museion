@@ -6,6 +6,7 @@ benchmark (evals.py), so none of them has to import another to name it.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from museion.index import Hit
@@ -15,6 +16,9 @@ from museion.index import Hit
 LIBRARY = "library"  # built on passages from the library
 LIBRARY_AND_CALCULATION = "library_and_calculation"  # passages plus the calculator
 COMPUTED = "computed"  # the calculator alone
+# No passage and no sum, but the agent read or wrote files (its stores list,
+# its notes, the library folder): the answer is about those, not the world.
+OWN_FILES = "own_files"
 # The library had nothing and no calculation was involved: whatever the model
 # said came from its own training. Shown as unverified.
 GENERAL_KNOWLEDGE = "general_knowledge"
@@ -49,7 +53,7 @@ class Answer:
     text: str
     sources: list[Hit]
     reranked: bool
-    basis: str  # LIBRARY, LIBRARY_AND_CALCULATION, COMPUTED or GENERAL_KNOWLEDGE
+    basis: str  # LIBRARY, LIBRARY_AND_CALCULATION, COMPUTED, OWN_FILES or GENERAL_KNOWLEDGE
     # Every calculation actually performed, verbatim. Shown to the reader as
     # ground truth: the model once reported 343.75 ml for a dose the
     # calculator had correctly returned as 67.8, by relabelling the result and
@@ -66,9 +70,14 @@ class Answer:
     log: str = ""
 
 
-def basis_of(cited: bool, calculated: bool) -> str:
-    """Where an answer came from, from whether it cites a passage and
-    whether the calculator ran -- never from what the model says."""
+FILE_TOOLS = frozenset({"read_file", "write_file", "list_files", "notes", "library_files", "add_source"})
+
+
+def basis_of(cited: bool, calculated: bool, tools: Sequence[str] = ()) -> str:
+    """Where an answer came from, from whether it cites a passage, whether
+    the calculator ran and which tools ran -- never from what the model says."""
     if cited:
         return LIBRARY_AND_CALCULATION if calculated else LIBRARY
-    return COMPUTED if calculated else GENERAL_KNOWLEDGE
+    if calculated:
+        return COMPUTED
+    return OWN_FILES if FILE_TOOLS.intersection(tools) else GENERAL_KNOWLEDGE

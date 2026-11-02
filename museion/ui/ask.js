@@ -21,6 +21,7 @@ const BASIS_LABELS = {
   library: ['From your library', ''],
   library_and_calculation: ['From your library, with calculation', ''],
   computed: ['Computed', ''],
+  own_files: ['From the files it checked', ''],
   general_knowledge: ['General knowledge — not from your library. Unverified.', 'warn'],
 };
 
@@ -223,7 +224,7 @@ function showCard(w) {
   card.hidden = !w?.kind;
   if (!w?.kind) return;
   if (w.kind === 'approve') {
-    card.append(el('div', 'card-title', `The ${w.agent} agent wants to ${w.summary}`));
+    card.append(el('div', 'card-title', `${w.agent} wants to ${w.summary}`));
     if (w.reason) card.append(el('div', 'muted', w.reason));
     const note = el('input');
     note.type = 'text';
@@ -340,6 +341,7 @@ export async function send(text) {
     if (live && !live.started && live.exchange === exchange)
       live.answerEl.textContent = 'Still working — retrieving passages and waiting on the model…';
   }, 12000);
+  if (!current.title) $('#chat-title').textContent = text.trim().replace(/\s+/g, ' ').slice(0, 80);
   void refreshChats();
   try {
     await invoke('send_message', { chat: chatId, text });

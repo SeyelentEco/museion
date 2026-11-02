@@ -20,7 +20,7 @@ const SETTING_HELP = {
   confirm: 'ask: asks before changing anything outside its folder. all: also before writing its own files.',
 };
 
-async function refresh() {
+async function refresh(flash = '') {
   let data;
   try {
     data = await invoke('list_agents');
@@ -44,7 +44,7 @@ async function refresh() {
     li.addEventListener('click', () => void show(a.id));
     list.append(li);
   }
-  if (selected) await show(selected);
+  if (selected) await show(selected, flash);
 }
 
 function field(label, help, input) {
@@ -74,7 +74,7 @@ function select(options, value) {
   return s;
 }
 
-async function show(id) {
+async function show(id, flash = '') {
   selected = id;
   document.querySelectorAll('#agent-items li').forEach((li) => li.classList.toggle('active', li.dataset.id === id));
   const a = await invoke('get_agent', { id });
@@ -165,7 +165,7 @@ async function show(id) {
     form.append(field('Prompt', 'What it is told. The shared rules (agents/_rules.md) always come first.', prompt));
   }
   const save = el('button', 'primary', 'Save');
-  const saved = el('span', 'muted');
+  const saved = el('span', 'muted', flash);
   save.addEventListener('click', async () => {
     const settings = {
       name: inputs.name.value, goal: inputs.goal.value, min_tier: inputs.min_tier.value,
@@ -177,8 +177,7 @@ async function show(id) {
     };
     try {
       await invoke('save_agent', { id, settings, prompt: prompt ? prompt.value : null });
-      saved.textContent = ' Saved.';
-      await refresh();
+      await refresh(' Saved.');
     } catch (e) {
       saved.textContent = ` ${String(e)}`;
     }

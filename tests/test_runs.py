@@ -70,5 +70,15 @@ max_rounds_used = 5
             save_case(spec, root, {"id": "new-one", "prompt": "again"})
 
 
+class BasisTest(unittest.TestCase):
+    def test_own_files_only_without_passages_or_sums(self):
+        from museion.answer import basis_of
+        self.assertEqual(basis_of(False, False, ["read_file"]), "own_files")
+        self.assertEqual(basis_of(False, False, ["search_library"]), "general_knowledge")
+        self.assertEqual(basis_of(False, True, ["read_file"]), "computed")
+        self.assertEqual(basis_of(True, False, ["notes"]), "library")
+
+
+
 if __name__ == "__main__":
     unittest.main()

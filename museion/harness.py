@@ -211,7 +211,7 @@ class Harness:
             cited = [n for n in cited_numbers(text) if n <= len(self.sources)]
             used = [self.sources[n - 1] for n in cited]
             return Answer(renumber_citations(text, cited), used, self.reranked,
-                          basis_of(bool(used), bool(self.calculations)), self.calculations,
+                          basis_of(bool(used), bool(self.calculations), self.used), self.calculations,
                           self.used, self.round, self.files)
 
     def seed(self, goal: str, history: Sequence[Exchange], messages: list[dict]) -> None:
@@ -287,7 +287,7 @@ class Harness:
         if self.needs_approval(tool):
             key = f"{name}:{json.dumps(args, sort_keys=True)}"
             if key not in self.allowed:
-                request = Approval(self.spec.id, name, args, tool.summary(args), said.strip()[:400])
+                request = Approval(self.spec.name, name, args, tool.summary(args), said.strip()[:400])
                 self.event("waiting", tool=name, args=args, summary=request.summary, reason=request.reason)
                 decision, note = self.person.approve(request)
                 self.check_stop()

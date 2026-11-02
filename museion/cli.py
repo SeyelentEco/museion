@@ -48,6 +48,7 @@ BASIS_LABELS = {
     ask.LIBRARY: "from the library",
     ask.LIBRARY_AND_CALCULATION: "from the library, with calculation",
     ask.COMPUTED: "computed",
+    "own_files": "from the files it checked",
     ask.GENERAL_KNOWLEDGE: "GENERAL KNOWLEDGE -- not from the library, unverified",
 }
 
