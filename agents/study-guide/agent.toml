@@ -1,0 +1,29 @@
+# Study guide: turns a topic in the library into a numbered lesson with
+# sources, saved as Markdown in its folder for printing or reading later.
+#
+# Long multi-source output inside 32k: the hardest case for compaction, which
+# must keep the passage numbers as it folds old searches away.
+
+name = "Study guide"
+goal = "Turn a topic from the library into a numbered lesson with sources, saved for later."
+min_tier = "Capable"
+tools = ["search_library", "read_page", "write_file", "list_files"]
+guards = ["call_again", "cite_or_stand"]
+max_rounds = 10
+answer_tokens = 2500
+keep_rounds = 2
+memory = "chat"
+examples = [
+  "Make a lesson on making soap from wood ash and fat.",
+  "Teach me how to splint a broken arm.",
+]
+
+[tier.Generous]
+max_rounds = 16
+answer_tokens = 3500
+keep_rounds = 3
+
+[tier.Ample]
+max_rounds = 24
+answer_tokens = 4000
+keep_rounds = 4

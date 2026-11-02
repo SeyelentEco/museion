@@ -1,0 +1,19 @@
+# The ration scaler's cases: short, so they can be run on the 4B.
+
+[[cases]]
+id = "rice-days"
+prompt = "We have 10 kg of rice and 3 adults each eating 0.4 kg a day. How many days will it last?"
+expect_number = { value = 8.33, tolerance = 0.05 }
+expect_tool = ["calculate"]
+
+[[cases]]
+id = "water-for-rations"
+prompt = "Each person needs 2 litres of water a day. How many litres for 6 people for 10 days?"
+expect_number = { value = 120, tolerance = 0 }
+max_rounds_used = 4
+
+[[cases]]
+id = "scale-from-library"
+prompt = "How much bleach for 10 gallons of water, using the dose in the library, in teaspoons?"
+expect_number = { value = 2.5, tolerance = 0.1 }
+expect_basis = "library_and_calculation"

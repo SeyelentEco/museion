@@ -17,7 +17,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from museion.ask import Asker, Calculation
+from museion.answer import Calculation
 
 # The benchmark shipped with Museion.
 BENCHMARK_PATH = Path(__file__).resolve().parent.parent / "evals" / "benchmark.toml"
@@ -43,15 +43,24 @@ class Case:
     min_steps: int | None = None
     source_from: str | None = None
     must_not_contain: list[str] = field(default_factory=list)
+    # For agents (agents/<id>/cases.toml):
+    expect_tool: list[str] = field(default_factory=list)  # each of these tools ran
+    max_rounds_used: int | None = None  # answered in at most this many model turns
+    expect_file: str | None = None  # the agent wrote this file in its folder
+    given_files: dict = field(default_factory=dict)  # {name: text} in its folder before it starts
+    person_says: list[str] = field(default_factory=list)  # answers to its questions, in order
+    approve: str = "deny"  # what the person presses on an Allow / Deny card: allow or deny
 
 
-def load_cases(text: str) -> list[Case]:
+def load_cases(text: str, agent: bool = False) -> list[Case]:
     """The cases in a benchmark file's text. A field Museion does not know is
     an error rather than silently ignored, so a misspelt check cannot quietly
-    pass every answer."""
+    pass every answer. An agent's cases need no capability or horizon."""
     known = {f.name for f in dataclasses.fields(Case)}
     cases = []
     for table in tomllib.loads(text).get("cases", []):
+        if agent:
+            table = {"capability": "agent", "horizon": "", **table}
         unknown = set(table) - known
         if unknown:
             raise ValueError(f"case {table.get('id', '?')}: unknown field(s) {', '.join(sorted(unknown))}")
@@ -106,7 +115,7 @@ class Run:
     seconds: float
 
 
-def run(asker: Asker, cases: list[Case], label: str,
+def run(asker, cases: list[Case], label: str,
         report: Callable[[int, int, str, bool | None], None] = lambda *a: None) -> Run:
     """Run the benchmark. `label` is a free name for the configuration under
     test. `report(index, total, case_id, passed)` is called as each case
@@ -124,7 +133,7 @@ def run(asker: Asker, cases: list[Case], label: str,
         report(i, len(cases), case.id, None)
         t0 = time.monotonic()
         try:
-            answer = asker.ask(case.prompt)
+            answer = asker.ask_case(case) if hasattr(asker, "ask_case") else asker.ask(case.prompt)
         except Exception as e:  # noqa: BLE001 -- one failing case must not end the run
             result = CaseResult(
                 id=case.id, capability=case.capability, horizon=case.horizon, prompt=case.prompt,
@@ -136,7 +145,8 @@ def run(asker: Asker, cases: list[Case], label: str,
                 f"{h.doc_title} (p.{h.page}) [{h.book}]" if h.page > 0 else f"{h.doc_title} [{h.book}]"
                 for h in answer.sources
             ]
-            checks = score(case, answer.text, answer.basis, sources, answer.calculations)
+            checks = score(case, answer.text, answer.basis, sources, answer.calculations,
+                           tools=answer.tools, rounds=answer.rounds, files=answer.files)
             result = CaseResult(
                 id=case.id, capability=case.capability, horizon=case.horizon, prompt=case.prompt,
                 passed=all(c.passed for c in checks), checks=checks, answer=answer.text,
@@ -166,7 +176,8 @@ def tally(results: list[CaseResult], key: str) -> list[tuple[str, int, int]]:
     return [(name, p, t) for name, (p, t) in counts.items()]
 
 
-def score(case: Case, answer: str, basis: str, sources: list[str], calcs: list[Calculation]) -> list[CheckResult]:
+def score(case: Case, answer: str, basis: str, sources: list[str], calcs: list[Calculation],
+          tools: list[str] | None = None, rounds: int = 0, files: list[str] | None = None) -> list[CheckResult]:
     """Apply every check a case declares."""
     hay = f"{answer}\n{chr(10).join(sources)}".lower()
     out = []
@@ -211,6 +222,16 @@ def score(case: Case, answer: str, basis: str, sources: list[str], calcs: list[C
         # figure "343" in the answer.
         bad = [t for t in case.must_not_contain if t.lower() in answer.lower()]
         out.append(CheckResult("must_not_contain", not bad, f"found {bad}" if bad else "clean"))
+    if case.expect_tool:
+        missing = [t for t in case.expect_tool if t not in (tools or [])]
+        out.append(CheckResult("expect_tool", not missing,
+                               f"never ran {missing}" if missing else f"ran {sorted(set(tools or []))}"))
+    if case.max_rounds_used is not None:
+        out.append(CheckResult("max_rounds_used", rounds <= case.max_rounds_used,
+                               f"{rounds} turns, wanted at most {case.max_rounds_used}"))
+    if case.expect_file is not None:
+        ok = case.expect_file in (files or [])
+        out.append(CheckResult("expect_file", ok, f"{'wrote' if ok else 'did not write'} {case.expect_file}"))
     if not out:
         out.append(CheckResult("answered", bool(answer.strip()), "no checks declared"))
     return out

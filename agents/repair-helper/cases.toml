@@ -1,0 +1,13 @@
+[[cases]]
+id = "pump"
+prompt = "Our hand pump brings up no water any more. What should I check?"
+person_says = ["The handle moves freely with no resistance."]
+expect_tool = ["search_library"]
+min_steps = 2
+expect_basis = "library|library_and_calculation"
+
+[[cases]]
+id = "bike-chain"
+prompt = "The bike chain keeps slipping when I pedal hard. How do I fix it?"
+expect_any = ["chain", "tension", "wear", "derailleur", "sprocket"]
+expect_basis = "library"

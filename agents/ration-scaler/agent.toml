@@ -1,0 +1,20 @@
+# Ration scaler: scales a recipe or ration from the library to the number of
+# people and the units the person has. Small and simple on purpose: it is the
+# agent that checks agents work on the 4B (min_tier Modest).
+
+name = "Ration scaler"
+goal = "Scale a recipe or ration from the library to a number of people, in the units the person has."
+min_tier = "Modest"
+tools = ["search_library", "calculate"]
+guards = ["calculate_first", "call_again", "cite_or_stand"]
+max_rounds = 5
+answer_tokens = 900
+memory = "none"
+examples = [
+  "Scale a basic bread recipe to feed 12 people.",
+  "We have 10 kg of rice. How many days will it feed 3 adults?",
+]
+
+[tier.Modest]
+max_rounds = 4
+max_history = 2

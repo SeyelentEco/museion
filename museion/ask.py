@@ -1,9 +1,12 @@
-"""Asking Hypatia a question.
+"""Asking Hypatia a question, and the library she searches.
 
-The model decides, per question, whether to search the library, calculate,
-both, or neither -- through two tools and nothing else. What it may *say* is
-still governed by where the material came from, and that is judged from which
-tools actually ran, not from what the model claims.
+The Asker is the library's search -- keyword search, the archives' own
+indexes, the reranker -- which the search_library tool uses for every agent.
+Asking a question runs the librarian agent (agents/librarian/) through the
+harness (harness.py). The model decides, per question, whether to search
+again, calculate, both, or neither; what it may *say* is still governed by
+where the material came from, and that is judged from which tools actually
+ran, not from what the model claims.
 
 Pure arithmetic never reaches the model at all.
 """
@@ -11,17 +14,20 @@ Pure arithmetic never reaches the model at all.
 from __future__ import annotations
 
 import json
-import os
 import re
 import sys
-import time
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
 
-from museion import calc, llama
-from museion.model_text import (cited_numbers, has_prose_arithmetic, looks_like_leaked_tool_call,
-                                parse_queries, renumber_citations, strip_citations)
+from museion import llama
+from museion.agents import AgentSpec
+from museion.agents import load as load_agent
+from museion.answer import (COMPUTED, DISCARD, GENERAL_KNOWLEDGE, LIBRARY,  # noqa: F401 -- named here as before
+                            LIBRARY_AND_CALCULATION, Answer, Calculation, Exchange)
+from museion.guards import (CALCULATE_FIRST, CALL_AGAIN, CITE_OR_STAND, CONTINUE,  # noqa: F401
+                            CUT_SHORT, NO_ANSWER, NO_MORE_TOOLS)
+from museion.hardware import CAPABLE
 from museion.index import Hit, Index, is_navigation_page
+from museion.model_text import parse_queries
 from museion.tuning import Tuning
 from museion.tuning import defaults as default_tuning
 
@@ -54,139 +60,35 @@ SEED_RETRIEVE = 20
 # Articles fetched per native archive per search.
 NATIVE_PER_BOOK = 4
 
-# Said once to an answer that worked a sum out in prose. The calculator is the
-# only arithmetic allowed; "20 ÷ 8 = 2.5" written by the model is the 343.75 ml
-# failure waiting to happen again.
-CALCULATE_FIRST = (
-    "That answer did arithmetic in prose. Do every calculation with the calculate "
-    "tool, one expression each, then give the answer again reporting each figure "
-    "exactly as calculate returned it, with the same citations."
-)
-
-CONTINUE = (
-    "Your answer was cut off mid-sentence by a length limit. Continue exactly from "
-    "where it stopped -- do not repeat anything already said, do not start over, do "
-    "not add a preamble -- and finish the answer."
-)
-
-CUT_SHORT = (
-    "\n\n*(This answer reached its length limit and was cut short. "
-    "Ask about the remaining steps separately.)*"
-)
-
-# Said to the model when the searches run out, and again if it hands back a
-# tool call as text anyway. Without it a planning question that wanted a
-# seventh search produced a bare <tool_call> block as its answer.
-NO_MORE_TOOLS = (
-    "No more searches or calculations are available. Answer now from the passages "
-    "already found, citing each by its number."
-)
-
-# Said once to an answer that cites nothing while passages were on the table.
-# A hypothermia answer once came word for word from Where There Is No Doctor --
-# kangarooing and all -- with no [n] anywhere, and was labelled general
-# knowledge. The model is asked to point at its sources, and told plainly that
-# an answer that owes them nothing may stand as it is.
-# Said once to a tool call that came back as text, while tools are still on
-# offer. Withholding them instead, as before, meant a calculation written out
-# as text was never made, and the next turn did the sum in prose unchecked.
-CALL_AGAIN = (
-    "That tool call came through as text and did not run. Make the call again "
-    "with the tool, or answer if you have what you need."
-)
-
-# What is shown when the model's last word was still a tool call written out
-# as text: that is not an answer.
-NO_ANSWER = "The model did not manage an answer to this. Try asking again, perhaps in other words."
-
-CITE_OR_STAND = (
-    "Your answer cites no passages. Every claim taken from the passages above must "
-    "carry that passage's number, like [2]. Rewrite the answer with those citations, "
-    "and if you cite anything do not say the library has nothing on this. If no part "
-    "of it comes from the passages, repeat it unchanged."
-)
-
 NOTHING_FOUND = (
     "No passages in the library match that. Try different words, or if the question "
     "is factual and nothing matches after another try, say the library does not "
     "cover it."
 )
 
-# Where an answer's substance came from -- decided by the tools that ran, and
-# written into saved eval runs under these names.
-LIBRARY = "library"  # built on passages from the library
-LIBRARY_AND_CALCULATION = "library_and_calculation"  # passages plus the calculator
-COMPUTED = "computed"  # the calculator alone
-# The library had nothing and no calculation was involved: whatever the model
-# said came from its own training. Shown as unverified.
-GENERAL_KNOWLEDGE = "general_knowledge"
-
-# What on_token receives instead of text when everything streamed so far must
-# be taken back.
-#
-# The model narrates before it calls a tool -- "55 × 0.25 teaspoons is 339
-# millilitres... let me check" -- and that narration went straight to the
-# screen, wrong number and all, before the calculator returned 68. Text is
-# streamed optimistically, and if the turn turns out to end in tool calls the
-# caller is told to discard it. Only the final turn's text stands.
-DISCARD = None
-
-TOOLS = [
-    llama.tool(
-        "search_library",
-        "Search the offline reference library. Returns numbered passages with the "
-        "document title and page. Cite passages by their number.",
-        {
-            "type": "object",
-            "properties": {
-                "query": {"type": "string", "description": "What to search for, as keywords or a short phrase"}
-            },
-            "required": ["query"],
-        },
-    ),
-    llama.tool(
-        "calculate",
-        "Evaluate an arithmetic expression exactly. Supports + - * / ^ %, parentheses, "
-        "sqrt, abs, round (round(x) or round(x, decimals)), floor, ceil, min, max, pow, pi, and "
-        "convert(value, from_unit, to_unit) for volume (gallon, liter, quart, pint, "
-        "cup, floz, tbsp, tsp, drop, ml), mass (kg, g, lb, oz), length (km, m, cm, mm, "
-        "mile, yard, foot, inch) and temperature (c, f, k). Example: "
-        "convert(0.25 * 55, tsp, ml)",
-        {
-            "type": "object",
-            "properties": {"expression": {"type": "string"}},
-            "required": ["expression"],
-        },
-    ),
-]
 
 
-@dataclass
-class Exchange:
-    """One earlier question and its answer, as the person saw them."""
-
-    question: str
-    answer: str
+def _tools() -> list[dict]:
+    from museion.agent_tools import all_tools
+    return [all_tools()[name].schema() for name in ("search_library", "calculate")]
 
 
-@dataclass
-class Calculation:
-    expression: str
-    result: str
+# The librarian's two tools, as the model is offered them (agent_tools/).
+TOOLS = _tools()
 
 
-@dataclass
-class Answer:
-    text: str
-    sources: list[Hit]
-    reranked: bool
-    basis: str  # LIBRARY, LIBRARY_AND_CALCULATION, COMPUTED or GENERAL_KNOWLEDGE
-    # Every calculation actually performed, verbatim. Shown to the reader as
-    # ground truth: the model once reported 343.75 ml for a dose the
-    # calculator had correctly returned as 67.8, by relabelling the result and
-    # multiplying again in prose. The log makes that contradiction visible
-    # instead of trusting the retelling.
-    calculations: list[Calculation] = field(default_factory=list)
+def librarian(tuning: Tuning) -> AgentSpec:
+    """The librarian agent as shipped, with its prompt and limits taken from
+    tuning.toml (and the person's override of it, which Settings edits), as
+    they always were."""
+    spec = load_agent("librarian", None, CAPABLE)
+    spec.prompt = tuning.system_prompt
+    spec.max_rounds = tuning.max_rounds
+    spec.answer_tokens = tuning.answer_tokens
+    spec.max_continuations = tuning.max_continuations
+    spec.max_history = tuning.max_history
+    spec.history_chars = tuning.history_chars
+    return spec
 
 
 class Asker:
@@ -322,221 +224,36 @@ class Asker:
         return out
 
     def ask(self, question: str, history: Sequence[Exchange] = (),
-            on_token: Callable[[str | None], None] = lambda t: None) -> Answer:
+            on_token: Callable[[str | None], None] = lambda t: None, setting=None) -> Answer:
         """Answer the question, streaming to `on_token` as it arrives (and
         DISCARD when what was streamed must be taken back). `history` is the
         conversation so far, oldest first, so that a follow-up like "what
         about the placenta?" or "I'm not near a hospital, how do I deliver
-        this baby?" is read against the exchange it follows."""
-        # Arithmetic never reaches the model. "10*10" is not a library question
-        # and a language model is the wrong instrument for it anyway.
-        if calc.looks_like_arithmetic(question):
-            return self._compute(question, on_token)
+        this baby?" is read against the exchange it follows.
 
-        # MUSEION_TRACE=1 prints where the seconds go: rewrite, each search,
-        # each model turn. The dev loop's stopwatch.
-        started = time.monotonic()
-        trace = "MUSEION_TRACE" in os.environ
+        This is the librarian agent (agents/librarian/) run by the harness
+        (harness.py), with this Asker as its library. Its ways, set in its
+        agent.toml:
 
-        def mark(what: str) -> None:
-            if trace:
-                print(f"  [{time.monotonic() - started:6.1f}s] {what}", file=sys.stderr)
-
-        tuning = self.tuning
-        messages = [llama.system(tuning.system_prompt)]
-        # Earlier exchanges give a follow-up its subject. Their citation
-        # markers are stripped: those numbers pointed at passages from an
-        # earlier search, and would otherwise be repeated as if they named the
-        # passages found for this question.
-        for x in recent(history, tuning.max_history):
-            messages.append(llama.user(x.question))
-            messages.append(llama.assistant(strip_citations(truncate_chars(x.answer, tuning.history_chars))))
-        messages.append(llama.user(question))
-        sources: list[Hit] = []
-        calculations: list[Calculation] = []
-
-        # The library is searched before the model says a word. Left to decide
-        # for itself, it skipped the search on three factual questions in one
-        # benchmark run -- a bleeding wound among them -- and answered from
-        # general knowledge, when the same question had cited Where There Is
-        # No Doctor every time under the old retrieval-first loop. Whether to
-        # consult the library is not the model's call; only how to use what it
-        # finds is. The seeded search is replayed as a tool exchange so the
-        # model sees it exactly as it would its own.
-        #
-        # What is searched for is the subject, not the sentence. "My friend
-        # just went into labor, what are the steps I should take to help with
-        # her delivery? I've never done this before" retrieved pages on
-        # comforting a labouring woman and on when to go to a medical centre,
-        # and the answer said the library had nothing on delivering a baby --
-        # while Where There Is No Doctor's "The stages of labor" sat unread. So
-        # the model first names what a reference book would have a chapter on,
-        # and those queries are searched ahead of the question itself.
-        queries = self.seed_queries(question, history)
-        mark(f"rewrite -> {queries}")
-        hits, reranked = self.gather_seeded(question, queries, set())
-        mark(f"seeded search ({len(queries) + 1} queries): {len(hits)} passages")
-        result = render_search(hits, sources)
-        seed_call = {
-            "id": "seed_search",
-            "type": "function",
-            "function": {
-                "name": "search_library",
-                "arguments": json.dumps({"query": " | ".join(queries + [question])},
-                                        separators=(",", ":"), ensure_ascii=False),
-            },
-        }
-        messages.append(llama.assistant_calls("", [seed_call]))
-        messages.append(llama.tool_result("seed_search", result))
-
-        repaired = False
-        math_repaired = False
-        leak_repaired = False
-        round = 0
-        room = self.room_for_searches()
-        while True:
-            # Another search must fit beside everything already here, or the
-            # server refuses the whole conversation and the answer is lost:
-            # at a 16k context, two or three searches did that. Without the
-            # room, the model answers from what it has.
-            if round < tuning.max_rounds and room is not None and prompt_chars(messages) > room:
-                mark("context nearly full; answering from what was found")
-                round = tuning.max_rounds
-            # On the last round the tools are withheld so the model must answer.
-            last = round >= tuning.max_rounds
-            if round == tuning.max_rounds:
-                messages.append(llama.user(NO_MORE_TOOLS))
-            round += 1
-            turn = self.chat.turn(messages, None if last else TOOLS, tuning.answer_tokens, on_token)
-            mark(f"turn {round}: {len(turn.tool_calls)} tool call(s), {len(turn.text)} chars")
-
-            if turn.tool_calls:
-                # Whatever it narrated on the way to the tool call is not the
-                # answer, and may contain numbers it made up. Take it back.
-                on_token(DISCARD)
-                # Replay the model's request, then answer each call.
-                messages.append(llama.assistant_calls(turn.text, turn.tool_calls))
-                for call in turn.tool_calls:
-                    output, rr = self._run_tool(call, sources, calculations)
-                    reranked |= rr
-                    messages.append(llama.tool_result(call["id"], output))
-                continue
-
-            text = self._finish(turn, messages, on_token)
-
-            # A sum worked out in prose is sent back once, with the tools still
-            # on offer, to be done by the calculator.
-            if not math_repaired and not calculations and round < tuning.max_rounds and has_prose_arithmetic(text):
-                math_repaired = True
-                on_token(DISCARD)
-                messages.append(llama.assistant(text))
-                messages.append(llama.user(CALCULATE_FIRST))
-                continue
-
-            # The library is always searched now, so "did retrieval find
-            # something" no longer says anything about the answer. What does is
-            # whether the answer *cites* it: a passage the model was handed and
-            # ignored did not ground anything. Only cited sources are kept, in
-            # citation order, and the label follows.
-            # Only numbers that name a passage count. A made-up [9], or a year
-            # in brackets, would otherwise take a place in the renumbering and
-            # move every real citation after it onto the wrong source.
-            cited = [n for n in cited_numbers(text) if n <= len(sources)]
-            leaked = looks_like_leaked_tool_call(text)
-            if leaked and not leak_repaired and round < tuning.max_rounds:
-                leak_repaired = True
-                on_token(DISCARD)
-                messages.append(llama.assistant(text))
-                messages.append(llama.user(CALL_AGAIN))
-                continue
-            if not repaired and (leaked or (not cited and sources)):
-                # One more turn, tools withheld: cite the passages, or answer
-                # at all if what came back was a tool call as text. What was
-                # streamed so far is taken back.
-                repaired = True
-                on_token(DISCARD)
-                messages.append(llama.assistant(text))
-                messages.append(llama.user(NO_MORE_TOOLS if leaked else CITE_OR_STAND))
-                round = tuning.max_rounds + 1
-                continue
-
-            if leaked:
-                on_token(DISCARD)
-                on_token(NO_ANSWER)
-                return Answer(NO_ANSWER, [], reranked, GENERAL_KNOWLEDGE, calculations)
-            used = [sources[n - 1] for n in cited]
-            if used:
-                basis = LIBRARY_AND_CALCULATION if calculations else LIBRARY
-            else:
-                basis = COMPUTED if calculations else GENERAL_KNOWLEDGE
-            return Answer(renumber_citations(text, cited), used, reranked, basis, calculations)
-
-    def _compute(self, question: str, on_token) -> Answer:
-        """The answer to a question that is nothing but arithmetic."""
-        expr = calc.normalise(question)
-        calculations = []
-        try:
-            result = calc.format_number(calc.evaluate(expr))
-            text = f"{expr} = **{result}**"
-            calculations.append(Calculation(expr, result))
-        except ValueError as e:
-            text = f"Could not evaluate `{expr}`: {e}"
-        on_token(text)
-        return Answer(text, [], False, COMPUTED, calculations)
-
-    def _finish(self, turn: llama.Turn, messages: list[dict], on_token) -> str:
-        """The text of a turn that answered, carried on past the token limit.
-
-        An answer that ran into the limit is not finished; it is asked to
-        carry on from the cut, and the reader sees the continuation stream in
-        behind the first part. If it runs out again after the allowed
-        continuations, say so rather than end mid-sentence as if that were the
-        whole answer."""
-        text, limited = turn.text, turn.hit_token_limit
-        continuations = 0
-        while limited and continuations < self.tuning.max_continuations:
-            messages.append(llama.assistant(text))
-            messages.append(llama.user(CONTINUE))
-            more = self.chat.turn(messages, None, self.tuning.answer_tokens, on_token)
-            if not text[-1:].isspace() and not more.text[:1].isspace():
-                text += " "
-                on_token(" ")
-            text += more.text
-            limited = more.hit_token_limit
-            continuations += 1
-        if limited:
-            text += CUT_SHORT
-            on_token(CUT_SHORT)
-        return text
-
-    def _run_tool(self, call: dict, sources: list[Hit], calculations: list[Calculation]) -> tuple[str, bool]:
-        """Carry out one tool call. Returns what to tell the model, and
-        whether a search was reranked."""
-        name = call["function"]["name"]
-        arguments = call["function"]["arguments"]
-        if name == "search_library":
-            hits, reranked = self.gather(argument(arguments, "query"))
-            return render_search(hits, sources), reranked
-        if name == "calculate":
-            expr = argument(arguments, "expression")
-            try:
-                result = calc.format_number(calc.evaluate(expr))
-            except ValueError as e:
-                return (f"Could not evaluate `{expr}`: {e}. Rewrite it using only numbers, "
-                        "operators, and the listed functions."), False
-            calculations.append(Calculation(expr, result))
-            return f"{expr} = {result}. Report this figure exactly; do not convert or rescale it.", False
-        return f"Unknown tool {name}.", False
-
-    def room_for_searches(self) -> int | None:
-        """How many characters of conversation still leave room for one more
-        search's passages and the answer, or None if the server does not say
-        how much context it has."""
-        size = getattr(self.chat, "context_size", lambda: None)()
-        if size is None:
-            return None
-        search = self.tuning.keep * (CONTEXT_CHARS + 200)
-        return int((size - self.tuning.answer_tokens - RESERVED_TOKENS) * CHARS_PER_TOKEN) - search
+        - Arithmetic never reaches the model. "10*10" is not a library
+          question and a language model is the wrong instrument for it.
+        - The library is searched before the model says a word. Left to
+          decide for itself, it skipped the search on three factual questions
+          in one benchmark run -- a bleeding wound among them -- and answered
+          from general knowledge. Whether to consult the library is not the
+          model's call; only how to use what it finds is.
+        - What is searched for is the subject, not the sentence. "My friend
+          just went into labor, what are the steps I should take to help with
+          her delivery?" retrieved pages on comforting a labouring woman, and
+          the answer said the library had nothing on delivering a baby, while
+          Where There Is No Doctor's "The stages of labor" sat unread. So the
+          model first names what a reference book would have a chapter on
+          (seed_queries), and those are searched with the question."""
+        from museion.harness import Harness, Setting
+        spec = librarian(self.tuning)
+        setting = setting or Setting(chat=self.chat)
+        setting.library = self
+        return Harness(spec, setting).run(question, history, on_token)
 
     def seed_queries(self, question: str, history: Sequence[Exchange]) -> list[str]:
         """The plain subjects behind a question, as up to three short library
@@ -583,9 +300,7 @@ def render_search(hits: list[Hit], sources: list[Hit]) -> str:
     return out
 
 
-def prompt_chars(messages: list[dict]) -> int:
-    """The size of a conversation, in characters, as the model will read it."""
-    return sum(len(m.get("content") or "") + len(json.dumps(m.get("tool_calls") or "")) for m in messages)
+from museion.compaction import prompt_chars  # noqa: E402,F401 -- where it always was
 
 
 def recent(history: Sequence[Exchange], n: int) -> list[Exchange]:

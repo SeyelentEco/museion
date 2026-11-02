@@ -1,0 +1,12 @@
+[[cases]]
+id = "plot-plan"
+prompt = "We have a 10 by 20 metre plot and cold winters, 4 people. What should we plant?"
+expect_tool = ["search_library", "calculate"]
+expect_file = "garden-plan.md"
+expect_any = ["potato", "bean", "squash", "cabbage", "carrot", "kale"]
+
+[[cases]]
+id = "seed-saving"
+prompt = "How do I save bean seed for next year?"
+expect_any = ["dry", "seed", "pod"]
+expect_basis = "library"

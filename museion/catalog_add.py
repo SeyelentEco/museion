@@ -47,6 +47,8 @@ def toml_value(value) -> str:
         return "true" if value else "false"
     if isinstance(value, int):
         return str(value)
+    if isinstance(value, float):
+        return repr(value) if value == value and abs(value) != float("inf") else "nan"
     if isinstance(value, str):
         # A JSON string is a TOML basic string, escapes and all, as long as
         # nothing outside the ASCII range is escaped: JSON writes an emoji as

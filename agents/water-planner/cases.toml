@@ -1,0 +1,37 @@
+# The water planner's cases. Same checks as evals/benchmark.toml, plus
+# expect_tool, max_rounds_used, expect_file, given_files, person_says and
+# approve (see docs/agents.md). Run them with Test this agent, or
+#   python -m museion agent test water-planner
+
+[[cases]]
+id = "drum-dose"
+prompt = "I have a 55 gallon drum of water. How much household bleach do I add to make it safe, in millilitres?"
+expect_number = { value = 67.8, tolerance = 1.0 }
+expect_basis = "library_and_calculation"
+must_not_contain = ["343", "339"]
+
+[[cases]]
+id = "household-storage"
+prompt = "There are 4 of us. How many litres of drinking water should we store for 14 days?"
+expect_tool = ["search_library", "calculate"]
+expect_basis = "library_and_calculation"
+min_sources = 1
+
+[[cases]]
+id = "no-chemicals"
+prompt = "We have no bleach or tablets. How do we make stream water safe to drink?"
+expect_any = ["boil", "boiling", "distill", "solar", "filter"]
+expect_basis = "library"
+
+[[cases]]
+id = "asks-household"
+prompt = "How much water should we store?"
+person_says = ["Three adults and a baby, for two weeks."]
+expect_tool = ["calculate"]
+expect_basis = "library_and_calculation"
+
+[[cases]]
+id = "gallon-dose"
+prompt = "How much bleach for one gallon of clear water?"
+expect_any = ["1/4 teaspoon", "¼ teaspoon", "16 drops", "8 drops"]
+expect_basis = "library|library_and_calculation"

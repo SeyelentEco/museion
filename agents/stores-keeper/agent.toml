@@ -1,0 +1,19 @@
+# Stores keeper: keeps the household's list of supplies in stores.csv, in its
+# own folder, and says how many days each lasts and what runs out first.
+#
+# Tests workspace files, memory shared across chats, and questions to the
+# person. It never searches the library: its answers come from the person's
+# own list, worked out with the calculator.
+
+name = "Stores keeper"
+goal = "Keep a list of the household's supplies and say how long they will last."
+min_tier = "Capable"
+tools = ["read_file", "write_file", "list_files", "notes", "calculate", "ask_person"]
+guards = ["calculate_first", "call_again"]
+max_rounds = 10
+memory = "agent"
+examples = [
+  "We just added 12 cans of beans and 5 kg of flour.",
+  "How long will our food last for 4 people?",
+  "What runs out first?",
+]
