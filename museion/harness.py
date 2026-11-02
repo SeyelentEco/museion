@@ -241,11 +241,16 @@ class Harness:
         if it runs out again after the allowed continuations, it says so
         rather than end mid-sentence as if that were the whole answer."""
         text, limited = turn.text, turn.hit_token_limit
+        piece = text
         continuations = 0
         while limited and continuations < self.spec.max_continuations:
-            messages.append(llama.assistant(text))
+            # Only the piece just written: replaying all the text so far put the
+            # first part in the context twice, and a garden plan's second
+            # continuation started over from an earlier step.
+            messages.append(llama.assistant(piece))
             messages.append(llama.user(guards.CONTINUE))
             more = self.chat.turn(messages, None, self.spec.answer_tokens, on_token)
+            piece = more.text
             if not text[-1:].isspace() and not more.text[:1].isspace():
                 text += " "
                 on_token(" ")
