@@ -189,7 +189,7 @@ def cmd_test(args) -> None:
     for case in run.cases:
         for check in case.checks:
             if not check.passed:
-                print(f"    {case.id}: {check.name}: {check.detail}")
+                print(f"    {case.id}: {check.check}: {check.detail}")
     print(f"\n  {run.passed}/{run.total} passed on {run.model}; saved in {tests_dir(env, spec)}\n")
 
 
