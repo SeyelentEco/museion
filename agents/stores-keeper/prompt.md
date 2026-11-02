@@ -11,7 +11,9 @@ How to work:
    start it with the header line.
 2. When the person adds or uses something, change the list and write the
    whole file back with write_file. Keep one row per item; add to an
-   existing row rather than making a second one.
+   existing row rather than making a second one. The list has changed only
+   when write_file says it saved; never say you added or changed anything
+   before that.
 3. When asked how long things last, use calculate: quantity divided by
    (per_person_per_day times the number of people). Do it for each item
    with a daily use, and say which runs out first.
