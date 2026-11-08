@@ -99,6 +99,22 @@ answer_tokens = 900
         for part in ("no tool is called shell", "no guard is called nope", "unknown setting 'max_rouds'", "memory"):
             self.assertIn(part, problems)
 
+    def test_locked_settings_stay_locked_inside_tier_and_model_tables(self):
+        write(self.mine / "a", "agent.toml",
+              '[tier.Capable]\nshared_rules = false\n[model."qwen3.6-35b"]\nprompt_from = "tuning"\n')
+        spec = self.load(model="Qwen3.6-35B-A3B-Q4_K_M.gguf")
+        self.assertTrue(spec.shared_rules)
+        self.assertEqual(spec.prompt_from, "file")
+        self.assertEqual(spec.prompt, "RULES\n\nShipped prompt.")
+        self.assertEqual(len([p for p in spec.problems if "may not change" in p]), 2)
+
+    def test_a_broken_cases_file_is_a_problem_not_a_crash(self):
+        from museion.agent_run import count_cases
+        write(self.shipped / "a", "cases.toml", '[[cases]]\nid = "x"\nprompt = "p"\nexpect_anyy = ["y"]\n')
+        spec = self.load()
+        self.assertEqual(count_cases(spec), 0)
+        self.assertTrue(any(p.startswith("cases:") for p in spec.problems))
+
     def test_broken_toml_is_a_problem(self):
         write(self.mine / "a", "agent.toml", 'max_rounds = \n')
         self.assertTrue(any("agent.toml" in p for p in self.load().problems))

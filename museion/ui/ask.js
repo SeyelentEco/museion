@@ -155,9 +155,11 @@ function showEmpty(info) {
     $('#empty-lede').textContent =
       "Answers come only from the archives on this disk, with citations you can open and read yourself. If the library doesn't cover something, it will say so.";
   }
+  // Always rebuilt: an agent with no examples must not show the last one's.
+  const list = $('#examples');
+  list.textContent = '';
+  list.hidden = !info?.examples?.length;
   if (info?.examples?.length) {
-    const list = $('#examples');
-    list.textContent = '';
     for (const ex of info.examples) {
       const li = el('li', undefined, ex);
       li.addEventListener('click', () => void send(ex));

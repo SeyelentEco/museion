@@ -130,6 +130,11 @@ async function show(id, flash = '') {
     confirm: select(['ask', 'all'], s.confirm),
     enabled: input('checkbox', s.enabled),
   };
+  // The librarian's limits are set in tuning.toml (Settings › Advanced).
+  for (const k of a.from_tuning ?? []) {
+    inputs[k].disabled = true;
+    inputs[k].title = 'Set in Settings › Advanced (tuning.toml)';
+  }
   form.append(field('Name', '', inputs.name), field('Goal', 'One sentence: what it does for the person.', inputs.goal));
   form.append(field('Smallest computer it runs on', '', inputs.min_tier));
   const tools = el('div', 'checks');
@@ -277,7 +282,7 @@ async function showTests(id, box) {
       tr.append(el('td', c.passed ? 'pass' : 'fail', c.passed ? 'pass' : 'FAIL'), el('td', undefined, c.id));
       const prev = before?.cases.find((p) => p.id === c.id);
       tr.append(el('td', 'muted', prev ? (prev.passed ? 'passed before' : 'failed before') : ''));
-      tr.append(el('td', 'muted', c.checks.filter((k) => !k.passed).map((k) => `${k.name}: ${k.detail}`).join('; ')));
+      tr.append(el('td', 'muted', c.checks.filter((k) => !k.passed).map((k) => `${k.check}: ${k.detail}`).join('; ')));
       table.append(tr);
     }
     box.append(table);

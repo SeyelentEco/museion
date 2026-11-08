@@ -48,6 +48,14 @@ class FileToolsTest(unittest.TestCase):
         self.assertIn("stores.csv", tool("list_files").run({}, self.run))
         self.assertNotIn(".history", tool("list_files").run({}, self.run))
 
+    def test_two_writes_in_one_second_keep_both_old_versions(self):
+        notes = tool("notes")
+        for line in ("one", "two", "three"):
+            notes.run({"action": "add", "text": line}, self.run)
+        kept = sorted(p.read_text() for p in (self.run.workspace / ".history").iterdir())
+        self.assertEqual(len(kept), 2)  # the versions before "two" and before "three"
+        self.assertNotEqual(kept[0], kept[1])
+
     def test_stays_inside_the_folder(self):
         write = tool("write_file")
         for name in ("../escape.md", "/etc/passwd", "C:/x.md", "sub/../../x.md", ".hidden.md"):

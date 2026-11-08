@@ -41,7 +41,12 @@ def keep_previous(run, path: Path) -> None:
         history.mkdir(parents=True, exist_ok=True)
         stamp = __import__("time").strftime("%Y%m%d-%H%M%S")
         rel = path.relative_to(root).as_posix().replace("/", "__")
-        (history / f"{stamp}-{rel}").write_bytes(path.read_bytes())
+        # Two writes in one second (two notes in one turn) must not share a
+        # name, or the second copy replaces the first and that version is lost.
+        target, n = history / f"{stamp}-{rel}", 2
+        while target.exists():
+            target, n = history / f"{stamp}-{n}-{rel}", n + 1
+        target.write_bytes(path.read_bytes())
 
 
 def record(run, path: Path) -> None:

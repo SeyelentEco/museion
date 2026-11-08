@@ -5,7 +5,7 @@ never Python's eval(): no code runs, whatever the model writes.
 """
 
 from museion import calc
-from museion.agent_tools import READ, Tool
+from museion.agent_tools import READ, Tool, ToolError
 from museion.answer import Calculation
 
 DESCRIPTION = (
@@ -23,8 +23,10 @@ def run(args: dict, run) -> str:
     try:
         result = calc.format_number(calc.evaluate(expr))
     except ValueError as e:
-        return (f"Could not evaluate `{expr}`: {e}. Rewrite it using only numbers, "
-                "operators, and the listed functions.")
+        # A ToolError, so a sum that failed does not count as calculated; the
+        # model is told the same words either way.
+        raise ToolError(f"Could not evaluate `{expr}`: {e}. Rewrite it using only numbers, "
+                        "operators, and the listed functions.") from None
     run.calculations.append(Calculation(expr, result))
     return f"{expr} = {result}. Report this figure exactly; do not convert or rescale it."
 

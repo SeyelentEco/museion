@@ -78,6 +78,13 @@ class BasisTest(unittest.TestCase):
         self.assertEqual(basis_of(False, True, ["read_file"]), "computed")
         self.assertEqual(basis_of(True, False, ["notes"]), "library")
 
+    def test_writing_a_note_does_not_vouch_for_an_answer(self):
+        from museion.answer import basis_of
+        # Searched, found nothing, noted the household, answered from memory.
+        self.assertEqual(basis_of(False, False, ["search_library", "notes"]), "general_knowledge")
+        self.assertEqual(basis_of(False, False, ["write_file"]), "general_knowledge")
+        self.assertEqual(basis_of(False, False, ["search_library", "read_file"]), "general_knowledge")
+
 
 
 if __name__ == "__main__":

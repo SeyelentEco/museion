@@ -139,9 +139,8 @@ def load(agent_id: str, overrides: Path | None, tier: str, model_id: str = "",
         except (OSError, ValueError) as e:
             spec.problems.append(f"{folder / 'agent.toml'}: {e}")
             continue
-        if layer == "yours" and spec.folder is not None and "shared_rules" in data:
-            spec.problems.append("your copy may not change shared_rules; the shared rules stay on")
-            data.pop("shared_rules")
+        if layer == "yours" and spec.folder is not None:
+            strip_locked(data, spec.problems)
         values.update(layered(data, tier, model_id, spec.problems))
     for key, value in values.items():
         setattr(spec, key, value)
@@ -150,6 +149,26 @@ def load(agent_id: str, overrides: Path | None, tier: str, model_id: str = "",
     spec.prompt = read_prompt(spec, tier, shipped)
     spec.problems += problems_of(spec)
     return spec
+
+
+# Settings the person's copy of a shipped agent may not change: the shared
+# rules hold the safety rules (no doses from memory, the calculator only),
+# and where the prompt comes from decides whether they are there at all.
+LOCKED = ("shared_rules", "prompt_from")
+
+
+def strip_locked(data: dict, problems: list[str]) -> None:
+    """Take the locked settings out of a person's agent.toml -- at the top
+    and inside its [tier.*] and [model.*] tables -- saying so for each."""
+    tables = [data]
+    for group in ("tier", "model"):
+        if isinstance(data.get(group), dict):
+            tables += [t for t in data[group].values() if isinstance(t, dict)]
+    for table in tables:
+        for key in LOCKED:
+            if key in table:
+                table.pop(key)
+                problems.append(f"your copy may not change {key}; the shipped agent's stays")
 
 
 def layered(data: dict, tier: str, model_id: str, problems: list[str]) -> dict:

@@ -16,8 +16,9 @@ from museion.index import Hit
 LIBRARY = "library"  # built on passages from the library
 LIBRARY_AND_CALCULATION = "library_and_calculation"  # passages plus the calculator
 COMPUTED = "computed"  # the calculator alone
-# No passage and no sum, but the agent read or wrote files (its stores list,
-# its notes, the library folder): the answer is about those, not the world.
+# No passage and no sum, but the agent read files (its stores list, the
+# library folder) and did not search the library: the answer is about those
+# files, not the world.
 OWN_FILES = "own_files"
 # The library had nothing and no calculation was involved: whatever the model
 # said came from its own training. Shown as unverified.
@@ -70,14 +71,21 @@ class Answer:
     log: str = ""
 
 
-FILE_TOOLS = frozenset({"read_file", "write_file", "list_files", "notes", "library_files", "add_source"})
+# Tools that read files. Writing a note or a file is not reading one: an
+# agent that searched, found nothing, noted the household size and then gave
+# a dose from memory must still be labelled unverified.
+READ_FILE_TOOLS = frozenset({"read_file", "list_files", "library_files"})
 
 
 def basis_of(cited: bool, calculated: bool, tools: Sequence[str] = ()) -> str:
     """Where an answer came from, from whether it cites a passage, whether
-    the calculator ran and which tools ran -- never from what the model says."""
+    the calculator ran and which tools ran -- never from what the model says.
+    "From the files it checked" needs a file read and no library search: an
+    uncited answer after a search is the general-knowledge case, files or not."""
     if cited:
         return LIBRARY_AND_CALCULATION if calculated else LIBRARY
     if calculated:
         return COMPUTED
-    return OWN_FILES if FILE_TOOLS.intersection(tools) else GENERAL_KNOWLEDGE
+    if READ_FILE_TOOLS.intersection(tools) and "search_library" not in tools:
+        return OWN_FILES
+    return GENERAL_KNOWLEDGE

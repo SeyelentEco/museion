@@ -18,11 +18,11 @@ from contextlib import closing
 from pathlib import Path
 
 from museion import agents, evals, guards, tuning
-from museion.agent_run import load_cases, prepared, save_case, tests_dir
+from museion.agent_run import count_cases, prepared, save_case, tests_dir
 from museion.agent_run import test as run_tests
 from museion.agent_tools import all_tools
 from museion.appstate import AppState, UiError, local
-from museion.catalog_add import toml_lines
+from museion.catalog_add import toml_key, toml_lines
 from museion.chat_commands import GPU, environment
 from museion.index import Index
 from museion.llama import Llama
@@ -31,6 +31,10 @@ from museion.runs import list_logs, read_log
 # The settings the page's form edits, in the order it shows them.
 EDITABLE = ["name", "goal", "min_tier", "tools", "guards", "max_rounds", "answer_tokens",
             "keep_rounds", "compact", "memory", "confirm", "enabled", "examples"]
+
+# The librarian's limits that tuning.toml sets (agent_run.prepared): the page
+# shows them but does not save them, since tuning.toml would override them.
+FROM_TUNING = ("max_rounds", "answer_tokens")
 
 
 def last_test(env, spec) -> dict | None:
@@ -64,10 +68,15 @@ def get_agent(state: AppState, id: str) -> dict:
     shipped_prompt = (spec.folder / "prompt.md").read_text(encoding="utf-8") if spec.folder and (spec.folder / "prompt.md").is_file() else ""
     mine_prompt = (spec.override / "prompt.md").read_text(encoding="utf-8") if spec.override and (spec.override / "prompt.md").is_file() else ""
     notes = env.workspace(spec)
+    # The librarian's limits come from tuning.toml at run time: show those,
+    # not the defaults they replace.
+    prepared(spec, tuning.load(state.tuning_path))
+    cases = count_cases(spec)
     return {
         "id": spec.id, "settings": agents.as_settings(spec), "problems": spec.problems,
         "prompt": mine_prompt or shipped_prompt, "prompt_from": spec.prompt_from,
-        "resolved_prompt": prepared(spec, tuning.load(state.tuning_path)).prompt,
+        "resolved_prompt": spec.prompt,
+        "from_tuning": list(FROM_TUNING) if spec.prompt_from == "tuning" else [],
         "shipped": spec.folder is not None, "yours": spec.override is not None,
         "folder": str(spec.folder or ""), "your_folder": str(spec.override or agents.override_dir(state.tuning_path) / id),
         "tier": env.tier, "model": env.model_id,
@@ -75,7 +84,7 @@ def get_agent(state: AppState, id: str) -> dict:
         "guards": list(guards.GUARDS),
         "tiers": list(agents.hardware.TIERS),
         "notes": (notes / "notes.md").read_text(encoding="utf-8") if notes and (notes / "notes.md").is_file() else "",
-        "cases": len(load_cases(spec)) if spec.cases_path() else 0,
+        "cases": cases,
         "last_test": last_test(env, spec),
     }
 
@@ -104,7 +113,7 @@ def save_agent(state: AppState, id: str, settings: dict, prompt: str | None = No
     except ValueError:
         fields = {}
     for key in EDITABLE:
-        if key not in settings:
+        if key not in settings or (spec.prompt_from == "tuning" and key in FROM_TUNING):
             continue
         value = settings[key]
         if shipped is not None and getattr(shipped, key) == value:
@@ -273,11 +282,43 @@ def export_agent(state: AppState, id: str) -> str:
                         names[p.name] = p
         for name, p in names.items():
             if name == "agent.toml" and spec.folder and spec.override:
-                text = toml_lines({k: v for k, v in agents.as_settings(spec).items() if v is not None})
-                z.writestr(f"{id}/agent.toml", text)
+                z.writestr(f"{id}/agent.toml", merged_agent_toml(spec.folder, spec.override))
             else:
                 z.write(p, f"{id}/{name}")
     return str(target)
+
+
+def merged_agent_toml(shipped: Path, mine: Path) -> str:
+    """The shipped agent.toml with the person's copy over it, keeping the
+    [tier.*] and [model.*] tables: settings resolved for this computer would
+    carry this computer's limits to another. The locked settings stay out,
+    so the import is an ordinary copy of the shipped agent."""
+    data = tomllib.loads((shipped / "agent.toml").read_text(encoding="utf-8"))
+    over = tomllib.loads((mine / "agent.toml").read_text(encoding="utf-8"))
+    # A setting at the top of the person's copy beats the shipped tier and
+    # model tables (it is a later layer); in one file a table would beat it,
+    # so the shipped tables lose that setting.
+    for group in ("tier", "model"):
+        for table in (data.get(group) or {}).values():
+            for key in [k for k in table if k in over and k not in ("tier", "model")]:
+                del table[key]
+    for key, value in over.items():
+        if key in ("tier", "model") and isinstance(value, dict):
+            group = data.setdefault(key, {})
+            for name, table in value.items():
+                group.setdefault(name, {}).update(table)
+        else:
+            data[key] = value
+    agents.strip_locked(data, [])
+    tables = {k: data.pop(k) for k in ("tier", "model") if k in data}
+    text = "# Exported from Museion: the shipped agent with the person's changes.\n" + toml_lines(data)
+    for group, named in tables.items():
+        for name, table in named.items():
+            text += f"\n[{group}.{toml_key(name)}]\n" + toml_lines(table)
+    return text
+
+
+MEMBER = re.compile(r"[a-z0-9]+(-[a-z0-9]+)*/[A-Za-z0-9_-][A-Za-z0-9._-]*\.(toml|md)")
 
 
 def import_agent(state: AppState, path: str) -> dict:
@@ -288,7 +329,9 @@ def import_agent(state: AppState, path: str) -> dict:
     with zipfile.ZipFile(src) as z:
         names = [n for n in z.namelist() if not n.endswith("/")]
         ids = {n.split("/")[0] for n in names}
-        if len(ids) != 1 or any(n.count("/") != 1 or not n.endswith((".toml", ".md")) for n in names):
+        # Plain names only: on Windows a backslash, a drive letter or ".."
+        # in a member name would write outside the agent's folder.
+        if len(ids) != 1 or not names or any(not MEMBER.fullmatch(n) for n in names):
             raise UiError("That zip is not an exported agent: it should hold one folder of .toml and .md files.")
         id = ids.pop()
         if not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", id):

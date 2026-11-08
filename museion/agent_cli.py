@@ -21,7 +21,7 @@ from contextlib import closing
 from pathlib import Path
 
 from museion import agents, appstate, hardware
-from museion.agent_run import Agents, load_cases, prepared, tests_dir
+from museion.agent_run import Agents, count_cases, prepared, tests_dir
 from museion.agent_run import test as run_tests
 from museion.harness import Approval, Person
 from museion.llama import Llama
@@ -96,11 +96,7 @@ def cmd_check(args) -> None:
     print(f"\n  {len(tools)} tools: {', '.join(sorted(tools))}")
     print(f"  Settings for a {env.tier} computer{f' running {env.model_id}' if env.model_id else ''}:\n")
     for spec in specs:
-        cases = len(load_cases(spec)) if spec.cases_path() else 0
-        try:
-            load_cases(spec)
-        except (ValueError, TypeError) as e:
-            spec.problems.append(f"cases: {e}")
+        cases = count_cases(spec)
         where = f"{spec.folder}" + (f" + yours in {spec.override}" if spec.override else "")
         print(f"  {spec.id}  ({where})")
         settings = agents.as_settings(spec)

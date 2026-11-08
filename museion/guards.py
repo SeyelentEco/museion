@@ -8,7 +8,7 @@ by name, in its agent.toml, in the order they are tried.
 These were the corrections built into the ask loop, one by one, each after a
 failure that is described beside its message. To add a guard: write a
 function here taking (text, run) and returning Push or None, add it to GUARDS,
-and add a test in tests/test_guards.py.
+and add a test in tests/test_harness.py.
 """
 
 from __future__ import annotations

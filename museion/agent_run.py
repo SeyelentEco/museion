@@ -58,7 +58,15 @@ class Agents:
                 on_step: Callable[[str, dict], None] = lambda k, d: None,
                 stop: threading.Event | None = None, tuning=None, log: bool = True) -> Setting:
         def find(agent_id: str) -> AgentSpec:
-            return prepared(self.get(agent_id), tuning)
+            # A helper must be one the person could start a chat with here:
+            # turned on, and not too big for this computer.
+            spec = prepared(self.get(agent_id), tuning)
+            if not spec.enabled:
+                spec.problems.append("it is turned off")
+            why = agents.tier_problem(spec, self.tier)
+            if why:
+                spec.problems.append(why)
+            return spec
 
         return Setting(
             chat=chat, library=library, library_dir=self.library_dir,
@@ -142,6 +150,16 @@ def load_cases(spec: AgentSpec) -> list[evals.Case]:
         return []
     text = path.read_text(encoding="utf-8")
     return evals.load_cases(text, agent=spec.cases != agents.CASES_BENCHMARK)
+
+
+def count_cases(spec: AgentSpec) -> int:
+    """How many test cases the agent has; a cases.toml that will not load is
+    added to its problems (a typo there must not stop `agent check`)."""
+    try:
+        return len(load_cases(spec))
+    except (OSError, ValueError, TypeError) as e:
+        spec.problems.append(f"cases: {e}")
+        return 0
 
 
 def tests_dir(env: Agents, spec: AgentSpec) -> Path:

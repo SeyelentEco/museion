@@ -59,5 +59,15 @@ class AddSourceTest(unittest.TestCase):
             self.assertIn(f"  {c}: '", js)
 
 
+class TomlValueTest(unittest.TestCase):
+    def test_keys_with_dots_are_quoted_and_read_back_whole(self):
+        import tomllib
+        from museion.catalog_add import toml_lines
+        text = toml_lines({"given_files": {"stores.csv": "flour,5"}, "x": float("inf"), "y": -float("inf")})
+        data = tomllib.loads(text)
+        self.assertEqual(data["given_files"], {"stores.csv": "flour,5"})
+        self.assertEqual((data["x"], data["y"]), (float("inf"), -float("inf")))
+
+
 if __name__ == "__main__":
     unittest.main()

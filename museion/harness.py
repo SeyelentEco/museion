@@ -190,6 +190,7 @@ class Harness:
                     messages.append(llama.tool_result(call["id"], self.call(call, turn.text)))
                 continue
 
+            before = len(messages)
             text = self.finish(turn, messages, on_token)
             objection = guards.check(self.guard_names(), text, self, fired)
             if objection is not None:
@@ -197,7 +198,11 @@ class Harness:
                 fired.add(name)
                 self.event("guard", guard=name, message=push.message)
                 on_token(DISCARD)
-                messages.append(llama.assistant(text))
+                # The answer goes back once, whole: finish() left its pieces
+                # and the "continue" prompts in the context, and adding the
+                # joined text after them put the first part in twice.
+                del messages[before:]
+                messages.append(llama.assistant(text.removesuffix(guards.CUT_SHORT)))
                 messages.append(llama.user(push.message))
                 if push.withhold_tools:
                     self.round = spec.max_rounds + 1
@@ -308,8 +313,10 @@ class Harness:
                     return (f"The person declined: {note or 'no reason given'}. Do not try this "
                             "again; carry on another way, or answer with what you have.")
         t0 = time.monotonic()
+        failed = True
         try:
             result = tool.run(args, self)
+            failed = False
         except ToolError as e:
             result = str(e)
         except Stopped:
@@ -318,8 +325,12 @@ class Harness:
             result = f"The tool {name} failed: {e}"
         if len(result) > MAX_RESULT_CHARS:
             result = result[:MAX_RESULT_CHARS] + "\n[... cut: too long to show]"
-        self.used.append(name)
-        self.event("tool", tool=name, args=args, result=result[:4000], seconds=round(time.monotonic() - t0, 1))
+        # Only a tool that ran counts: a test case's expect_tool and the
+        # answer's basis must not credit a call that only got an error back.
+        if not failed:
+            self.used.append(name)
+        self.event("tool", tool=name, args=args, result=result[:4000], seconds=round(time.monotonic() - t0, 1),
+                   **({"failed": True} if failed else {}))
         return result
 
     def needs_approval(self, tool: Tool) -> bool:

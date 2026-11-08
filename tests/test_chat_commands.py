@@ -20,7 +20,10 @@ def port_of(url: str) -> int:
     return int(url.rsplit(":", 1)[1])
 
 
-class ChatCommandsTest(unittest.TestCase):
+class Setup:
+    """A config and library in a temporary folder, a stand-in chat model, and
+    an Ample computer, so every agent can run."""
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         folder = Path(self.tmp.name)
@@ -47,9 +50,12 @@ class ChatCommandsTest(unittest.TestCase):
             time.sleep(0.05)
         self.fail("the run never waited for the person")
 
+
+class ChatCommandsTest(Setup, unittest.TestCase):
     def test_a_chat_keeps_its_messages_and_files(self):
         chat = chat_commands.new_chat(self.state, "stores-keeper")
         self.chat.script = [
+            [call_fragment(0, "c0", "list_files", "{}")],
             [call_fragment(0, "c1", "write_file", json.dumps({"name": "stores.csv", "text": "item,quantity\nbeans,12\n"}))],
             [text("Saved 12 cans of beans.")],
         ]
@@ -102,6 +108,44 @@ class ChatCommandsTest(unittest.TestCase):
         mine = Path(got["your_folder"]) / "agent.toml"
         self.assertIn("max_rounds = 3", mine.read_text())
         self.assertNotIn("goal", mine.read_text())
+
+
+class ExportImportTest(Setup, unittest.TestCase):
+    def test_export_keeps_tier_tables_and_import_round_trips(self):
+        import tomllib
+        import zipfile
+        agent_commands.save_agent(self.state, "study-guide", {"max_rounds": 7}, None)
+        path = agent_commands.export_agent(self.state, "study-guide")
+        with zipfile.ZipFile(path) as z:
+            data = tomllib.loads(z.read("study-guide/agent.toml").decode())
+        shipped = tomllib.loads((Path(agent_commands.agents.SHIPPED_DIR) / "study-guide" / "agent.toml").read_text())
+        self.assertEqual(data["max_rounds"], 7)
+        # Not flattened for this computer: the tables are kept, less the
+        # setting the person's copy made for every tier.
+        self.assertEqual(data["tier"]["Generous"], {k: v for k, v in shipped["tier"]["Generous"].items() if k != "max_rounds"})
+        self.assertNotIn("shared_rules", data)
+        got = agent_commands.import_agent(self.state, path)
+        self.assertEqual(got["settings"]["max_rounds"], 7)
+        self.assertEqual(got["problems"], [])
+
+    def test_import_refuses_names_that_could_leave_the_folder(self):
+        import zipfile
+        for bad in ("x/..\\..\\evil.md", "x/C:\\Users\\evil.md", "x/../evil.md", "x/.hidden.md", "x/run.py"):
+            path = Path(self.tmp.name) / "bad.zip"
+            with zipfile.ZipFile(path, "w") as z:
+                z.writestr("x/agent.toml", 'name = "X"\n')
+                z.writestr(bad, "boo")
+            with self.subTest(bad), self.assertRaises(UiError):
+                agent_commands.import_agent(self.state, str(path))
+
+    def test_a_helper_that_cannot_run_here_is_refused(self):
+        from museion.harness import Harness
+        env = chat_commands.environment(self.state)
+        agent_commands.save_agent(self.state, "ration-scaler", {"enabled": False}, None)
+        setting = env.setting(None)
+        with self.assertRaises(Exception) as caught:
+            Harness(env.get("three-day-planner"), setting).delegate("ration-scaler", "scale")
+        self.assertIn("turned off", str(caught.exception))
 
 
 if __name__ == "__main__":

@@ -48,7 +48,11 @@ def toml_value(value) -> str:
     if isinstance(value, int):
         return str(value)
     if isinstance(value, float):
-        return repr(value) if value == value and abs(value) != float("inf") else "nan"
+        if value != value:
+            return "nan"
+        if abs(value) == float("inf"):
+            return "inf" if value > 0 else "-inf"
+        return repr(value)
     if isinstance(value, str):
         # A JSON string is a TOML basic string, escapes and all, as long as
         # nothing outside the ASCII range is escaped: JSON writes an emoji as
@@ -60,13 +64,19 @@ def toml_value(value) -> str:
             return "[]"
         return "[\n" + "".join(f"  {toml_value(v)},\n" for v in value) + "]"
     if isinstance(value, dict):
-        return "{ " + ", ".join(f"{k} = {toml_value(v)}" for k, v in value.items()) + " }"
+        return "{ " + ", ".join(f"{toml_key(k)} = {toml_value(v)}" for k, v in value.items()) + " }"
     raise TypeError(f"no TOML for {value!r}")
+
+
+def toml_key(key: str) -> str:
+    """A key as TOML: bare when it can be, else quoted. A bare stores.csv
+    would be read back as the dotted key stores -> csv."""
+    return key if re.fullmatch(r"[A-Za-z0-9_-]+", key) else toml_value(str(key))
 
 
 def toml_lines(fields: dict) -> str:
     """A catalogue entry: one `key = value` per field, in the order given."""
-    return "".join(f"{k} = {toml_value(v)}\n" for k, v in fields.items())
+    return "".join(f"{toml_key(k)} = {toml_value(v)}\n" for k, v in fields.items())
 
 
 def source_toml(path: Path, title: str, category: str, description: str = "") -> str:

@@ -63,6 +63,22 @@ class HarnessTest(unittest.TestCase):
         offered = [t["function"]["name"] for t in chat.calls[0][1]]
         self.assertEqual(offered, ["calculate", "write_file", "ask_person"])
 
+    def test_a_tool_that_failed_is_not_counted_as_used(self):
+        chat = ScriptedChat(calls(("calculate", {"expression": "1/0"})), says("Cannot."))
+        answer = Harness(spec(), Setting(chat=chat)).run("1/0?")
+        self.assertEqual(answer.tools, [])
+        self.assertEqual(answer.basis, "general_knowledge")
+
+    def test_a_guard_after_a_continuation_sends_the_answer_back_once(self):
+        chat = ScriptedChat(says("First part, 20 / 8 = 2.5", limited=True), says(" and the rest."),
+                            calls(("calculate", {"expression": "20/8"})), says("It is 2.5."))
+        Harness(spec(guards=["calculate_first"]), Setting(chat=chat)).run("how much?")
+        sent = chat.calls[2][0]
+        firsts = [m for m in sent if m["role"] == "assistant" and "First part" in (m.get("content") or "")]
+        self.assertEqual(len(firsts), 1)
+        self.assertEqual(sent[-1]["content"], guards.CALCULATE_FIRST)
+        self.assertNotIn(guards.CONTINUE, [m.get("content") for m in sent])
+
     def test_unknown_and_bad_arguments_go_back_to_the_model(self):
         chat = ScriptedChat(calls(("delete_everything", {}), ("calculate", {"expr": "1"})), says("Done."))
         Harness(spec(), Setting(chat=chat)).run("go")
