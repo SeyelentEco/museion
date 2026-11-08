@@ -48,6 +48,8 @@ function stepText(s) {
         read_note: `Read your note ${a.name ?? ''}`,
         write_note: `${a.append ? 'Added to' : 'Wrote'} your note ${a.name ?? ''}`,
         check_dates: `Checked the dates in ${a.name ?? ''}`,
+        radio_messages: 'Read the radio messages',
+        send_radio: `Sent by radio to ${a.to || 'everyone in range'}: ${a.text ?? ''}`,
       }[s.tool] ?? `Used ${s.tool}`;
     case 'approval':
       return s.decision === 'deny' ? `You declined ${s.tool}` : `You allowed ${s.tool}`;

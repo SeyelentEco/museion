@@ -84,6 +84,7 @@ class Setting:
     library: object | None = None  # ask.Asker: gather, gather_seeded, seed_queries
     library_dir: Path | None = None  # the library folder, for the tools that list it
     notes_dir: Path | None = None  # the person's notes and records (notes.py)
+    radio: object | None = None  # radio.Link, when a Meshtastic radio is connected
     person: Person = field(default_factory=Person)
     find_agent: Callable[[str], AgentSpec] | None = None  # for delegate
     workspace_for: Callable[[AgentSpec], Path | None] = lambda spec: None

@@ -54,7 +54,7 @@ welcome screen and nothing else: it detects your hardware, shows exactly what it
 fetch and how large each piece is — helper programs, the reranker, the chat model for
 your tier, the content bundle you pick — then downloads it all (resumable, verified),
 fits the model to your GPU, starts the services and builds the index. Then it gets out of
-the way, leaving Ask, Library, Evals and Settings.
+the way, leaving Ask, Agents, Notes, Map, Library, Evals and Settings.
 
 Or skip the clone: each [release](https://github.com/SeyelentEco/museion/releases) is a
 zip for Windows or macOS holding Museion, the portable Python that runs it and every
@@ -88,6 +88,33 @@ library, with calculation*, *computed*, or *general knowledge — not from your 
 unverified*. Asked what caused the Bronze Age collapse, it answers from general
 knowledge under that last label; asked anything medical or safety-critical the library
 doesn't hold, it says so and stops. See [docs/retrieval.md](docs/retrieval.md).
+
+---
+
+## For the long haul
+
+Beyond answering questions, Museion keeps what one household needs to get through a long
+time cut off, all in plain files on the same disk:
+
+- **Your notes and records.** The Notes tab holds what you write down and the records
+  the agents keep for you: stores, medicines, a health log, machines and their servicing,
+  power, places, people. They are searched with the library, and an answer that rests on
+  them says *from your own notes*. An agent changes one only after you press Allow on a
+  card that shows the change. See [docs/notes.md](docs/notes.md).
+- **First steps.** Tell the First steps agent what happened (the grid is down; the power
+  is on but the phones and internet are not; a long isolation; a flood) and it reads your
+  records, works out what runs out first, asks the water planner, clinic and power keeper
+  for their part, and saves a checklist for today, this week and this month.
+- **Clinic and power.** The Clinic agent answers from the medical books with danger signs
+  first and doses only from a passage it cites; the Power keeper works out what your
+  panels, batteries or generator can run and when servicing is due.
+- **Offline maps.** The Map tab shows a map of your area, made beforehand as an `.mbtiles`
+  file, with the places you mark on it: water, shelter, medical help, danger. See
+  [docs/maps.md](docs/maps.md).
+- **A radio, if you have one.** With a Meshtastic radio plugged in, a Radio tab sends and
+  receives short text messages with other radios nearby, no network needed, and keeps them
+  in your notes. Optional, and so far tested only against simulated radios. See
+  [docs/radio.md](docs/radio.md).
 
 ---
 

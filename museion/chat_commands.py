@@ -262,6 +262,7 @@ def run_agent(state: AppState, env: Agents, spec, chat_id: str, text: str, histo
     with closing(Index(db)) as index:
         asker = make_asker(state, cfg, index, chat)
         setting = env.setting(chat, asker, PagePerson(state, chat_id, live), chat_id, on_step, live.stop, tune)
+        setting.radio = getattr(state, "radio_link", None)
         answer = env.run(spec, text, setting, history, on_token, chat_id, tune)
     return {
         "role": "assistant", "text": answer.text, "basis": answer.basis,

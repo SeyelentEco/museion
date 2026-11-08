@@ -50,7 +50,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
 from museion import (agent_commands, chat_commands, commands, drives, library, map_commands, maps,
-                     notes_commands, services, sidecar)
+                     notes_commands, radio_commands, services, sidecar)
 from museion.appstate import AppState, UiError, open_state
 
 UI_DIR = Path(__file__).with_name("ui")
@@ -84,6 +84,8 @@ COMMANDS = {f.__name__: f for f in [
     notes_commands.list_notes, notes_commands.read_note, notes_commands.save_note, notes_commands.new_note,
     notes_commands.open_notes_folder,
     map_commands.list_maps, map_commands.list_places, map_commands.add_place, map_commands.open_maps_folder,
+    radio_commands.radio_state, radio_commands.find_radios, radio_commands.connect_radio,
+    radio_commands.disconnect_radio, radio_commands.radio_messages, radio_commands.send_radio_message,
 ]}
 
 # The page's kinds of file. Spelled out rather than asked of the mimetypes
@@ -168,6 +170,8 @@ class Server(ThreadingHTTPServer):
             return
         self.stopping.set()
         self.state.supervisor.release_all()
+        if self.state.radio_link is not None:
+            self.state.radio_link.stop()
         threading.Thread(target=self.shutdown, daemon=True).start()
 
     def watch_idle(self) -> None:
@@ -435,6 +439,7 @@ def serve(port: int = DEFAULT_PORT, open_browser: bool = True, stay: bool = Fals
     events = Events()
     state = open_state(config_dir, events.emit)
     server = Server(state, events, port)
+    radio_commands.start_saved(state)
     url = f"http://127.0.0.1:{server.port}/"
     print(f"\nMuseion is at {url}\n"
           f"Settings: {state.config_path}\n"

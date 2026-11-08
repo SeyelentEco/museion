@@ -15,7 +15,25 @@ person or by a coding agent on the local model.
 | The person's own agents, and their changes to shipped ones | `agents/<id>/` beside `config.json` (the Agents tab writes there; the shipped folder is never changed) |
 | Tools | `museion/agent_tools/<name>.py`, one tool per file; files starting with `_` are helpers, not tools |
 | An agent's own folder (its files, `notes.md`, run logs, test results) | `agent-work/<id>/` in the library folder |
+| The person's notes and records, which agents read and (behind Allow / Deny) write | `notes/` in the library folder ([notes.md](notes.md)) |
 | Chats | `chats/<chat id>.json` in the library folder |
+
+## The agents Museion ships
+
+| Agent | What it does | Smallest tier |
+| --- | --- | --- |
+| `librarian` | Answers a question from the library, citing the pages (the Ask tab) | Modest |
+| `first-steps` | Says what to do first after a disaster for this household and what it has: reads the records, works out what runs out first, asks the agents below for their part, saves a plan by today / this week / this month | Capable |
+| `water-planner` | How much water a household needs and how to make it safe | Capable |
+| `stores-keeper` | Keeps `stores.csv` in the notes; how long things last, what expires soon | Capable |
+| `clinic` | The sick and injured, from the library's medical books (danger signs first, doses only from a cited passage); keeps the health log and medicine list | Capable |
+| `power-keeper` | What the power you have can run, how long fuel lasts, what servicing is due (`power.csv`, `maintenance.csv`) | Capable |
+| `garden-planner` | A food garden: what, when, spacing and seed; keeps `garden-plan.md` | Capable |
+| `repair-helper` | Fixing a tool or machine step by step from the repair guides | Capable |
+| `ration-scaler` | Scales a recipe or ration to a number of people | Modest |
+| `study-guide` | Turns a topic into a numbered lesson with sources | Capable |
+| `library-curator` | Adds archives found in the library folder to the catalogue | Capable |
+| `radio-operator` | Reads radio messages and sends replies you allow; needs the optional radio to send ([radio.md](radio.md)) | Capable |
 
 ## The settings (`agent.toml`)
 
@@ -85,12 +103,12 @@ Beyond the benchmark's checks (`expect_any`, `must_not_contain`,
 | --- | --- |
 | `expect_tool = ["calculate"]` | these tools ran |
 | `max_rounds_used = 4` | it answered within this many rounds |
-| `expect_file = "stores.csv"` | it wrote this file in its folder |
-| `given_files = { "stores.csv" = "..." }` | files put in its folder before the case runs |
+| `expect_file = "stores.csv"` | it wrote this file in its folder (`notes/stores.csv`: in the notes) |
+| `given_files = { "stores.csv" = "..." }` | files put in its folder before the case runs (`notes/<name>`: in the notes) |
 | `person_says = ["We are 3."]` | answers to its questions, in order |
 | `approve = "allow"` | press Allow on its Allow / Deny cards (Deny otherwise) |
 
-Cases run in a scratch folder, so they never touch the agent's real files.
+Cases run in a scratch folder, with a scratch notes folder, so they never touch the agent's real files or the person's notes.
 Run them with the agent's Test button, or
 `python -m museion agent test <id> --library <library folder>` while the
 services are running (open the page to start them); results are kept in

@@ -6,6 +6,7 @@
 //   chats.js     the list of chats    agents.js   the Agents tab
 //   library.js   the Library tab      chooser.js  the Choose… window
 //   notes.js     the Notes tab        map.js      the Map tab
+//   radio.js     the Radio tab and its card in Settings
 //   evals.js     the Evals tab        dots.js     the header's service dots
 //   settings.js  the Settings tab     tabs.js     switching tabs
 //   welcome.js   first-run set-up     dom.js      small helpers
@@ -19,6 +20,7 @@ import './chats.js';
 import './agents.js';
 import './notes.js';
 import './map.js';
+import './radio.js';
 import './library.js';
 import './evals.js';
 import './settings.js';

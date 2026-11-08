@@ -93,6 +93,7 @@ nav { display: flex; gap: 0.25rem; margin-left: 0.5rem; }
   border-radius: 7px;
   cursor: pointer;
 }
+.tab[hidden] { display: none; }
 .tab:hover { color: var(--ink); background: var(--surface-2); }
 .tab[aria-current="true"] { color: var(--ink); background: var(--surface-2); }
 
@@ -727,3 +728,26 @@ td.fail { color: var(--bad); font-weight: 600; }
 .place-form { display: grid; gap: 0.4rem; padding: 0.6rem; border: 1px solid var(--accent-dim); border-radius: var(--radius); }
 .place-form input, .place-form select { width: 100%; }
 #map-pick { flex: 0 0 auto; padding: 0.4rem 0.5rem; }
+
+/* ---------- radio ---------- */
+
+.card h2 .opt { font-weight: 400; color: var(--ink-mute); font-size: 0.75em; margin-left: 0.35rem; }
+.side-head { font-size: 0.85rem; margin: 0.4rem 0 0; color: var(--ink-mid); }
+#radio-status.err { color: var(--bad); }
+#radio-status.good { color: var(--good); }
+.radio-main { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 0 1.25rem 0.75rem; }
+.radio-log { list-style: none; margin: 0; padding: 1rem 0; flex: 1 1 auto; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem; }
+.radio-log .empty-note { color: var(--ink-mute); }
+.radio-msg { max-width: 42rem; padding: 0.45rem 0.7rem; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); }
+.radio-msg.out { align-self: flex-end; background: var(--surface-2); border-color: var(--accent-dim); }
+.radio-msg .meta { font-size: 0.78rem; color: var(--ink-mute); }
+.radio-msg .t { white-space: pre-wrap; overflow-wrap: anywhere; }
+.radio-send { display: flex; gap: 0.5rem; }
+.radio-send select { flex: 0 0 auto; max-width: 14rem; padding: 0.4rem 0.5rem; }
+.radio-send input { flex: 1 1 auto; min-width: 0; }
+.radio-foot { margin-top: 0.4rem; }
+#radio-count:not(:empty) { margin-right: 0.5rem; color: var(--ink-mid); }
+#radio-count.err { color: var(--bad); }
+.radio-found { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.4rem; }
+.radio-found:empty { display: none; }
+.radio-found .muted { font-size: 0.9rem; }

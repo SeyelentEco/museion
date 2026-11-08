@@ -24,6 +24,7 @@
           <button class="tab" data-tab="agents">Agents</button>
           <button class="tab" data-tab="notes">Notes</button>
           <button class="tab" data-tab="map">Map</button>
+          <button class="tab" data-tab="radio" id="tab-radio" hidden>Radio</button>
           <button class="tab" data-tab="library">Library</button>
           <button class="tab" data-tab="evals">Evals</button>
           <button class="tab" data-tab="setup">Settings</button>
@@ -179,6 +180,29 @@
                 <div id="map-marks" class="map-layer"></div>
                 <div id="map-credit" class="map-credit"></div>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Radio: messages by a Meshtastic radio, if one is connected (museion/radio.py) -->
+        <section id="panel-radio" class="panel">
+          <div class="notes-page">
+            <aside class="note-list">
+              <div class="agent-list-head"><h1>Radio</h1></div>
+              <p id="radio-status" class="small-print"></p>
+              <h3 class="side-head">Radios heard</h3>
+              <ul id="radio-nodes" class="agent-items"></ul>
+              <p class="muted small-print">Every message sent and received is kept in radio-messages.csv in your notes, so it is searched with them and the agents can read it.</p>
+              <button id="radio-settings" type="button" class="small">Radio settings</button>
+            </aside>
+            <div class="radio-main">
+              <ol id="radio-log" class="radio-log"></ol>
+              <form id="radio-send" class="radio-send">
+                <select id="radio-to" aria-label="Send to"></select>
+                <input id="radio-text" type="text" maxlength="760" autocomplete="off" placeholder="A short message" aria-label="Message" />
+                <button type="submit" class="primary" id="radio-send-button">Send</button>
+              </form>
+              <p class="muted small-print radio-foot"><span id="radio-count"></span>Anyone with a radio on the same channel can read what you send: keep health details, and what you have stored and where, off the air.</p>
             </div>
           </div>
         </section>
@@ -393,6 +417,30 @@
                 <span class="what">Measures the chat model against your GPU and stores the layer split. Set-up did this once; run it again after changing the GPU or the chat model. Stops the chat model to measure, so start services afterwards.</span>
                 <button id="fit-model" type="button">Fit model to this machine</button>
               </div>
+            </div>
+            <div class="card" id="card-radio">
+              <h2>Radio <span class="opt">optional</span></h2>
+              <p class="muted">
+                A Meshtastic radio passes short text messages to other radios nearby, a few
+                kilometres a hop, with no phone network or internet. If you have one, plug it in
+                by USB (or put it on the same network) and connect it here: a Radio tab then shows
+                the messages, and the Radio operator agent can read them and send replies you
+                allow. Without one, nothing changes.
+              </p>
+              <div class="field">
+                <label for="radio-address">Where the radio is</label>
+                <span class="what">Its port: COM5 on Windows, /dev/ttyUSB0 or /dev/ttyACM0 on Linux, /dev/cu.usbserial… on a Mac. For a radio on the network, tcp: and its address, like tcp:192.168.1.40.</span>
+                <div class="row">
+                  <input id="radio-address" type="text" placeholder="COM5" autocomplete="off" />
+                  <button id="radio-find" type="button">Look for a radio</button>
+                </div>
+                <div id="radio-found" class="radio-found"></div>
+              </div>
+              <div class="actions">
+                <button id="radio-connect" type="button">Connect</button>
+                <button id="radio-disconnect" type="button" hidden>Disconnect</button>
+              </div>
+              <p id="radio-card-status" class="status" role="status"></p>
             </div>
             <div class="card" id="card-drive" hidden>
               <h2>This drive</h2>

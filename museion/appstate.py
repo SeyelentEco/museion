@@ -37,6 +37,8 @@ class AppState:
         self._lock = threading.Lock()
         self._hardware: hardware.Hardware | None = None
         self._stats: tuple[float, tuple[int, int, int]] | None = None
+        # The Meshtastic radio's link, if one is connected (radio_commands.py).
+        self.radio_link = None
         cfg = config.load(config_path)
         if drive:
             cfg = cfg.resolved(drive.root)

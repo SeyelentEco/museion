@@ -105,14 +105,16 @@ def read(folder: Path, name: str) -> str:
     return path.read_text(encoding="utf-8-sig", errors="replace")
 
 
-def write(folder: Path, name: str, text: str, append: bool = False) -> Path:
+def write(folder: Path, name: str, text: str, append: bool = False, history: bool = True) -> Path:
     """Write a note, or add to its end; the version before goes to
-    .history first. Returns the file written."""
+    .history first (unless `history` is off, for a log that only ever grows,
+    like the radio's messages). Returns the file written."""
     if len(text.encode("utf-8")) > MAX_BYTES:
         raise NoteError(f"That is too long for one note; keep notes under {MAX_BYTES // 1000} kB.")
     path = path_of(folder, name)
     path.parent.mkdir(parents=True, exist_ok=True)
-    keep_previous(folder, path)
+    if history:
+        keep_previous(folder, path)
     if not text.endswith("\n"):
         text += "\n"
     if append and path.is_file():

@@ -97,6 +97,9 @@ and the unit tests. A change shows in a new chat; no restart is needed.
 | The benchmark of questions and expected answers | `evals/benchmark.toml`, `museion/evals.py`; retrieval alone: `evals/retrieval.toml`, `retrieval_eval.py` |
 | Agents: the harness, its tools, chats | `agents/` (one folder each), `museion/harness.py`, `agent_tools/` (one tool per file), `agents.py` (settings), `chat_commands.py`, `agent_commands.py`; see `docs/agents.md` |
 | The command line | `museion/cli.py`, `catalog_cli.py`, `drive_cli.py` |
+| The person's notes and records (the Notes tab), and their kinds | `museion/notes.py`, `records.toml`, `notes_commands.py`, `agent_tools/write_note.py` and the other note tools; see `docs/notes.md` |
+| Offline maps and places (the Map tab) | `museion/maps.py`, `map_commands.py`, `ui/map.js`; see `docs/maps.md` |
+| The optional Meshtastic radio (the Radio tab) | `museion/radio.py`, `radio_commands.py`, `ui/radio.js`; see `docs/radio.md` |
 
 `docs/` explains the design: `retrieval.md` (how search works and why),
 `python.md` (how this Python version works), `portable.md` (drives),
