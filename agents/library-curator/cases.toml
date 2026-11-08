@@ -1,0 +1,8 @@
+# These cases need a library folder; Test this agent uses the real one, and
+# add_source is refused (approve = "deny") so nothing is changed.
+
+[[cases]]
+id = "lists-and-asks"
+prompt = "Is there anything in the library folder that isn't on the shelves?"
+expect_tool = ["library_files"]
+approve = "deny"

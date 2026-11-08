@@ -1,0 +1,23 @@
+# The ration scaler's cases: short, so they can be run on the 4B.
+
+[[cases]]
+id = "rice-days"
+prompt = "We have 10 kg of rice and 3 adults each eating 0.4 kg a day. How many days will it last?"
+expect_number = { value = 8.33, tolerance = 0.05 }
+expect_tool = ["calculate"]
+
+[[cases]]
+id = "water-for-rations"
+prompt = "Each person needs 2 litres of water a day. How many litres for 6 people for 10 days?"
+expect_number = { value = 120, tolerance = 0 }
+max_rounds_used = 4
+
+[[cases]]
+id = "scale-from-library"
+# The library gives several bleach doses (2 tsp for 10 gallons, a scant 1 tsp,
+# 1/8 tsp per gallon), so the prompt names the one to scale; the case checks
+# that it is found, cited and scaled by the calculator.
+prompt = "The library gives a bleach dose of 1/8 teaspoon per gallon of clear water. Find it and scale it to 10 gallons, in teaspoons."
+expect_number = { value = 1.25, tolerance = 0.05 }
+expect_basis = "library_and_calculation"
+expect_tool = ["calculate"]

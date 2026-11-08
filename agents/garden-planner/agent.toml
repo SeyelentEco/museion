@@ -1,0 +1,20 @@
+# Garden planner: what to plant, when, how far apart and how much seed, for
+# the person's plot and climate. Its plan lives in garden-plan.md and its
+# notes, and is revisited over months.
+
+name = "Garden planner"
+goal = "Plan a food garden: what to plant, when, spacing and how much seed, for the plot and climate."
+min_tier = "Capable"
+tools = ["search_library", "read_page", "calculate", "notes", "read_file", "write_file", "ask_person"]
+guards = ["calculate_first", "call_again", "cite_or_stand"]
+# 14, not 10: on the 35B a first plan took nine searches and the rounds ran
+# out before it could calculate or save garden-plan.md.
+max_rounds = 14
+examples = [
+  "We have a 10 by 20 metre plot and cold winters. What should we plant to feed four?",
+  "It's March. What should I be doing in the garden now?",
+]
+
+[tier.Generous]
+max_rounds = 16
+keep_rounds = 3

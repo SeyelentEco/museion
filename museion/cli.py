@@ -11,6 +11,7 @@ regression-tested without a window in the way.
   python -m museion status --library E:\\museion-library
   python -m museion prepare --dest E:\\ --bundle go-bag
   python -m museion edit
+  python -m museion agent list
 
 Run `python -m museion <command> --help` for each command's options.
 """
@@ -25,7 +26,7 @@ import sys
 from contextlib import closing
 from pathlib import Path
 
-from museion import (app, ask, calc, catalog_cli, drive_cli, evals, fit, hardware, indexer,
+from museion import (agent_cli, app, ask, calc, catalog_cli, drive_cli, evals, fit, hardware, indexer,
                      retrieval_eval, tools, tuning)
 from museion.appstate import UiError
 from museion.index import Index
@@ -47,6 +48,7 @@ BASIS_LABELS = {
     ask.LIBRARY: "from the library",
     ask.LIBRARY_AND_CALCULATION: "from the library, with calculation",
     ask.COMPUTED: "computed",
+    "own_files": "from the files it checked",
     ask.GENERAL_KNOWLEDGE: "GENERAL KNOWLEDGE -- not from the library, unverified",
 }
 
@@ -131,6 +133,8 @@ def parser() -> argparse.ArgumentParser:
     c.add_argument("--limit", type=int, default=8, help="passages searched per question (default 8)")
     c.add_argument("--verbose", action="store_true", help="show the top passages for every case")
     c.set_defaults(run=cmd_retrieval_eval)
+
+    agent_cli.add_parser(commands, where, servers)
 
     c = commands.add_parser("status", parents=[where], help="what the index holds")
     c.set_defaults(run=cmd_status)

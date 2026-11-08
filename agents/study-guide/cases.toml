@@ -1,0 +1,14 @@
+[[cases]]
+id = "soap-lesson"
+prompt = "Make a lesson on making soap from fat and lye."
+expect_tool = ["search_library", "write_file"]
+min_steps = 4
+min_sources = 2
+expect_basis = "library"
+
+[[cases]]
+id = "splint-lesson"
+prompt = "Teach me how to splint a broken arm."
+expect_any = ["splint", "pad", "sling"]
+min_steps = 3
+expect_basis = "library"

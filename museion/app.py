@@ -49,7 +49,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
-from museion import commands, drives, library, services, sidecar
+from museion import agent_commands, chat_commands, commands, drives, library, services, sidecar
 from museion.appstate import AppState, UiError, open_state
 
 UI_DIR = Path(__file__).with_name("ui")
@@ -73,6 +73,13 @@ COMMANDS = {f.__name__: f for f in [
     library.list_content, library.library_space, library.fetch_source, library.add_content_dir,
     library.remove_content_dir, library.build_index,
     drives.prepare_options, drives.prepare_estimate, drives.prepare_drive, drives.verify_drive,
+    chat_commands.list_chats, chat_commands.new_chat, chat_commands.get_chat, chat_commands.rename_chat,
+    chat_commands.delete_chat, chat_commands.send_message, chat_commands.answer_agent, chat_commands.stop_run,
+    agent_commands.list_agents, agent_commands.get_agent, agent_commands.save_agent,
+    agent_commands.revert_agent, agent_commands.new_agent, agent_commands.save_notes,
+    agent_commands.agent_runs, agent_commands.read_run, agent_commands.save_test_case,
+    agent_commands.test_agent, agent_commands.agent_tests, agent_commands.export_agent,
+    agent_commands.import_agent,
 ]}
 
 # The page's kinds of file. Spelled out rather than asked of the mimetypes

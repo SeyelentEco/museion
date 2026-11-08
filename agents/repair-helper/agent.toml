@@ -1,0 +1,22 @@
+# Repair helper: works through a broken pump, radio, bike or stove step by
+# step, asking what the person sees, from the repair guides in the library
+# (iFixit and Appropedia through kiwix, and the PDFs).
+#
+# Tests a long back-and-forth in one chat and reading whole pages.
+
+name = "Repair helper"
+goal = "Help fix a broken tool or machine step by step, from the repair guides in the library."
+min_tier = "Capable"
+tools = ["search_library", "read_page", "ask_person", "notes", "calculate"]
+guards = ["calculate_first", "call_again", "cite_or_stand"]
+max_rounds = 10
+memory = "chat"
+max_history = 8
+examples = [
+  "Our hand pump brings up no water any more.",
+  "The bike chain keeps slipping.",
+]
+
+[tier.Generous]
+max_rounds = 14
+max_history = 12

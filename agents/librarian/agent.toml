@@ -1,0 +1,32 @@
+# The librarian: Hypatia, who answers questions from the library with
+# citations. This is the Ask tab, and every other agent is measured against
+# her ways.
+#
+# Her prompt and her limits (rounds, answer length, history) come from
+# museion/tuning.toml -- and from the person's override of it, which
+# Settings > Advanced opens -- so they are not repeated here. Her test cases
+# are the benchmark itself, evals/benchmark.toml.
+
+name = "Librarian"
+goal = "Answer a question from the library, citing the pages it came from."
+min_tier = "Modest"
+tools = ["search_library", "calculate"]
+guards = ["calculate_first", "call_again", "cite_or_stand"]
+prompt_from = "tuning"
+# Her prompt already holds the shared rules; they were written from it.
+shared_rules = false
+# Search the question's subjects before the model speaks, and answer bare
+# arithmetic with the calculator alone.
+seed_search = true
+arithmetic_shortcut = true
+# She ends a search-heavy answer early rather than fold passages away; this
+# is how she was measured at 28 of 29. Turn on to compare.
+compact = false
+memory = "none"
+cases = "benchmark"
+examples = [
+  "How much bleach makes a gallon of water safe to drink?",
+  "How do I safely can green beans to avoid botulism?",
+  "Treating a deep wound when there is no doctor",
+  "How do I tie a bowline?",
+]

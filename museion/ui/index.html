@@ -21,6 +21,7 @@
         </div>
         <nav>
           <button class="tab" data-tab="ask" aria-current="true">Ask</button>
+          <button class="tab" data-tab="agents">Agents</button>
           <button class="tab" data-tab="library">Library</button>
           <button class="tab" data-tab="evals">Evals</button>
           <button class="tab" data-tab="setup">Settings</button>
@@ -34,34 +35,75 @@
       </header>
 
       <main>
-        <!-- Ask -->
+        <!-- Ask: chats, each with one agent; the librarian by default -->
         <section id="panel-ask" class="panel active">
-          <div id="transcript" class="transcript">
-            <div id="boot-status" class="boot-status" hidden></div>
-            <div class="empty" id="ask-empty">
-              <h1>Ask the library</h1>
-              <p>
-                Answers come only from the archives on this disk, with citations you can open
-                and read yourself. If the library doesn't cover something, it will say so.
-              </p>
-              <ul class="examples" id="examples">
-                <li>How much bleach makes a gallon of water safe to drink?</li>
-                <li>How do I safely can green beans to avoid botulism?</li>
-                <li>Treating a deep wound when there is no doctor</li>
-                <li>How do I tie a bowline?</li>
-              </ul>
+          <div class="chats">
+            <aside class="chat-list" aria-label="Chats">
+              <div class="new-chat">
+                <select id="new-chat-agent" aria-label="Agent for a new chat"></select>
+                <button id="new-chat" type="button" class="primary" title="Start a new chat with this agent">New chat</button>
+              </div>
+              <select id="chat-filter" aria-label="Show chats of">
+                <option value="">All chats</option>
+              </select>
+              <ul id="chat-items" class="chat-items"></ul>
+            </aside>
+            <div class="chat-main">
+              <div class="chat-head" id="chat-head" hidden>
+                <span class="chat-agent" id="chat-agent"></span>
+                <span class="chat-title" id="chat-title"></span>
+                <button id="chat-rename" type="button" class="small">Rename</button>
+                <button id="chat-delete" type="button" class="small">Delete</button>
+              </div>
+              <div id="transcript" class="transcript">
+                <div id="boot-status" class="boot-status" hidden></div>
+                <div class="empty" id="ask-empty">
+                  <h1 id="empty-title">Ask the library</h1>
+                  <p id="empty-lede">
+                    Answers come only from the archives on this disk, with citations you can open
+                    and read yourself. If the library doesn't cover something, it will say so.
+                  </p>
+                  <ul class="examples" id="examples">
+                    <li>How much bleach makes a gallon of water safe to drink?</li>
+                    <li>How do I safely can green beans to avoid botulism?</li>
+                    <li>Treating a deep wound when there is no doctor</li>
+                    <li>How do I tie a bowline?</li>
+                  </ul>
+                </div>
+              </div>
+              <form id="ask-form" class="composer">
+                <input
+                  id="question"
+                  type="text"
+                  autocomplete="off"
+                  placeholder="Ask a question…"
+                  aria-label="Question"
+                />
+                <button id="ask-send" type="submit">Ask</button>
+                <button id="ask-stop" type="button" hidden title="Stop this chat's agent">Stop</button>
+              </form>
             </div>
           </div>
-          <form id="ask-form" class="composer">
-            <input
-              id="question"
-              type="text"
-              autocomplete="off"
-              placeholder="Ask a question…"
-              aria-label="Question"
-            />
-            <button id="ask-send" type="submit">Ask</button>
-          </form>
+        </section>
+
+        <!-- Agents: what each can do, editing them, their runs and tests -->
+        <section id="panel-agents" class="panel">
+          <div class="agents-page">
+            <aside class="agent-list">
+              <div class="agent-list-head">
+                <h1>Agents</h1>
+                <span class="muted" id="agents-tier"></span>
+              </div>
+              <ul id="agent-items" class="agent-items"></ul>
+              <div class="row">
+                <button id="agent-new" type="button">New agent</button>
+                <button id="agent-import" type="button">Import…</button>
+              </div>
+            </aside>
+            <div class="agent-detail" id="agent-detail">
+              <div class="empty"><h1>Agents</h1><p>An agent has a goal, tools and rules, and works with the model on this computer. Pick one to see it, change it, or test it.</p></div>
+            </div>
+          </div>
         </section>
 
         <!-- Library: what you have, what you could have, and the reader -->

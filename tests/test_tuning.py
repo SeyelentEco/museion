@@ -14,6 +14,7 @@ class TuningTest(unittest.TestCase):
         t = tuning.defaults()
         prompt = t.system_prompt.replace("\n", " ")
         self.assertIn("do not improvise", prompt)
+        self.assertIn("give no doses, amounts or schedules from general knowledge", prompt)
         self.assertIn("Never do arithmetic or unit conversion yourself", prompt)
         self.assertIn("EXACTLY as calculate returned it", prompt)
         self.assertIn("The library has nothing on this, so from general knowledge:", prompt)

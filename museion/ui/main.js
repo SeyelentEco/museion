@@ -2,7 +2,8 @@
 // together, starts the services when Museion opens, and handles Quit.
 //
 //   api.js       talking to Museion (museion/app.py)
-//   ask.js       the Ask tab          answer.js   showing an answer
+//   ask.js       the Ask tab: a chat  answer.js   showing an answer
+//   chats.js     the list of chats    agents.js   the Agents tab
 //   library.js   the Library tab      chooser.js  the Choose… window
 //   evals.js     the Evals tab        dots.js     the header's service dots
 //   settings.js  the Settings tab     tabs.js     switching tabs
@@ -13,6 +14,8 @@ import { $, el } from './dom.js';
 import { refreshServiceDots, setDot } from './dots.js';
 import { showTab, showWelcome } from './tabs.js';
 import './ask.js';
+import './chats.js';
+import './agents.js';
 import './library.js';
 import './evals.js';
 import './settings.js';

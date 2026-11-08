@@ -239,6 +239,8 @@ class AskTest(unittest.TestCase):
         answer = asker(chat).ask("purify water")
         self.assertEqual(chat.calls[1][0][-1]["content"], ask.CONTINUE)
         self.assertIsNone(chat.calls[1][1])
+        said = [m["content"] for m in chat.calls[2][0] if m["role"] == "assistant"]
+        self.assertEqual(said[-2:], ["Step one", "step two"], "each piece is replayed once")
         self.assertEqual(answer.text, "Step one step two three [1]." + ask.CUT_SHORT)
 
     def test_the_last_round_withholds_the_tools(self):

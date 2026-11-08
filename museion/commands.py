@@ -297,6 +297,8 @@ def wanted(entry: os.DirEntry, want: str) -> bool:
     name = entry.name.lower()
     if want == "gguf":
         return name.endswith(".gguf")
+    if want == "zip":
+        return name.endswith(".zip")
     if want == "program":
         return name.endswith(".exe") if sys.platform == "win32" else os.access(entry.path, os.X_OK)
     return True

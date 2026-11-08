@@ -1,0 +1,24 @@
+# Water planner: how much water a household needs, and how to make it safe,
+# with doses scaled to the containers the person actually has.
+#
+# Tests the guards and grounding together with arithmetic, the two things the
+# benchmark already scores; its cases carry the bleach cases over.
+
+name = "Water planner"
+goal = "Work out how much water a household needs and how to make it safe to drink, from the library."
+min_tier = "Capable"
+tools = ["search_library", "read_page", "calculate", "notes", "ask_person"]
+guards = ["calculate_first", "call_again", "cite_or_stand"]
+max_rounds = 8
+examples = [
+  "There are 5 of us and a dog. How much water should we store for two weeks?",
+  "I have a 55 gallon drum of rain water. How do I make it safe to drink?",
+]
+
+[tier.Generous]
+max_rounds = 12
+keep_rounds = 3
+
+[tier.Ample]
+max_rounds = 16
+keep_rounds = 4

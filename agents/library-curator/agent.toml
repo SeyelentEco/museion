@@ -1,0 +1,15 @@
+# Library curator: finds archives copied into the library but not yet in the
+# catalogue, and adds them -- each one only when the person presses Allow.
+#
+# The cleanest test of human in the loop: its one action that changes
+# Museion, add_source, is risk "ask", and goes through the same safe code as
+# `python -m museion add-source`.
+
+name = "Library curator"
+goal = "Find archives in the library folder that are not in the catalogue, and add them with the person's say-so."
+min_tier = "Capable"
+tools = ["library_files", "add_source", "ask_person"]
+guards = ["call_again"]
+max_rounds = 8
+memory = "none"
+examples = ["Is there anything in the library folder that isn't on the shelves?"]
