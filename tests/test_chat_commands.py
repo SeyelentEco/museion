@@ -155,7 +155,7 @@ class ExportImportTest(Setup, unittest.TestCase):
         agent_commands.save_agent(self.state, "ration-scaler", {"enabled": False}, None)
         setting = env.setting(None)
         with self.assertRaises(Exception) as caught:
-            Harness(env.get("three-day-planner"), setting).delegate("ration-scaler", "scale")
+            Harness(env.get("first-steps"), setting).delegate("ration-scaler", "scale")
         self.assertIn("turned off", str(caught.exception))
 
 

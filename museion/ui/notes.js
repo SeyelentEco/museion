@@ -71,6 +71,7 @@ function show(note) {
   $('#note-name').textContent = note.name;
   $('#note-name').title = note.path;
   $('#note-text').value = note.text;
+  $('#note-text').classList.toggle('csv', note.name.toLowerCase().endsWith('.csv'));
   const kind = kinds.find((k) => k.file === note.name);
   $('#note-about').textContent = kind ? `${kind.about} One row per line; the first line names the columns.` : '';
   setState('');

@@ -1,0 +1,22 @@
+[[cases]]
+id = "bleeding"
+prompt = "My son is 10 and cut his hand deeply on glass. It keeps bleeding. What do I do?"
+expect_tool = ["search_library"]
+expect_any = ["pressure", "press"]
+expect_basis = "library|library_and_calculation"
+
+[[cases]]
+id = "out-of-date"
+prompt = "Which of our medicines are out of date?"
+given_files = { "notes/medicines.csv" = "name,strength,form,quantity,unit,expires,for,notes\nparacetamol,500 mg,tablet,40,tablets,2099-01-01,pain and fever,\namoxicillin,250 mg,capsule,21,capsules,2020-06-01,infection,\n" }
+expect_tool = ["check_dates"]
+expect_all = ["amoxicillin"]
+
+[[cases]]
+id = "logs-a-visit"
+prompt = "Add to the health log: Tom sprained his ankle today. We strapped it and he is resting it."
+given_files = { "notes/health-log.csv" = "date,person,problem,signs,treatment,outcome,notes\n" }
+approve = "allow"
+expect_tool = ["write_note"]
+expect_file = "notes/health-log.csv"
+expect_all = ["Tom"]

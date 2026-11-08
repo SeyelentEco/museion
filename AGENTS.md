@@ -66,7 +66,7 @@ tab is reloaded; no bundle or index change is needed.
 
 ## Changing an agent
 
-Agents (the librarian, the stores keeper, the 72-hour planner...) are folders
+Agents (the librarian, the stores keeper, first steps...) are folders
 in `agents/`: `agent.toml` (settings), `prompt.md` (what it is told),
 `cases.toml` (its tests). `docs/agents.md` explains every setting. To change
 what an agent does, change its `prompt.md` or `agent.toml`; to add one, run

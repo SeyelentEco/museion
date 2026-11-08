@@ -74,7 +74,8 @@ export function renderAnswer(container, text) {
     if (bullet || number) {
       flushPara();
       const ordered = Boolean(number);
-      const body = (bullet ?? number)[1];
+      // A checklist item ("- [ ] Fill the water containers") shows a box.
+      const body = (bullet ?? number)[1].replace(/^\[ \]\s+/, '☐ ').replace(/^\[[xX]\]\s+/, '☑ ');
       // An indented item nests under the previous top-level item.
       if (list && indent >= 2 && list.el.lastElementChild) {
         if (!list.sub) {

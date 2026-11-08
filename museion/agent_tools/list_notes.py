@@ -9,9 +9,10 @@ from museion.agent_tools._notes import folder
 
 def run(args: dict, run) -> str:
     files = notes.listing(folder(run))
+    today = f"Today is {time.strftime('%Y-%m-%d')}."
     if not files:
-        return "There are no notes yet."
-    return "\n".join(f"{f.name} ({f.size} bytes, changed {time.strftime('%Y-%m-%d', time.localtime(f.modified))})"
+        return f"There are no notes yet. {today}"
+    return today + "\n" + "\n".join(f"{f.name} ({f.size} bytes, changed {time.strftime('%Y-%m-%d', time.localtime(f.modified))})"
                      for f in files)
 
 

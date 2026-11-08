@@ -126,7 +126,7 @@ class ToolsTest(unittest.TestCase):
         self.run.setting.notes_dir = self.dir
 
     def test_write_read_list(self):
-        self.assertEqual(tool("list_notes").run({}, self.run), "There are no notes yet.")
+        self.assertTrue(tool("list_notes").run({}, self.run).startswith("There are no notes yet. Today is "))
         tool("write_note").run({"name": "stores.csv", "text": "item,quantity\nrice,10"}, self.run)
         self.assertEqual(tool("read_note").run({"name": "stores.csv"}, self.run), "item,quantity\nrice,10\n")
         self.assertIn("stores.csv (", tool("list_notes").run({}, self.run))
@@ -207,3 +207,39 @@ class BasisTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FirstStepsFlowTest(unittest.TestCase):
+    """The first-steps agent's own case, played through with a scripted model:
+    it reads the person's records, works out what runs out first, hands water
+    to the water planner and saves its plan in the notes."""
+
+    def test_reads_records_delegates_and_saves_the_plan(self):
+        from museion import evals, hardware
+        from museion.agent_run import Agents, CaseRunner, load_cases
+        root = Path(tempfile.mkdtemp())
+        env = Agents(root / "library", root / "mine", hardware.AMPLE)
+        spec = env.get("first-steps")
+        case = [c for c in load_cases(spec) if c.id == "power-on-comms-down"]
+        plan = ("Tom's insulin comes first, then water: it lasts 2 days.\n\n## Today\n"
+                "- [ ] Fill every clean container with water while the taps run.\n"
+                "- [ ] Count Tom's insulin and keep it cool.\n- [ ] Agree a meeting place with neighbours.\n"
+                "## This week\n- [ ] Get fuel and food for a month.\n")
+        chat = ScriptedChat(
+            calls(("list_notes", {})),
+            calls(("read_note", {"name": "household.csv"}), ("read_note", {"name": "stores.csv"})),
+            calls(("calculate", {"expression": "24 / (4 * 3)"})),
+            calls(("delegate", {"agent": "water-planner", "task": "3 people, 24 litres stored, taps still run."})),
+            says("Fill every clean container now and keep it covered."),
+            calls(("write_note", {"name": "first-steps-plan.md", "text": plan})),
+            says(plan),
+        )
+        index = Index(":memory:")
+        self.addCleanup(index.close)
+        library = ask.Asker(index, chat, tuning=copy.deepcopy(default_tuning()))
+        run = evals.run(CaseRunner(env, spec, chat, library), case, "t")
+        self.assertTrue(run.cases[0].passed, run.cases[0].checks)
+        read = [m["content"] for m in chat.calls[2][0] if m["role"] == "tool"]
+        self.assertTrue(any("type 1 diabetes" in r for r in read), read)
+        self.assertIn("Today is ", [m["content"] for m in chat.calls[1][0] if m["role"] == "tool"][0])
+        self.assertFalse((root / "library").exists())  # the person's notes were never touched
