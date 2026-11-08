@@ -115,6 +115,14 @@ class AppState:
         wanted = cfg.library_dir / "evals"
         return self.drive.writable_or_cache(wanted) if self.drive else wanted
 
+    def notes_dir(self, cfg: Config) -> Path | None:
+        """The person's notes and records: the library's notes folder, or on
+        a write-protected drive one on this computer (as agent-work is)."""
+        if not cfg.library_dir:
+            return None
+        wanted = cfg.library_dir / "notes"
+        return self.drive.writable_or_cache(wanted) if self.drive else wanted
+
     def hardware(self) -> hardware.Hardware:
         """Detected once. Detection shells out to nvidia-smi, and doing that
         every time the Settings tab opened is what made the Rust app's page

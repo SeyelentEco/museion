@@ -22,6 +22,7 @@
         <nav>
           <button class="tab" data-tab="ask" aria-current="true">Ask</button>
           <button class="tab" data-tab="agents">Agents</button>
+          <button class="tab" data-tab="notes">Notes</button>
           <button class="tab" data-tab="library">Library</button>
           <button class="tab" data-tab="evals">Evals</button>
           <button class="tab" data-tab="setup">Settings</button>
@@ -102,6 +103,41 @@
             </aside>
             <div class="agent-detail" id="agent-detail">
               <div class="empty"><h1>Agents</h1><p>An agent has a goal, tools and rules, and works with the model on this computer. Pick one to see it, change it, or test it.</p></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Notes: the person's own notes and records (museion/notes.py) -->
+        <section id="panel-notes" class="panel">
+          <div class="notes-page">
+            <aside class="note-list">
+              <div class="agent-list-head"><h1>Notes</h1></div>
+              <p class="muted small-print">Your own notes and records. Museion searches them with the library, and an answer that rests on them says so.</p>
+              <ul id="note-items" class="agent-items"></ul>
+              <div class="note-new">
+                <button id="note-new" type="button">New note</button>
+                <select id="note-record" aria-label="Start a record">
+                  <option value="">New record…</option>
+                </select>
+              </div>
+              <button id="note-folder" type="button" class="small">Open the notes folder</button>
+            </aside>
+            <div class="note-detail" id="note-detail">
+              <div class="empty" id="note-empty">
+                <h1>Your notes</h1>
+                <p>Write down what you learn, what you have and what worked: a repair, a remedy, which seeds grew. Records such as stores, medicines and maintenance are tables that agents keep up to date for you, after you press Allow.</p>
+                <p class="muted">They are plain files in the library's notes folder, so any text editor opens them too. Every change keeps the version before in the folder's .history.</p>
+              </div>
+              <div id="note-edit" hidden>
+                <div class="note-head">
+                  <span class="chat-title" id="note-name"></span>
+                  <span class="muted" id="note-state"></span>
+                  <button id="note-save" type="button" class="primary small">Save</button>
+                </div>
+                <p class="muted small-print" id="note-about"></p>
+                <textarea id="note-text" class="prompt-edit note-text" spellcheck="true" aria-label="Note"></textarea>
+                <div id="note-table" class="note-table"></div>
+              </div>
             </div>
           </div>
         </section>

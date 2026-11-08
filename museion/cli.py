@@ -49,6 +49,7 @@ BASIS_LABELS = {
     ask.LIBRARY_AND_CALCULATION: "from the library, with calculation",
     ask.COMPUTED: "computed",
     "own_files": "from the files it checked",
+    "notes": "from your own notes, not checked against the library",
     ask.GENERAL_KNOWLEDGE: "GENERAL KNOWLEDGE -- not from the library, unverified",
 }
 
@@ -297,7 +298,9 @@ def answer_from(args, index: Index, question: str, history: list[ask.Exchange]) 
             shown += text
             print(text, end="", flush=True)
 
-    answer = asker.ask(question, history, show)
+    from museion.harness import Setting
+    notes_dir = Path(args.library) / "notes" if getattr(args, "library", None) else None
+    answer = asker.ask(question, history, show, Setting(chat=asker.chat, notes_dir=notes_dir))
     # Nothing streams when retrieval found nothing, and that answer -- the
     # library saying it does not cover this -- is the one that must not be
     # swallowed.

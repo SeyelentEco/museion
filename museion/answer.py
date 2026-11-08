@@ -20,6 +20,9 @@ COMPUTED = "computed"  # the calculator alone
 # library folder) and did not search the library: the answer is about those
 # files, not the world.
 OWN_FILES = "own_files"
+# Every passage it cites is one of the person's own notes (notes.py): what
+# they wrote down, not checked against any book.
+OWN_NOTES = "notes"
 # The library had nothing and no calculation was involved: whatever the model
 # said came from its own training. Shown as unverified.
 GENERAL_KNOWLEDGE = "general_knowledge"
@@ -54,7 +57,7 @@ class Answer:
     text: str
     sources: list[Hit]
     reranked: bool
-    basis: str  # LIBRARY, LIBRARY_AND_CALCULATION, COMPUTED, OWN_FILES or GENERAL_KNOWLEDGE
+    basis: str  # LIBRARY, LIBRARY_AND_CALCULATION, COMPUTED, OWN_NOTES, OWN_FILES or GENERAL_KNOWLEDGE
     # Every calculation actually performed, verbatim. Shown to the reader as
     # ground truth: the model once reported 343.75 ml for a dose the
     # calculator had correctly returned as 67.8, by relabelling the result and
@@ -65,7 +68,8 @@ class Answer:
     # many model turns the answer took. Agent test cases check them.
     tools: list[str] = field(default_factory=list)
     rounds: int = 0
-    # Files the agent wrote, relative to its own folder.
+    # Files the agent wrote, relative to its own folder; notes it wrote as
+    # notes/<name>.
     files: list[str] = field(default_factory=list)
     # The run's log file, when the run was logged.
     log: str = ""
@@ -74,14 +78,17 @@ class Answer:
 # Tools that read files. Writing a note or a file is not reading one: an
 # agent that searched, found nothing, noted the household size and then gave
 # a dose from memory must still be labelled unverified.
-READ_FILE_TOOLS = frozenset({"read_file", "list_files", "library_files"})
+READ_FILE_TOOLS = frozenset({"read_file", "list_files", "library_files", "read_note", "list_notes",
+                             "check_dates"})
 
 
-def basis_of(cited: bool, calculated: bool, tools: Sequence[str] = ()) -> str:
+def basis_of(cited: bool, calculated: bool, tools: Sequence[str] = (), notes_only: bool = False) -> str:
     """Where an answer came from, from whether it cites a passage, whether
     the calculator ran and which tools ran -- never from what the model says.
     "From the files it checked" needs a file read and no library search: an
     uncited answer after a search is the general-knowledge case, files or not."""
+    if cited and notes_only:
+        return OWN_NOTES
     if cited:
         return LIBRARY_AND_CALCULATION if calculated else LIBRARY
     if calculated:

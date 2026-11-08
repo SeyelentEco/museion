@@ -47,8 +47,9 @@ class Tool:
     run: Callable[[dict, object], str]
     required: list[str] = field(default_factory=list)
     # One line for the Allow / Deny card: what this call will do, in words a
-    # person reads. Defaults to the tool's name and arguments.
-    describe: Callable[[dict], str] | None = None
+    # person reads. Defaults to the tool's name and arguments. It may take
+    # (args, run) instead of (args).
+    describe: Callable[..., str] | None = None
 
     def schema(self) -> dict:
         """The tool as the chat model is offered it."""
@@ -62,11 +63,16 @@ class Tool:
             },
         }
 
-    def summary(self, args: dict) -> str:
+    def summary(self, args: dict, run=None) -> str:
+        """`describe` may take the run as well, to say what a call would
+        change (write_note shows the lines it would change)."""
         if self.describe:
             try:
+                import inspect
+                if len(inspect.signature(self.describe).parameters) >= 2:
+                    return self.describe(args, run)
                 return self.describe(args)
-            except (KeyError, TypeError, ValueError):
+            except (KeyError, TypeError, ValueError, OSError):
                 pass
         shown = ", ".join(f"{k}={str(v)[:80]!r}" for k, v in args.items())
         return f"{self.name}({shown})"

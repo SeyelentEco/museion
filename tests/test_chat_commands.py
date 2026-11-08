@@ -55,14 +55,25 @@ class ChatCommandsTest(Setup, unittest.TestCase):
     def test_a_chat_keeps_its_messages_and_files(self):
         chat = chat_commands.new_chat(self.state, "stores-keeper")
         self.chat.script = [
-            [call_fragment(0, "c0", "list_files", "{}")],
-            [call_fragment(0, "c1", "write_file", json.dumps({"name": "stores.csv", "text": "item,quantity\nbeans,12\n"}))],
+            [call_fragment(0, "c0", "list_notes", "{}")],
+            [call_fragment(0, "c1", "write_note", json.dumps({"name": "stores.csv", "text": "item,quantity\nbeans,12\n"}))],
             [text("Saved 12 cans of beans.")],
         ]
-        reply = chat_commands.send_message(self.state, chat["id"], "We have 12 cans of beans.")
+        out = {}
+        t = threading.Thread(target=lambda: out.update(
+            chat_commands.send_message(self.state, chat["id"], "We have 12 cans of beans.")))
+        t.start()
+        card = self.waiting(chat["id"])
+        self.assertEqual(card["tool"], "write_note")
+        self.assertIn("beans,12", card["summary"])
+        chat_commands.answer_agent(self.state, chat["id"], decision="allow")
+        t.join(10)
+        reply = out
         self.assertEqual(reply["text"], "Saved 12 cans of beans.")
-        self.assertEqual(reply["files"], ["stores.csv"])
+        self.assertEqual(reply["files"], ["notes/stores.csv"])
         self.assertEqual(reply["basis"], "own_files")
+        library = Path(self.tmp.name) / "library"
+        self.assertEqual((library / "notes" / "stores.csv").read_text(), "item,quantity\nbeans,12\n")
         saved = chat_commands.get_chat(self.state, chat["id"])
         self.assertEqual([m["role"] for m in saved["messages"]], ["user", "assistant"])
         self.assertEqual(saved["title"], "We have 12 cans of beans.")

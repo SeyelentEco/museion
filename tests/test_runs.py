@@ -40,14 +40,14 @@ class CaseRunnerTest(unittest.TestCase):
 [[cases]]
 id = "days"
 prompt = "How long will the rice last?"
-given_files = { "stores.csv" = "item,quantity,unit,per_person_per_day,notes\\nrice,10,kg,0.2,\\n" }
+given_files = { "notes/stores.csv" = "item,quantity,unit,per_person_per_day,notes\\nrice,10,kg,0.2,\\n" }
 person_says = ["We are 4."]
-expect_tool = ["read_file", "ask_person", "calculate"]
+expect_tool = ["read_note", "ask_person", "calculate"]
 expect_number = { value = 12.5, tolerance = 0 }
 max_rounds_used = 5
 ''', agent=True)
         chat = ScriptedChat(
-            calls(("read_file", {"name": "stores.csv"})),
+            calls(("read_note", {"name": "stores.csv"})),
             calls(("ask_person", {"question": "How many of you?"})),
             calls(("calculate", {"expression": "10 / (0.2 * 4)"})),
             says("The rice lasts 12.5 days."),

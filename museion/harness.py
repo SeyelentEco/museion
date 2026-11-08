@@ -29,6 +29,7 @@ from museion.agent_tools import ASK, WORKSPACE, Tool, ToolError, all_tools, chec
 from museion.agents import AgentSpec
 from museion.answer import DISCARD, Answer, Calculation, Exchange, basis_of
 from museion.compaction import compact, prompt_chars
+from museion.notes import NOTES_BOOK
 from museion.model_text import cited_numbers, looks_like_leaked_tool_call, renumber_citations, strip_citations
 
 # For keeping a conversation inside the model's context: characters per token,
@@ -82,6 +83,7 @@ class Setting:
     chat: llama.Llama
     library: object | None = None  # ask.Asker: gather, gather_seeded, seed_queries
     library_dir: Path | None = None  # the library folder, for the tools that list it
+    notes_dir: Path | None = None  # the person's notes and records (notes.py)
     person: Person = field(default_factory=Person)
     find_agent: Callable[[str], AgentSpec] | None = None  # for delegate
     workspace_for: Callable[[AgentSpec], Path | None] = lambda spec: None
@@ -215,9 +217,10 @@ class Harness:
                               self.calculations, self.used, self.round, self.files)
             cited = [n for n in cited_numbers(text) if n <= len(self.sources)]
             used = [self.sources[n - 1] for n in cited]
+            notes_only = bool(used) and all(h.book == NOTES_BOOK for h in used)
             return Answer(renumber_citations(text, cited), used, self.reranked,
-                          basis_of(bool(used), bool(self.calculations), self.used), self.calculations,
-                          self.used, self.round, self.files)
+                          basis_of(bool(used), bool(self.calculations), self.used, notes_only),
+                          self.calculations, self.used, self.round, self.files)
 
     def guard_names(self) -> list[str]:
         """The agent's guards, plus those it gets for having a tool."""
@@ -232,7 +235,7 @@ class Harness:
         from museion.ask import render_search
         queries = self.library.seed_queries(goal, history)
         self.mark(f"rewrite -> {queries}")
-        hits, reranked = self.library.gather_seeded(goal, queries, set())
+        hits, reranked = self.library.gather_seeded(goal, queries, set(), **self.notes_arg())
         self.reranked |= reranked
         self.mark(f"seeded search ({len(queries) + 1} queries): {len(hits)} passages")
         result = render_search(hits, self.sources)
@@ -244,6 +247,11 @@ class Harness:
         messages.append(llama.tool_result("seed_search", result))
         self.event("tool", tool="search_library", args={"query": " | ".join(queries + [goal])},
                    result=result[:4000], seeded=True)
+
+    def notes_arg(self) -> dict:
+        """The notes folder for the library's search, when there is one: a
+        library that predates notes is called as it always was."""
+        return {"notes_dir": self.setting.notes_dir} if self.setting.notes_dir is not None else {}
 
     def finish(self, turn: llama.Turn, messages: list[dict], on_token) -> str:
         """The text of a turn that answered, carried on past the token limit.
@@ -302,7 +310,7 @@ class Harness:
         if self.needs_approval(tool):
             key = f"{name}:{json.dumps(args, sort_keys=True)}"
             if key not in self.allowed:
-                request = Approval(self.spec.name, name, args, tool.summary(args), said.strip()[:400])
+                request = Approval(self.spec.name, name, args, tool.summary(args, self), said.strip()[:400])
                 self.event("waiting", tool=name, args=args, summary=request.summary, reason=request.reason)
                 decision, note = self.person.approve(request)
                 self.check_stop()

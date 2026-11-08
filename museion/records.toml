@@ -1,0 +1,55 @@
+# The records Museion knows how to start: CSV files in the library's notes
+# folder. The Notes tab offers them under "New record", and the agents that
+# keep them (agents/*/prompt.md) use these names and columns. A person can add
+# columns to their own copy; agents keep the ones they find.
+#
+# Dates are written YYYY-MM-DD, so they sort and the check_dates tool can
+# read them.
+
+[[records]]
+file = "stores.csv"
+title = "Stores"
+about = "Food, water, fuel and other supplies: how much there is and how much a person uses a day."
+columns = ["item", "quantity", "unit", "per_person_per_day", "expires", "where", "notes"]
+
+[[records]]
+file = "medicines.csv"
+title = "Medicines"
+about = "Medicines and medical supplies on hand, with strength and expiry date."
+columns = ["name", "strength", "form", "quantity", "unit", "expires", "for", "notes"]
+
+[[records]]
+file = "health-log.csv"
+title = "Health log"
+about = "Each time someone is ill or hurt: what was wrong, what was done and how it went."
+columns = ["date", "person", "problem", "signs", "treatment", "outcome", "notes"]
+
+[[records]]
+file = "maintenance.csv"
+title = "Maintenance"
+about = "Machines and what they need: the task, how often in days, and when it was last done."
+columns = ["machine", "task", "every_days", "last_done", "notes"]
+
+[[records]]
+file = "power.csv"
+title = "Power"
+about = "What makes and stores power (panels, batteries, generator) and what uses it, in watts."
+columns = ["thing", "kind", "watts", "hours_per_day", "capacity_wh", "fuel_per_hour", "notes"]
+
+[[records]]
+file = "places.csv"
+title = "Places"
+about = "Places worth finding again: wells, gardens, safe routes, neighbours. Latitude and longitude in decimal degrees."
+columns = ["name", "kind", "lat", "lon", "notes"]
+
+[[records]]
+file = "people.csv"
+title = "People nearby"
+about = "Neighbours and what they know how to do, so you know who to ask."
+columns = ["name", "skills", "where", "how_to_reach", "notes"]
+
+[[records]]
+file = "household.csv"
+title = "Household"
+about = "Who lives here: ages, health needs, medicines taken every day."
+columns = ["name", "age", "needs", "daily_medicines", "notes"]

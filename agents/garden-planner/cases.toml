@@ -2,7 +2,8 @@
 id = "plot-plan"
 prompt = "We have a 10 by 20 metre plot and cold winters, 4 people. What should we plant?"
 expect_tool = ["search_library", "calculate"]
-expect_file = "garden-plan.md"
+approve = "allow"
+expect_file = "notes/garden-plan.md"
 expect_any = ["potato", "bean", "squash", "cabbage", "carrot", "kale"]
 
 [[cases]]

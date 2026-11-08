@@ -453,6 +453,22 @@ class Index:
         return [(book, count) for book, count in rows]
 
 
+def coverage(text: str, terms: list[str], weights: list[float]) -> float:
+    """The share of the terms' weight that `text` carries, matched as
+    search_ungated matches them (a prefix at a word boundary)."""
+    total = 0.0
+    for weight in weights:
+        total += weight
+    if total <= 0:
+        return 0.0
+    words = _words(text.lower())
+    carried = 0.0
+    for term, weight in zip(terms, weights):
+        if any(w.startswith(term) for w in words):
+            carried += weight
+    return carried / total
+
+
 def to_fts_query(text: str) -> str:
     """Turn a natural-language question into an FTS5 query.
 
