@@ -49,8 +49,8 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
-from museion import (agent_commands, chat_commands, commands, drives, library, notes_commands, services,
-                     sidecar)
+from museion import (agent_commands, chat_commands, commands, drives, library, map_commands, maps,
+                     notes_commands, services, sidecar)
 from museion.appstate import AppState, UiError, open_state
 
 UI_DIR = Path(__file__).with_name("ui")
@@ -83,6 +83,7 @@ COMMANDS = {f.__name__: f for f in [
     agent_commands.import_agent,
     notes_commands.list_notes, notes_commands.read_note, notes_commands.save_note, notes_commands.new_note,
     notes_commands.open_notes_folder,
+    map_commands.list_maps, map_commands.list_places, map_commands.add_place, map_commands.open_maps_folder,
 ]}
 
 # The page's kinds of file. Spelled out rather than asked of the mimetypes
@@ -196,6 +197,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(200, {"app": "museion"})
         if url.path == "/file":
             return self.send_content_file(urllib.parse.parse_qs(url.query).get("path", [""])[0])
+        if url.path.startswith("/tiles/"):
+            return self.send_tile(url.path)
         self.send_ui_file(url.path)
 
     def do_POST(self) -> None:
@@ -353,6 +356,34 @@ class Handler(BaseHTTPRequestHandler):
                     self.wfile.write(chunk)
         except OSError:
             pass
+
+
+    def send_tile(self, path: str) -> None:
+        """One map tile, /tiles/<map>/<z>/<x>/<y>, from a map in the library
+        found by its name: nothing in the address is used as a path."""
+        m = re.fullmatch(r"/tiles/([A-Za-z0-9._-]+)/(\d{1,2})/(\d{1,7})/(\d{1,7})(?:\.\w+)?", path)
+        found = None
+        if m and self.headers.get("Sec-Fetch-Site") != "cross-site":
+            file = map_commands.find_map(self.server.state, m[1])
+            if file is not None:
+                try:
+                    found = maps.tile(file, int(m[2]), int(m[3]), int(m[4]))
+                except (OSError, sqlite3.Error):
+                    found = None
+        if found is None:
+            # No tile there is normal at the map's edge: an empty answer, not
+            # an error the console complains about.
+            self.send_response(204)
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            return
+        data, kind = found
+        self.send_response(200)
+        self.send_header("Content-Type", kind)
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "max-age=3600")
+        self.end_headers()
+        self.wfile.write(data)
 
 
 def plain_relative(name: str) -> bool:

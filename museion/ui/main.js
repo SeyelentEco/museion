@@ -5,7 +5,7 @@
 //   ask.js       the Ask tab: a chat  answer.js   showing an answer
 //   chats.js     the list of chats    agents.js   the Agents tab
 //   library.js   the Library tab      chooser.js  the Choose… window
-//   notes.js     the Notes tab
+//   notes.js     the Notes tab        map.js      the Map tab
 //   evals.js     the Evals tab        dots.js     the header's service dots
 //   settings.js  the Settings tab     tabs.js     switching tabs
 //   welcome.js   first-run set-up     dom.js      small helpers
@@ -18,6 +18,7 @@ import './ask.js';
 import './chats.js';
 import './agents.js';
 import './notes.js';
+import './map.js';
 import './library.js';
 import './evals.js';
 import './settings.js';

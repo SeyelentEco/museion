@@ -697,3 +697,33 @@ td.fail { color: var(--bad); font-weight: 600; }
   background: var(--surface-2); border-radius: 7px;
 }
 .note-text.csv { flex: 0 0 auto; height: 13rem; min-height: 8rem; }
+
+/* ---------- map ---------- */
+
+.map-main { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.map-bar { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-bottom: 1px solid var(--line); }
+.map-note { padding: 0.5rem 1rem; color: var(--ink-mid); font-size: 0.9rem; border-bottom: 1px solid var(--line); }
+.map-note[hidden], .place-form[hidden] { display: none; }
+.map-view {
+  position: relative; flex: 1 1 auto; overflow: hidden; touch-action: none; cursor: grab;
+  background-color: var(--surface-2);
+  background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+.map-view:active { cursor: grabbing; }
+.map-view.adding { cursor: crosshair; }
+.map-layer { position: absolute; inset: 0; pointer-events: none; }
+.map-layer img { position: absolute; user-select: none; image-rendering: auto; }
+.place-mark { position: absolute; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; pointer-events: auto; }
+.place-mark .pin { width: 14px; height: 14px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: var(--accent); border: 2px solid var(--ground); }
+.place-mark .label { margin-top: 2px; padding: 0 4px; font-size: 0.75rem; border-radius: 4px; background: var(--ground); color: var(--ink); white-space: nowrap; opacity: 0.9; }
+.place-mark.kind-water .pin { background: #3d8bd8; }
+.place-mark.kind-medical .pin { background: #d8483d; }
+.place-mark.kind-food .pin { background: #5fa84a; }
+.place-mark.kind-danger .pin { background: #111; border-color: #e0a045; }
+.place-mark.kind-power .pin { background: #e0c445; }
+.map-credit { position: absolute; right: 6px; bottom: 4px; font-size: 0.72rem; color: var(--ink-mute); background: var(--ground); padding: 0 4px; border-radius: 4px; }
+.map-credit:empty { display: none; }
+.place-form { display: grid; gap: 0.4rem; padding: 0.6rem; border: 1px solid var(--accent-dim); border-radius: var(--radius); }
+.place-form input, .place-form select { width: 100%; }
+#map-pick { flex: 0 0 auto; padding: 0.4rem 0.5rem; }

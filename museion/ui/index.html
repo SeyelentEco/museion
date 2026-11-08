@@ -23,6 +23,7 @@
           <button class="tab" data-tab="ask" aria-current="true">Ask</button>
           <button class="tab" data-tab="agents">Agents</button>
           <button class="tab" data-tab="notes">Notes</button>
+          <button class="tab" data-tab="map">Map</button>
           <button class="tab" data-tab="library">Library</button>
           <button class="tab" data-tab="evals">Evals</button>
           <button class="tab" data-tab="setup">Settings</button>
@@ -137,6 +138,46 @@
                 <p class="muted small-print" id="note-about"></p>
                 <textarea id="note-text" class="prompt-edit note-text" spellcheck="true" aria-label="Note"></textarea>
                 <div id="note-table" class="note-table"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Map: an offline map and the person's places (museion/maps.py) -->
+        <section id="panel-map" class="panel">
+          <div class="notes-page">
+            <aside class="note-list">
+              <div class="agent-list-head"><h1>Map</h1></div>
+              <select id="map-pick" aria-label="Map"></select>
+              <p class="muted small-print">Your places are kept in places.csv in your notes, so the agents can read them too.</p>
+              <ul id="place-items" class="agent-items"></ul>
+              <form id="place-form" class="place-form" hidden>
+                <div class="muted small-print">New place at <span id="place-at"></span></div>
+                <input id="place-name" type="text" placeholder="Name, like Spring by the old mill" aria-label="Name" />
+                <select id="place-kind" aria-label="Kind"></select>
+                <input id="place-notes" type="text" placeholder="Notes (optional)" aria-label="Notes" />
+                <div class="row">
+                  <button type="submit" class="primary small">Save place</button>
+                  <button type="button" id="place-cancel" class="small">Cancel</button>
+                </div>
+              </form>
+              <div class="row">
+                <button id="map-reload" type="button" class="small">Look again</button>
+                <button id="map-folder" type="button" class="small">Open the maps folder</button>
+              </div>
+            </aside>
+            <div class="map-main">
+              <div class="map-bar">
+                <button id="map-in" type="button" class="small" title="Zoom in">+</button>
+                <button id="map-out" type="button" class="small" title="Zoom out">−</button>
+                <button id="map-add" type="button" class="small">Add a place</button>
+                <span id="map-where" class="muted"></span>
+              </div>
+              <div id="map-note" class="map-note" hidden></div>
+              <div id="map-view" class="map-view">
+                <div id="map-tiles" class="map-layer"></div>
+                <div id="map-marks" class="map-layer"></div>
+                <div id="map-credit" class="map-credit"></div>
               </div>
             </div>
           </div>
