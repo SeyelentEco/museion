@@ -29,7 +29,7 @@ def source_id(filename: str) -> str:
     other sources have it. "wikipedia_en_chemistry_nopic_2026-07.zim" is
     "wikipedia_en_chemistry_nopic"."""
     stem = filename.removesuffix(".zim")
-    return re.sub(r"_\d{4}-\d{2}$", "", stem)
+    return re.sub(r"_\d{4}-\d{2}[a-z]?$", "", stem)
 
 
 def sha256_of(path: Path) -> str:

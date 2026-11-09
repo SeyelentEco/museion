@@ -11,6 +11,7 @@ sources = [
   "zimgit-post-disaster",
   "zimgit-water",
   "zimgit-food-preparation",
+  "usda-home-canning",
   "zimgit-knots",
   "zimgit-medicine",
   "appropedia_en_all_maxi",

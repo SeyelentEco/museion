@@ -200,7 +200,7 @@ producing a corrupt double-length file.
 |---|---|---|
 | **Go Bag** | 822 MB | Post-disaster, water, medicine, food preparation, knots |
 | Medicine | ~5 GB | Field medicine, US military medical manuals, MDWiki / WikiMed, MedlinePlus, NHS medicines A to Z, Wikipedia's medicine articles *(planned)* |
-| Homestead | ~21 GB | + Appropedia, energypedia and CD3WD (power, water, building), iFixit, Wikibooks, Wikipedia in summary *(planned)* |
+| Homestead | ~21 GB | + Appropedia, energypedia and CD3WD (power, water, building), the USDA canning guide, iFixit, Wikibooks, Wikipedia in summary *(planned)* |
 | Library | ~250 GB+ | + full Wikipedia, Gutenberg, Wikiversity, Stack Exchange, maps *(planned)* |
 
 In the app, the **Library** tab shows what you have and what you could fetch, by category

@@ -24,6 +24,7 @@ class AddSourceTest(unittest.TestCase):
                          "wikipedia_en_chemistry_nopic")
         self.assertEqual(catalog_add.source_id("zimgit-knots_en_2024-08.zim"), "zimgit-knots_en")
         self.assertEqual(catalog_add.source_id("found.zim"), "found")
+        self.assertEqual(catalog_add.source_id("nhs.uk_en_medicines_2026-09b.zim"), "nhs.uk_en_medicines")
 
     def test_the_entry_is_measured_from_the_file_and_loads_as_a_source(self):
         path = catalog_add.add_source(self.zim, 'Chemistry by "Wikipedia"', "reference",
