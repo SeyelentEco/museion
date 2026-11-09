@@ -2,7 +2,7 @@
 # Regenerate with: python -m museion sync-source https://download.kiwix.org/zim/ifixit/ifixit_en_all_2025-12.zim --category making --id ifixit_en_all
 id = "ifixit_en_all"
 title = "iFixit in English"
-description = "iFixit is a global community of people helping each other repair things. Let&apos;s …"
+description = "iFixit is a global community of people helping each other repair things. Let's …"
 claims_fulltext_index = false
 category = "making"
 filename = "ifixit_en_all_2025-12.zim"

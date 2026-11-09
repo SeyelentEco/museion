@@ -1,0 +1,27 @@
+# Written by python -m museion sync-source -- do not hand-edit size_bytes or sha256.
+# Regenerate with: python -m museion sync-source https://download.kiwix.org/zim/other/energypedia_en_all_maxi_2026-06.zim --category making --id energypedia_en_all_maxi
+id = "energypedia_en_all_maxi"
+title = "energypedia"
+description = "Knowledge exchange on renewable energy and energy access"
+claims_fulltext_index = true
+category = "making"
+filename = "energypedia_en_all_maxi_2026-06.zim"
+version = "2026-06"
+size_bytes = 799712780
+sha256 = "c328df321497003e30f96af67340c04bff52e2831e09cf2b0c0fde52bba23bd0"
+urls = [
+  "https://download.kiwix.org/zim/other/energypedia_en_all_maxi_2026-06.zim",
+]
+mirrors = [
+  "https://lb.download.kiwix.org/zim/other/energypedia_en_all_maxi_2026-06.zim",
+  "https://www.mirrorservice.org/sites/download.kiwix.org/zim/other/energypedia_en_all_maxi_2026-06.zim",
+  "https://ny.mirror.driftle.ss/kiwix/zim/other/energypedia_en_all_maxi_2026-06.zim",
+  "https://wi.mirror.driftle.ss/kiwix/zim/other/energypedia_en_all_maxi_2026-06.zim",
+  "https://mirrors.dotsrc.org/kiwix/zim/other/energypedia_en_all_maxi_2026-06.zim",
+  "https://ftp.nluug.nl/pub/kiwix/zim/other/energypedia_en_all_maxi_2026-06.zim",
+  "https://mirror-sites-in.mblibrary.info/mirror-sites/download.kiwix.org/zim/other/energypedia_en_all_maxi_2026-06.zim",
+  "https://mirror.download.kiwix.org/zim/other/energypedia_en_all_maxi_2026-06.zim",
+]
+torrent = "https://download.kiwix.org/zim/other/energypedia_en_all_maxi_2026-06.zim.torrent"
+magnet = "magnet:?xt=urn:btih:62279d72c7de43b5bcb159aeb7005e5732629c46&xt=urn:md5:ceaa726e5215bcfb641a51f98830f490&xl=799712780&dn=energypedia_en_all_maxi_2026-06.zim&as=https://lb.download.kiwix.org/zim/other/energypedia_en_all_maxi_2026-06.zim&tr=https://tracker.openzim.org/announce&tr=udp://tracker.openzim.org:6969/announce&ws=https://https://ny.mirror.driftle.ss/kiwix/zim/other/energypedia_en_all_maxi_2026-06.zim&ws=https://https://wi.mirror.driftle.ss/kiwix/zim/other/energypedia_en_all_maxi_2026-06.zim&ws=https://https://mirrors.dotsrc.org/kiwix/zim/other/energypedia_en_all_maxi_2026-06.zim&ws=https://https://ftp.nluug.nl/pub/kiwix/zim/other/energypedia_en_all_maxi_2026-06.zim&ws=https://https://mirror-sites-in.mblibrary.info/mirror-sites/download.kiwix.org/zim/other/energypedia_en_all_maxi_2026-06.zim&ws=https://https://mirror.download.kiwix.org/zim/other/energypedia_en_all_maxi_2026-06.zim&xs=https://lb.download.kiwix.org/zim/other/energypedia_en_all_maxi_2026-06.zim.torrent"
+license = { name = "CC-BY-SA-4.0", attribution = "Kiwix and contributors" }
