@@ -125,6 +125,7 @@ def parser() -> argparse.ArgumentParser:
     c = commands.add_parser("eval", parents=[where, servers], help="run the benchmark and save the run")
     c.add_argument("--label", default="cli", help="a name for the configuration under test")
     c.add_argument("--only", help="run only this capability, horizon or case id")
+    c.add_argument("--results", help="folder to save the run in (default: evals/ beside the index)")
     c.set_defaults(run=cmd_eval)
 
     c = commands.add_parser("retrieval-eval", parents=[where, servers],
@@ -335,7 +336,7 @@ def cmd_eval(args) -> None:
     db = db_path(args)
     with closing(Index(db)) as index:
         run = run_benchmark(args, index)
-    path = evals.save_run(db.parent / "evals", run)
+    path = evals.save_run(Path(args.results) if args.results else db.parent / "evals", run)
     print(f"\nSaved {path}\n")
 
 

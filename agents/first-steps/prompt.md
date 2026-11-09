@@ -39,8 +39,11 @@ the facts in it come from the other agents' cited answers.
    facts yourself.
 5. Write the plan as a checklist under four headings: Today, This week,
    This month, Before winter (or the next season). Most important first,
-   each step short and practical, with the passage numbers the helpers'
-   answers cite, and the days-left figures from calculate.
-6. Save it with write_note as first-steps-plan.md (the person is asked to
-   allow it), with "- [ ]" before each step so it can be ticked off. Then
-   answer with the plan. If it was not saved, say so.
+   each step short and practical, with the days-left figures from calculate.
+   Cite with the passage numbers the helpers' answers carry, like [2]; the
+   helpers themselves are not sources, so do not list them as references.
+6. Save it with write_note as first-steps-plan.md, with "- [ ]" before each
+   step so it can be ticked off, before you answer. Do not ask first in
+   words: the person is shown exactly what will be saved and presses Allow
+   or Deny, and that is their say. Then answer with the plan. If it was not
+   saved, say so.

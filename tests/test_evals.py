@@ -91,13 +91,15 @@ class RunTest(unittest.TestCase):
             evals.Case("warm", "retrieve_pdf", "month", "cold?", expect_basis="library"),
             evals.Case("bronze", "refuse", "any", "bronze age?", expect_basis="general_knowledge"),
         ]
-        asker = FakeAsker({"cold?": Answer("Keep warm [1][2].", [page, article], True, LIBRARY),
+        asker = FakeAsker({"cold?": Answer("Keep warm [1][2].", [page, article], True, LIBRARY,
+                                           tools=["search_library", "read_page"], rounds=3),
                            "bronze age?": RuntimeError("no chat model")})
         seen = []
         run = evals.run(asker, cases, "test", lambda *progress: seen.append(progress))
         self.assertEqual(seen, [(1, 2, "warm", None), (1, 2, "warm", True), (2, 2, "bronze", None), (2, 2, "bronze", False)])
         self.assertEqual((run.passed, run.total, run.model), (1, 2, "fake-model.gguf"))
         self.assertEqual(run.cases[0].sources, ["Where There Is No Doctor (p.12) [zimgit]", "Hypothermia [wikipedia]"])
+        self.assertEqual((run.cases[0].tools, run.cases[0].rounds), (["search_library", "read_page"], 3))
         self.assertEqual(run.cases[1].error, "no chat model")
         self.assertEqual(run.by_capability, [("retrieve_pdf", 1, 1), ("refuse", 0, 1)])
 

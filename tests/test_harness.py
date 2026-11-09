@@ -170,6 +170,34 @@ class HarnessTest(unittest.TestCase):
         self.assertEqual(answer.basis, "library")
         self.assertEqual(answer.text, "Boil it [1].")
 
+    def test_an_answer_without_searching_is_sent_back_to_search(self):
+        # On the PC the clinic told someone how to stop bleeding from memory,
+        # with the library's first-aid books one search away.
+        lib = FakeLibrary()
+        chat = ScriptedChat(says("Press on it hard."), calls(("search_library", {"query": "bleeding"})),
+                            says("Press on it hard [1]."))
+        s = spec(tools=["search_library", "read_note"], guards=["search_first", "cite_or_stand"])
+        answer = Harness(s, Setting(chat=chat, library=lib)).run("bleeding?")
+        self.assertEqual(chat.calls[1][0][-1]["content"], guards.SEARCH_FIRST)
+        self.assertIsNotNone(chat.calls[1][1], "tools stay on offer, to search")
+        self.assertEqual((answer.text, answer.basis), ("Press on it hard [1].", "library"))
+
+    def test_search_first_lets_a_search_or_the_records_stand(self):
+        class Run:
+            round, max_rounds, sources, calculations = 1, 4, [], []
+            tools = {"search_library": None, "read_note": None}
+            used: list = []
+
+        run = Run()
+        self.assertIsNotNone(guards.search_first("Boil it.", run))
+        for used in (["search_library"], ["read_note"], ["check_dates"]):
+            run.used = used  # searched and found nothing, or answered from the person's records
+            self.assertIsNone(guards.search_first("Boil it.", run), used)
+        run.used, run.round = [], 4
+        self.assertIsNone(guards.search_first("Boil it.", run), "the last round must answer")
+        run.round, run.tools = 1, {"read_note": None}
+        self.assertIsNone(guards.search_first("Boil it.", run), "an agent that cannot search")
+
     def test_no_tools_means_no_tool_offer_and_no_no_more_tools(self):
         chat = ScriptedChat(says("Hello."))
         Harness(spec(tools=[], guards=[]), Setting(chat=chat)).run("hi")

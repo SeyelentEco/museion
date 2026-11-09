@@ -205,9 +205,6 @@ class BasisTest(unittest.TestCase):
         self.assertEqual(answer.files, ["notes/x.md"])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class FirstStepsFlowTest(unittest.TestCase):
     """The first-steps agent's own case, played through with a scripted model:
@@ -221,7 +218,7 @@ class FirstStepsFlowTest(unittest.TestCase):
         env = Agents(root / "library", root / "mine", hardware.AMPLE)
         spec = env.get("first-steps")
         case = [c for c in load_cases(spec) if c.id == "power-on-comms-down"]
-        plan = ("Tom's insulin comes first, then water: it lasts 2 days.\n\n## Today\n"
+        plan = ("Tom's insulin comes first, then water: it lasts 2 days [1].\n\n## Today\n"
                 "- [ ] Fill every clean container with water while the taps run.\n"
                 "- [ ] Count Tom's insulin and keep it cool.\n- [ ] Agree a meeting place with neighbours.\n"
                 "## This week\n- [ ] Get fuel and food for a month.\n")
@@ -230,7 +227,8 @@ class FirstStepsFlowTest(unittest.TestCase):
             calls(("read_note", {"name": "household.csv"}), ("read_note", {"name": "stores.csv"})),
             calls(("calculate", {"expression": "24 / (4 * 3)"})),
             calls(("delegate", {"agent": "water-planner", "task": "3 people, 24 litres stored, taps still run."})),
-            says("Fill every clean container now and keep it covered."),
+            calls(("search_library", {"query": "storing drinking water"})),  # the helper searches first
+            says("You have 24 litres [1]: fill every clean container now and keep it covered."),
             calls(("write_note", {"name": "first-steps-plan.md", "text": plan})),
             says(plan),
         )
@@ -243,3 +241,7 @@ class FirstStepsFlowTest(unittest.TestCase):
         self.assertTrue(any("type 1 diabetes" in r for r in read), read)
         self.assertIn("Today is ", [m["content"] for m in chat.calls[1][0] if m["role"] == "tool"][0])
         self.assertFalse((root / "library").exists())  # the person's notes were never touched
+
+
+if __name__ == "__main__":
+    unittest.main()

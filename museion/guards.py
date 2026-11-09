@@ -17,6 +17,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 
+from museion.answer import READ_FILE_TOOLS
 from museion.model_text import cited_numbers, has_prose_arithmetic, looks_like_leaked_tool_call
 
 # Said once to an answer that worked a sum out in prose. The calculator is the
@@ -83,6 +84,18 @@ ASK_BY_CARD = (
     "If you can finish without asking, finish it now."
 )
 
+# Said once to an answer given without looking anything up, by an agent that
+# can search the library. On Qwen3.6-35B the clinic answered "my son cut his
+# hand deeply on glass" from memory, with a made-up list of references and
+# no search at all, and the garden planner explained seed saving the same
+# way. A question about the person's own records is answered from them, so
+# reading a note or a file counts as looking.
+SEARCH_FIRST = (
+    "You answered without searching the library. Facts, methods and doses must come "
+    "from it: search for this now, then answer from what you find, citing it. If the "
+    "question was only about the person's own records, read them instead."
+)
+
 # Longer than this, an uncited answer with a question in it is an answer that
 # also asks something, not a list of questions instead of one.
 QUESTION_CHARS = 1500
@@ -95,7 +108,8 @@ class RunView(Protocol):
     max_rounds: int
     sources: list
     calculations: list
-    tools: dict
+    tools: dict  # the tools on offer, by name
+    used: list  # the tools it called, in order
 
 
 @dataclass
@@ -138,6 +152,17 @@ def cite_or_stand(text: str, run: RunView) -> Push | None:
     return None
 
 
+def search_first(text: str, run: RunView) -> Push | None:
+    """An answer from an agent that could search the library but neither
+    searched nor read any of the person's records is sent back to search."""
+    used = set(run.used)
+    if "search_library" in run.tools and not run.sources and run.round < run.max_rounds \
+            and "search_library" not in used and not READ_FILE_TOOLS & used \
+            and not looks_like_leaked_tool_call(text):
+        return Push(SEARCH_FIRST)
+    return None
+
+
 def ends_with_question(text: str) -> bool:
     lines = [line.strip() for line in text.strip().splitlines() if line.strip()]
     return bool(lines) and lines[-1].rstrip("*_ )").endswith("?")
@@ -168,6 +193,7 @@ GUARDS: dict[str, Guard] = {
     "call_again": call_again,
     "cite_or_stand": cite_or_stand,
     "ask_by_card": ask_by_card,
+    "search_first": search_first,
 }
 
 # Guards every agent gets when it has the tool they need, listed or not.
@@ -176,7 +202,7 @@ AUTOMATIC = {"ask_by_card": "ask_person"}
 # The order the ask loop always used. An agent that names guards gets them
 # in this order whatever order it lists them in, because the order matters:
 # a sum in prose is fixed before citations are asked for.
-ORDER = ["calculate_first", "call_again", "ask_by_card", "cite_or_stand"]
+ORDER = ["calculate_first", "call_again", "ask_by_card", "search_first", "cite_or_stand"]
 
 
 def check(names: list[str], text: str, run: RunView, fired: set[str]) -> tuple[str, Push] | None:
