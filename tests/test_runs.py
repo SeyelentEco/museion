@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from museion import agents, evals, hardware
-from museion.agent_run import Agents, CaseRunner, save_case
+from museion.agent_run import Agents, CaseRunner, save_case, tests_dir
 from museion.runs import ChatStore, title_from
 from agent_fakes import ScriptedChat, calls, says
 
@@ -56,7 +56,9 @@ max_rounds_used = 5
         self.assertTrue(run.cases[0].passed, run.cases[0].checks)
         read = [m["content"] for m in chat.calls[1][0] if m["role"] == "tool"][0]
         self.assertIn("rice,10,kg", read)
-        self.assertFalse((root / "library").exists())  # the real folder was not touched
+        # Nothing in the library but the case's log, where test results go.
+        written = [f for f in (root / "library").rglob("*") if f.is_file()]
+        self.assertEqual([f.parent for f in written], [tests_dir(env, spec) / "logs"])
 
     def test_save_case(self):
         root = Path(tempfile.mkdtemp())

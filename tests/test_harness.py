@@ -7,7 +7,8 @@ import unittest
 from pathlib import Path
 
 from museion import guards
-from museion.agents import AgentSpec
+from museion.agent_tools import all_tools
+from museion.agents import AgentSpec, problems_of
 from museion.harness import Harness, Person, Setting, Stopped
 from museion.index import Hit
 from museion.runs import RunLog, read_log
@@ -169,6 +170,7 @@ class HarnessTest(unittest.TestCase):
         self.assertIsNone(chat.calls[2][1])  # no tools after cite_or_stand
         self.assertEqual(answer.basis, "library")
         self.assertEqual(answer.text, "Boil it [1].")
+        self.assertEqual(answer.rounds, 3, "the model's turns, not the round the guard jumped to")
 
     def test_an_answer_without_searching_is_sent_back_to_search(self):
         # On the PC the clinic told someone how to stop bleeding from memory,
@@ -197,6 +199,33 @@ class HarnessTest(unittest.TestCase):
         self.assertIsNone(guards.search_first("Boil it.", run), "the last round must answer")
         run.round, run.tools = 1, {"read_note": None}
         self.assertIsNone(guards.search_first("Boil it.", run), "an agent that cannot search")
+
+    def test_asking_twice_is_the_limit(self):
+        # On the PC first-steps asked thirteen times in one answer, told
+        # "I don't know." each time, and never made the plan.
+        person = Approving()
+        ask = ("ask_person", {"question": "How many are you?"})
+        chat = ScriptedChat(calls(ask), calls(ask, ask), says("A plan for four."))
+        answer = Harness(spec(), Setting(chat=chat, person=person)).run("plan")
+        self.assertEqual(len(person.questions), 2)
+        results = [m["content"] for m in chat.calls[2][0] if m["role"] == "tool"]
+        spent = all_tools()["ask_person"].spent
+        self.assertTrue(results[1].endswith(spent))  # told on its last question...
+        self.assertEqual(results[2], spent)  # ...and a third gets nothing from the person
+        self.assertNotIn("ask_person", [t["function"]["name"] for t in chat.calls[2][1]])
+        self.assertEqual((answer.text, answer.tools), ("A plan for four.", ["ask_person", "ask_person"]))
+
+    def test_an_agent_can_limit_a_tool(self):
+        lib = FakeLibrary()
+        chat = ScriptedChat(calls(("search_library", {"query": "beans"})), says("Beans [1]."))
+        s = spec(tools=["search_library", "calculate"], guards=[], max_calls={"search_library": 1})
+        Harness(s, Setting(chat=chat, library=lib)).run("beans?")
+        self.assertIn("cannot be used again", [m["content"] for m in chat.calls[1][0] if m["role"] == "tool"][0])
+        self.assertEqual([t["function"]["name"] for t in chat.calls[1][1]], ["calculate"])
+        self.assertIn("max_calls names read_page, which is not one of its tools",
+                      problems_of(spec(max_calls={"read_page": 2})))
+        self.assertIn("max_calls for calculate must be a whole number, 1 or more",
+                      problems_of(spec(max_calls={"calculate": 0})))
 
     def test_no_tools_means_no_tool_offer_and_no_no_more_tools(self):
         chat = ScriptedChat(says("Hello."))

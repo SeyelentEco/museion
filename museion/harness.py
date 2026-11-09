@@ -105,6 +105,11 @@ class Harness:
         self.depth = depth
         known = all_tools()
         self.tools: dict[str, Tool] = {n: known[n] for n in spec.tools if n in known}
+        # How often each tool may be called in this answer (0: no limit), and
+        # what a call to one that is used up gets back.
+        mine = spec.max_calls if isinstance(spec.max_calls, dict) else {}
+        self.limits = {n: mine.get(n, t.max_calls) for n, t in self.tools.items()}
+        self.spent: dict[str, str] = {}
         # What tools add to as they run (see agent_tools/).
         self.sources: list = []
         self.calculations: list[Calculation] = []
@@ -112,6 +117,7 @@ class Harness:
         self.used: list[str] = []
         self.reranked = False
         self.round = 0
+        self.turns = 0  # the model's turns: what an answer reports as its rounds
         self.max_rounds = spec.max_rounds
         self.allowed: set[str] = set()  # calls the person allowed for the rest of the run
         self.log = None
@@ -181,6 +187,7 @@ class Harness:
             self.round += 1
             schemas = None if last else [t.schema() for t in self.tools.values()]
             turn = self.chat.turn(messages, schemas, spec.answer_tokens, on_token)
+            self.turns += 1
             self.mark(f"turn {self.round}: {len(turn.tool_calls)} tool call(s), {len(turn.text)} chars")
             self.event("turn", round=self.round, calls=len(turn.tool_calls), chars=len(turn.text))
 
@@ -215,13 +222,13 @@ class Harness:
                 on_token(DISCARD)
                 on_token(guards.NO_ANSWER)
                 return Answer(guards.NO_ANSWER, [], self.reranked, basis_of(False, False),
-                              self.calculations, self.used, self.round, self.files)
+                              self.calculations, self.used, self.turns, self.files)
             cited = [n for n in cited_numbers(text) if n <= len(self.sources)]
             used = [self.sources[n - 1] for n in cited]
             notes_only = bool(used) and all(h.book == NOTES_BOOK for h in used)
             return Answer(renumber_citations(text, cited), used, self.reranked,
                           basis_of(bool(used), bool(self.calculations), self.used, notes_only),
-                          self.calculations, self.used, self.round, self.files)
+                          self.calculations, self.used, self.turns, self.files)
 
     def guard_names(self) -> list[str]:
         """The agent's guards, plus those it gets for having a tool."""
@@ -302,7 +309,7 @@ class Harness:
         raw = call["function"].get("arguments") or ""
         tool = self.tools.get(name)
         if tool is None:
-            return f"Unknown tool {name}."
+            return self.spent.get(name, f"Unknown tool {name}.")
         args = parse_args(tool, raw)
         problem = check_args(tool, args)
         if problem:
@@ -338,6 +345,14 @@ class Harness:
         # answer's basis must not credit a call that only got an error back.
         if not failed:
             self.used.append(name)
+            limit = self.limits.get(name, 0)
+            if limit and self.used.count(name) >= limit:
+                # Used up: no longer offered, and the model is told so now
+                # rather than finding out by calling it again.
+                self.spent[name] = tool.spent or (f"{name} cannot be used again for this answer: "
+                                                  "go on with what you have.")
+                del self.tools[name]
+                result = f"{result}\n\n{self.spent[name]}"
         self.event("tool", tool=name, args=args, result=result[:4000], seconds=round(time.monotonic() - t0, 1),
                    **({"failed": True} if failed else {}))
         return result

@@ -11,6 +11,9 @@ guards = ["calculate_first", "call_again", "search_first", "cite_or_stand"]
 # 14, not 10: on the 35B a first plan took nine searches and the rounds ran
 # out before it could calculate or save garden-plan.md.
 max_rounds = 14
+# On Qwen3.6-35B it searched twelve times for a 10 by 20 metre plot, told
+# to stop after three, and ran out of rounds before calculating or saving.
+max_calls = { search_library = 4 }
 examples = [
   "We have a 10 by 20 metre plot and cold winters. What should we plant to feed four?",
   "It's March. What should I be doing in the garden now?",

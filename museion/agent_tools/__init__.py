@@ -50,6 +50,12 @@ class Tool:
     # person reads. Defaults to the tool's name and arguments. It may take
     # (args, run) instead of (args).
     describe: Callable[..., str] | None = None
+    # How many times one answer may call it (0: no limit), and what the
+    # model is told on the last call it may make. After that it is no
+    # longer offered: asked to stop asking, a model asked "how many are
+    # you?" thirteen times in one answer.
+    max_calls: int = 0
+    spent: str = ""
 
     def schema(self) -> dict:
         """The tool as the chat model is offered it."""

@@ -147,6 +147,10 @@ class CaseRunner:
                 target.write_text(text, encoding="utf-8")
             setting = self.env.setting(self.chat, self.library, ScriptedPerson(case.approve, case.person_says),
                                        tuning=self.tuning, log=False)
+            # Each case's run log (and its helpers'), beside the test results:
+            # what a failed case asked, searched and was told.
+            logs = tests_dir(self.env, self.spec) / "logs"
+            setting.open_log = lambda spec: RunLog(logs)
             setting.workspace_for = lambda spec: scratch / spec.id
             # Its own notes too: a case's given notes/... files, and never
             # the person's.

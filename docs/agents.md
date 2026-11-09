@@ -44,6 +44,7 @@ person or by a coding agent on the local model.
 | `tools` | Tool names it may use |
 | `guards` | Checks on its answers: `calculate_first`, `call_again`, `search_first` (an answer given without searching or reading any records is sent back to search), `cite_or_stand` (`museion/guards.py`). An agent with `ask_person` also gets `ask_by_card`, which sends a question written in the answer back to be asked with the tool |
 | `max_rounds` | Most tool rounds before it must answer |
+| `max_calls` | How many times one answer may call a tool, like `{ search_library = 4 }`; then the tool is taken away. `ask_person` allows 2 unless this says otherwise |
 | `answer_tokens` | Most tokens in one model turn |
 | `max_history`, `history_chars` | How many earlier exchanges of the chat it sees, and how long each may be |
 | `compact`, `keep_rounds` | Fold old tool results into one-line stubs when the context fills, keeping the last rounds whole (`museion/compaction.py`) |
@@ -112,8 +113,9 @@ Cases run in a scratch folder, with a scratch notes folder, so they never touch 
 Run them with the agent's Test button, or
 `python -m museion agent test <id> --library <library folder>` while the
 services are running (open the page to start them); results are kept in
-`agent-work/<id>/tests/` and the Agents tab shows what changed since the last
-run. Any run in the Agents tab can be saved as a new case. To test against a
+`agent-work/<id>/tests/`, with each case's run log (every tool call, what it
+was given and what came back) in `tests/logs/`, and the Agents tab shows what
+changed since the last run. Any run in the Agents tab can be saved as a new case. To test against a
 library that must not be written to (a copy on a read-only drive, someone
 else's), add `--work <folder>`: what agents write, test results included, goes
 there instead.

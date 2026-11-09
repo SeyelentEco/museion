@@ -10,6 +10,7 @@ import unittest
 from pathlib import Path
 
 from museion import ask, notes
+from museion.runs import read_log
 from museion.agent_tools import ToolError, all_tools
 from museion.agents import AgentSpec
 from museion.harness import Harness, Person, Setting
@@ -240,7 +241,10 @@ class FirstStepsFlowTest(unittest.TestCase):
         read = [m["content"] for m in chat.calls[2][0] if m["role"] == "tool"]
         self.assertTrue(any("type 1 diabetes" in r for r in read), read)
         self.assertIn("Today is ", [m["content"] for m in chat.calls[1][0] if m["role"] == "tool"][0])
-        self.assertFalse((root / "library").exists())  # the person's notes were never touched
+        self.assertFalse((root / "library" / "notes").exists())  # the person's notes were never touched
+        log = Path(run.cases[0].log)  # kept beside the results, with the water planner's beside it
+        self.assertEqual([e["kind"] for e in read_log(log)][::len(read_log(log)) - 1], ["start", "done"])
+        self.assertEqual(len(list(log.parent.glob("*.jsonl"))), 2)
 
 
 if __name__ == "__main__":

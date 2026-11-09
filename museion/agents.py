@@ -44,6 +44,9 @@ class AgentSpec:
     tools: list[str] = field(default_factory=list)
     guards: list[str] = field(default_factory=list)
     max_rounds: int = 8
+    # How many times one answer may call a tool, by tool name, over the
+    # tool's own limit (ask_person: 2). Past it the tool is taken away.
+    max_calls: dict = field(default_factory=dict)
     answer_tokens: int = 1500
     max_continuations: int = 2
     # Earlier messages of the chat carried into a new one, and how much of
@@ -258,6 +261,14 @@ def problems_of(spec: AgentSpec) -> list[str]:
     for name in ("tools", "guards", "examples"):
         if not isinstance(getattr(spec, name), list):
             out.append(f"{name} must be a list")
+    if not isinstance(spec.max_calls, dict):
+        out.append("max_calls must be a table, like { search_library = 4 }")
+    else:
+        for tool, n in spec.max_calls.items():
+            if tool not in spec.tools:
+                out.append(f"max_calls names {tool}, which is not one of its tools")
+            elif not isinstance(n, int) or isinstance(n, bool) or n < 1:
+                out.append(f"max_calls for {tool} must be a whole number, 1 or more")
     if spec.prompt_from == "file" and not spec.prompt.strip():
         out.append("prompt.md is missing or empty")
     if not spec.goal:
