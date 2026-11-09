@@ -39,6 +39,18 @@ From the command line:
   example after Museion learns to draw something new.
 - **Buildings** make the download and the map several times bigger. They are
   on for 5 and 10 km, off for 25 and 50 km; change it with the tick box.
+- **How long and how big.** Measured for Lewes (a small English town in
+  farmland) on a home connection:
+
+  | Size | Pieces | Time | Map | Download kept |
+  | --- | --- | --- | --- | --- |
+  | 5 km, buildings | 1 | about 1 min | 0.3 MB | |
+  | 10 km, buildings | 2 | about 70 s | 0.7 MB | 2.2 MB |
+  | 25 km, no buildings | 12 | about 7.5 min | 3.6 MB | 10.6 MB |
+
+  Nearly all of the time is downloading: making a map again from the kept
+  download took 2 seconds. A 50 km map is about 40 pieces, so expect half an
+  hour or more. A city takes longer and makes a bigger file than this.
 - **Not drawn yet:** the sea is not filled in (coastlines show as a line),
   there are no contour lines or hill shading, and house numbers are left out.
 
