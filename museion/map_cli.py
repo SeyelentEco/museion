@@ -18,7 +18,8 @@ def add_commands(commands) -> None:
     c.add_argument("--library", type=Path, help="the library: the map goes in its maps folder")
     c.add_argument("--dest", type=Path, help="the folder to put the map in, instead of <library>/maps")
     c.add_argument("--again", metavar="ID", help="make a map again from the data downloaded for it before, "
-                                                 "with no internet (its folder name in maps/sources)")
+                                                 "with no internet (its folder name in maps/sources); with --name, as a new "
+                                                 "map beside the old one")
     c.set_defaults(run=cmd_make_map)
 
 

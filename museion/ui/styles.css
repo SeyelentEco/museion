@@ -753,7 +753,8 @@ td.fail { color: var(--bad); font-weight: 600; }
 .radio-found .muted { font-size: 0.9rem; }
 
 /* Making a map (the Map tab's side panel) and the area it will cover. */
-#panel-map .note-list { overflow-y: auto; }
+#panel-map .note-list { overflow-y: auto; overflow-x: hidden; }
+#panel-map .note-list > .row { flex-wrap: wrap; }
 #panel-map #place-items, #make-found { flex: 0 0 auto; overflow: visible; }
 .make-map { border-top: 1px solid var(--accent-dim); padding-top: 0.6rem; }
 .make-map summary { cursor: pointer; font-weight: 600; }

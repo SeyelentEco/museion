@@ -516,8 +516,9 @@ def make(name: str, box: osm.Box, maps_dir: Path, buildings: bool = True,
 
 def remake(source: Path, maps_dir: Path, name: str | None = None,
            report: Report = lambda step, done, total: None) -> Path:
-    """Make a map again from data downloaded before, with no internet."""
+    """Make a map again from data downloaded before, with no internet. With a
+    new name it is a new map file beside the old one."""
     area = osm.read_area(source)
     box = osm.Box(*area["box"])
-    return build(osm.elements(source), box, maps_dir / f"{source.name}.mbtiles",
-                 name or area.get("name") or source.name, report)
+    out = maps_dir / f"{map_id(name) if name else source.name}.mbtiles"
+    return build(osm.elements(source), box, out, name or area.get("name") or source.name, report)

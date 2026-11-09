@@ -163,7 +163,10 @@ class BuildTest(unittest.TestCase):
         self.assertEqual(len(fake.queries), 2)
         fake.close()
         again = mapmaker.remake(source, self.dir)
-        self.assertEqual(maps.info(again).name, "Millbrook (10 km)")
+        self.assertEqual((again, maps.info(again).name), (path, "Millbrook (10 km)"))
+        renamed = mapmaker.remake(source, self.dir, "Millbrook before the flood")
+        self.assertEqual(renamed.name, "millbrook-before-the-flood.mbtiles")
+        self.assertTrue(path.exists(), "the first one is kept")
         # Stopped before a piece: what was there is kept, and it says so.
         stop = threading.Event()
         stop.set()
