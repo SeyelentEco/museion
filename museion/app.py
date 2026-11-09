@@ -84,6 +84,7 @@ COMMANDS = {f.__name__: f for f in [
     notes_commands.list_notes, notes_commands.read_note, notes_commands.save_note, notes_commands.new_note,
     notes_commands.open_notes_folder,
     map_commands.list_maps, map_commands.list_places, map_commands.add_place, map_commands.open_maps_folder,
+    map_commands.find_place, map_commands.map_plan, map_commands.make_map, map_commands.stop_map,
     radio_commands.radio_state, radio_commands.find_radios, radio_commands.connect_radio,
     radio_commands.disconnect_radio, radio_commands.radio_messages, radio_commands.send_radio_message,
 ]}
@@ -381,9 +382,11 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
             return
-        data, kind = found
+        data, kind, encoding = found
         self.send_response(200)
         self.send_header("Content-Type", kind)
+        if encoding:
+            self.send_header("Content-Encoding", encoding)
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "max-age=3600")
         self.end_headers()

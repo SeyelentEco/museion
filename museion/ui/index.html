@@ -166,6 +166,32 @@
                 <button id="map-reload" type="button" class="small">Look again</button>
                 <button id="map-folder" type="button" class="small">Open the maps folder</button>
               </div>
+              <details id="make-map" class="make-map">
+                <summary>Make a map…</summary>
+                <p class="muted small-print">Downloads what OpenStreetMap has for an area (roads, water, buildings,
+                  names, and places like pharmacies and drinking water) and makes a map of it that works with no
+                  internet. It needs the internet while it is made.</p>
+                <form id="make-find" class="row">
+                  <input id="make-where" type="text" placeholder="A town, or 51.50, -0.12" aria-label="Where" />
+                  <button type="submit" class="small">Find</button>
+                </form>
+                <ul id="make-found" class="agent-items"></ul>
+                <div class="row">
+                  <select id="make-size" aria-label="How big">
+                    <option value="5">5 km across</option>
+                    <option value="10" selected>10 km across</option>
+                    <option value="25">25 km across</option>
+                    <option value="50">50 km across</option>
+                  </select>
+                  <label class="small-print"><input id="make-buildings" type="checkbox" checked /> Buildings</label>
+                </div>
+                <p id="make-plan" class="muted small-print"></p>
+                <div class="row">
+                  <button id="make-go" type="button" class="primary small" disabled>Make the map</button>
+                  <button id="make-stop" type="button" class="small" hidden>Stop</button>
+                </div>
+                <p id="make-status" class="small-print"></p>
+              </details>
             </aside>
             <div class="map-main">
               <div class="map-bar">
@@ -177,6 +203,8 @@
               <div id="map-note" class="map-note" hidden></div>
               <div id="map-view" class="map-view">
                 <div id="map-tiles" class="map-layer"></div>
+                <canvas id="map-canvas" class="map-layer" hidden></canvas>
+                <div id="map-area" class="map-area" hidden></div>
                 <div id="map-marks" class="map-layer"></div>
                 <div id="map-credit" class="map-credit"></div>
               </div>

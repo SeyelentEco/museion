@@ -35,6 +35,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from museion import notes
+from museion.protobuf import decode, field_bytes, field_fixed32, field_varint, first, read_varint, varint  # noqa: F401
 
 START1, START2 = 0x94, 0xC3
 MAX_FRAME = 512
@@ -58,78 +59,6 @@ class RadioError(Exception):
 
 
 # ── protobuf, the little that is needed ──────────────────────────────────────
-
-def varint(n: int) -> bytes:
-    out = bytearray()
-    while True:
-        b = n & 0x7F
-        n >>= 7
-        if n:
-            out.append(b | 0x80)
-        else:
-            out.append(b)
-            return bytes(out)
-
-
-def field_varint(number: int, value: int) -> bytes:
-    return varint(number << 3) + varint(value)
-
-
-def field_fixed32(number: int, value: int) -> bytes:
-    return varint((number << 3) | 5) + struct.pack("<I", value & 0xFFFFFFFF)
-
-
-def field_bytes(number: int, value: bytes) -> bytes:
-    return varint((number << 3) | 2) + varint(len(value)) + value
-
-
-def read_varint(data: bytes, i: int) -> tuple[int, int]:
-    n = shift = 0
-    while True:
-        if i >= len(data):
-            raise ValueError("truncated varint")
-        b = data[i]
-        i += 1
-        n |= (b & 0x7F) << shift
-        if not b & 0x80:
-            return n, i
-        shift += 7
-        if shift > 63:
-            raise ValueError("varint too long")
-
-
-def decode(data: bytes) -> dict[int, list]:
-    """A message's fields, by number: varints and fixed numbers as ints,
-    length-delimited fields as bytes. Unknown wire types end the message."""
-    out: dict[int, list] = {}
-    i = 0
-    while i < len(data):
-        key, i = read_varint(data, i)
-        number, kind = key >> 3, key & 7
-        if kind == 0:
-            value, i = read_varint(data, i)
-        elif kind == 1:
-            value = struct.unpack_from("<Q", data, i)[0]
-            i += 8
-        elif kind == 2:
-            length, i = read_varint(data, i)
-            value = data[i:i + length]
-            if len(value) < length:
-                raise ValueError("truncated field")
-            i += length
-        elif kind == 5:
-            value = struct.unpack_from("<I", data, i)[0]
-            i += 4
-        else:
-            raise ValueError(f"wire type {kind}")
-        out.setdefault(number, []).append(value)
-    return out
-
-
-def first(fields: dict, number: int, default=None):
-    values = fields.get(number)
-    return values[0] if values else default
-
 
 # ── the messages ──────────────────────────────────────────────────────────────
 

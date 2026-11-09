@@ -1,27 +1,74 @@
 # Offline maps
 
 The Map tab shows a map of your area with the places you mark on it, with no
-internet. The map is an **.mbtiles** file in the library's `maps` folder; the
+internet. Museion can make the map itself while the internet works. The map is an **.mbtiles** file in the library's `maps` folder; the
 places are `places.csv` in your notes (see [notes.md](notes.md)).
 
-Make the map **before** you need it: drawing one takes map data you can only
+Make the map **before** you need it: making one takes map data you can only
 download while the internet works.
+
+## Make a map in Museion
+
+In the Map tab, open **Make a map...**, type a town (or a latitude and
+longitude such as `50.87, 0.01`) and press **Find**, pick the place it found,
+pick how far across (5, 10, 25 or 50 km), and press **Make the map**. Museion
+downloads what OpenStreetMap has for that area and makes a map that works with
+no internet: roads and paths with their names, rail, rivers and lakes, woods
+and fields, buildings, place names, and the signs that matter in an emergency
+(hospitals, doctors, pharmacies, drinking water and springs, fuel, police,
+fire stations, shelters, food shops). Click a sign to keep it as one of your
+places.
+
+From the command line:
+
+    python -m museion make-map "Lewes, England" --km 10
+    python -m museion make-map "50.87, 0.01" --km 25 --no-buildings
+    python -m museion make-map --again lewes-10-km      # no internet needed
+
+- **Where the data comes from.** Places are found with OpenStreetMap's
+  Nominatim search (only when you press Find, at most once a second). The map
+  data comes from the Overpass API (`overpass-api.de`, then
+  `overpass.kumi.systems` if that one is busy), in pieces of about 10 by 10 km.
+  Both are free services run by volunteers: make the maps you need, not a whole
+  country. Set `MUSEION_OVERPASS` or `MUSEION_NOMINATIM` to use other servers.
+- **The download is kept.** Each piece is saved in
+  `<library>/maps/sources/<map>/` (gzip-compressed Overpass JSON, with
+  `area.json` saying what it is). If the internet drops halfway, press Make the
+  map again: the pieces already there are not downloaded again. The map can
+  also be made again from them later with no internet (`--again`), for
+  example after Museion learns to draw something new.
+- **Buildings** make the download and the map several times bigger. They are
+  on for 5 and 10 km, off for 25 and 50 km; change it with the tick box.
+- **Not drawn yet:** the sea is not filled in (coastlines show as a line),
+  there are no contour lines or hill shading, and house numbers are left out.
+
+Museion makes the map itself (`museion/osm.py` downloads, `mapmaker.py` cuts
+the data into tiles, `mvt.py` writes them) and the page draws it
+(`ui/mvt.js` reads the tiles, `ui/mapdraw.js` draws them on a canvas). No map
+library or map server is involved, so there is nothing more to break or update.
 
 ## What kind of map
 
-An MBTiles file is a single SQLite database of map pictures ("tiles"),
-zoom level by zoom level. Museion reads it with Python's own `sqlite3` and the
-page draws the tiles itself (`museion/maps.py`, `museion/ui/map.js`), so there
-is no map server or map library to break.
+An MBTiles file is a single SQLite database of map tiles, zoom level by zoom
+level. Museion reads it with Python's own `sqlite3` (`museion/maps.py`) and the
+page draws the tiles itself (`museion/ui/map.js`).
 
-It must hold **raster** tiles (PNG, JPEG or WebP pictures). Vector MBTiles
-(format `pbf`, as OpenMapTiles and Protomaps make) need a full map renderer;
-Museion says so and does not show them.
+Two kinds work:
 
-Size grows four times with each zoom level. For one district, zoom 8 to 16 is
-typically a few hundred MB; zoom 17 shows single houses and quadruples that.
+- **Vector** tiles (format `pbf`): the shapes and names themselves, drawn by
+  the page. This is what Make a map writes: zoom 8 to 14, drawn up to zoom 19.
+  Other vector MBTiles that use the OpenMapTiles layer names (OpenMapTiles,
+  MapTiler, Planetiler) should draw with the same style, but so far only maps
+  made by Museion have been tried.
+- **Raster** tiles (PNG, JPEG or WebP pictures), as QGIS and most other tools
+  make. Size grows four times with each zoom level: for one district, zoom 8
+  to 16 is typically a few hundred MB; zoom 17 shows single houses and
+  quadruples that.
 
 ## Making one with QGIS (free, works offline once installed)
+
+For an area bigger than Make a map allows, a map styled your own way, or your
+own scans and drone photos:
 
 1. Download OpenStreetMap data for your region while you still can: a
    `.osm.pbf` extract from <https://download.geofabrik.de/> (pick the smallest

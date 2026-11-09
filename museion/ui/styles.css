@@ -751,3 +751,17 @@ td.fail { color: var(--bad); font-weight: 600; }
 .radio-found { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.4rem; }
 .radio-found:empty { display: none; }
 .radio-found .muted { font-size: 0.9rem; }
+
+/* Making a map (the Map tab's side panel) and the area it will cover. */
+#panel-map .note-list { overflow-y: auto; }
+#panel-map #place-items, #make-found { flex: 0 0 auto; overflow: visible; }
+.make-map { border-top: 1px solid var(--accent-dim); padding-top: 0.6rem; }
+.make-map summary { cursor: pointer; font-weight: 600; }
+.make-map > * + * { margin-top: 0.5rem; }
+.make-map #make-find input { flex: 1 1 auto; min-width: 0; }
+.make-map #make-found li.chosen { outline: 2px solid var(--accent); }
+.make-map .good { color: var(--good, #2f9a4b); }
+.make-map .err { color: var(--err, #c0392b); }
+.map-area { position: absolute; border: 2px dashed #c24e6b; background: rgba(194, 78, 107, 0.06); pointer-events: none; }
+.map-area[hidden], #map-canvas[hidden] { display: none; }
+#map-canvas { left: 0; top: 0; }

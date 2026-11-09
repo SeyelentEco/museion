@@ -108,9 +108,10 @@ time cut off, all in plain files on the same disk:
 - **Clinic and power.** The Clinic agent answers from the medical books with danger signs
   first and doses only from a passage it cites; the Power keeper works out what your
   panels, batteries or generator can run and when servicing is due.
-- **Offline maps.** The Map tab shows a map of your area, made beforehand as an `.mbtiles`
-  file, with the places you mark on it: water, shelter, medical help, danger. See
-  [docs/maps.md](docs/maps.md).
+- **Offline maps.** The Map tab shows a map of your area with the places you mark on it:
+  water, shelter, medical help, danger. Museion makes the map itself from OpenStreetMap
+  while the internet works (type a town, pick how far across), or shows one you made with
+  QGIS. See [docs/maps.md](docs/maps.md).
 - **A radio, if you have one.** With a Meshtastic radio plugged in, a Radio tab sends and
   receives short text messages with other radios nearby, no network needed, and keeps them
   in your notes. Optional, and so far tested only against simulated radios. See

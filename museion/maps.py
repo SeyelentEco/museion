@@ -5,9 +5,11 @@ An .mbtiles file is an SQLite database of map tiles (the MBTiles format:
 a metadata table of name/value pairs and a tiles table keyed by zoom, column
 and row). Python reads it with nothing but sqlite3, and the page draws the
 tiles itself (ui/map.js), so a map needs no server, no internet and no
-library. Raster tiles only: PNG, JPEG or WebP pictures, which any browser
-shows. A map is made before it is needed (docs/maps.md says how, with QGIS
-from OpenStreetMap data) and copied into <library>/maps/.
+library. Raster tiles (PNG, JPEG or WebP pictures) are shown as they are;
+vector tiles (pbf: roads, water and names as shapes, mvt.py) are drawn by
+the page (ui/mapdraw.js). A map is made before it is needed: in the Map tab,
+which downloads OpenStreetMap data for an area and makes a vector map of it
+(mapmaker.py), or with QGIS and copied into <library>/maps/ (docs/maps.md).
 
 Places are a record in the person's notes, places.csv (name, kind, lat, lon,
 notes), so they are searched and cited like any other note and the agents
@@ -16,6 +18,7 @@ can read them.
 
 from __future__ import annotations
 
+import os
 import re
 import sqlite3
 import threading
@@ -52,6 +55,7 @@ class MapInfo:
     center: list[float] | None  # lon, lat, zoom
     attribution: str
     problem: str = ""  # why it cannot be shown, if it cannot
+    vector: bool = False  # vector tiles (mvt.py), drawn by the page (ui/mapdraw.js)
 
 
 def folder_of(library_dir: Path | None) -> Path | None:
@@ -95,8 +99,7 @@ def info(path: Path) -> MapInfo:
         out.name = meta.get("name") or path.stem
         out.attribution = re.sub(r"<[^>]*>", "", meta.get("attribution", ""))
         out.format = meta.get("format", "")
-        if out.format.lower() == "pbf":
-            out.problem = "it holds vector tiles, which Museion cannot draw; it needs a raster map (PNG or JPEG tiles)"
+        out.vector = out.format.lower() == "pbf"
         if lo is None:
             out.problem = out.problem or "it holds no tiles"
         else:
@@ -113,9 +116,20 @@ def info(path: Path) -> MapInfo:
     return out
 
 
-def tile(path: Path, z: int, x: int, y: int) -> tuple[bytes, str] | None:
-    """One tile, as the page counts tiles (y from the top), and its type.
-    MBTiles counts rows from the bottom."""
+def replace(new: Path, path: Path) -> None:
+    """Put a newly made map in place of an old one. The old one is closed
+    first (Windows will not replace a file that is open), and no tile is
+    read until the new one is there."""
+    with _lock:
+        for key in [k for k in _connections if k.resolve() == path.resolve()]:
+            _connections.pop(key).close()
+        os.replace(new, path)
+
+
+def tile(path: Path, z: int, x: int, y: int) -> tuple[bytes, str, str] | None:
+    """One tile, as the page counts tiles (y from the top), its type, and
+    "gzip" for a vector tile kept compressed (as they usually are), which the
+    browser unpacks itself. MBTiles counts rows from the bottom."""
     row = (1 << z) - 1 - y
     conn = connect(path)
     # One connection serves every request thread; SQLite's Python module
@@ -127,8 +141,10 @@ def tile(path: Path, z: int, x: int, y: int) -> tuple[bytes, str] | None:
     if not found:
         return None
     data = bytes(found[0])
-    kind = next((t for sig, t in SIGNATURES if data.startswith(sig)), "application/octet-stream")
-    return data, kind
+    if data.startswith(b"\x1f\x8b"):
+        return data, "application/x-protobuf", "gzip"
+    kind = next((t for sig, t in SIGNATURES if data.startswith(sig)), "application/x-protobuf")
+    return data, kind, ""
 
 
 # ── places ───────────────────────────────────────────────────────────────────

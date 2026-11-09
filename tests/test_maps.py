@@ -52,14 +52,15 @@ class MapsTest(unittest.TestCase):
         self.assertEqual(got.bounds, [-10.0, 40.0, 10.0, 55.0])
         self.assertEqual(got.center, [0.0, 47.5, 0])
         self.assertEqual(got.attribution, "© OpenStreetMap contributors")
-        data, kind = maps.tile(path, 2, 1, 0)
-        self.assertEqual(kind, "image/png")
+        data, kind, encoding = maps.tile(path, 2, 1, 0)
+        self.assertEqual((kind, encoding), ("image/png", ""))
         self.assertEqual(data, png(160, 63, 0))  # y=0 is the top row
         self.assertIsNone(maps.tile(path, 5, 0, 0))
 
-    def test_vector_and_broken_maps_say_why(self):
+    def test_vector_maps_and_broken_ones(self):
         make_mbtiles(self.dir / "vector.mbtiles", fmt="pbf")
-        self.assertIn("vector tiles", maps.info(self.dir / "vector.mbtiles").problem)
+        got = maps.info(self.dir / "vector.mbtiles")
+        self.assertEqual((got.vector, got.problem), (True, ""))
         (self.dir / "junk.mbtiles").write_bytes(b"not a database")
         self.assertIn("could not be read", maps.info(self.dir / "junk.mbtiles").problem)
         self.assertEqual([p.name for p in maps.map_files([self.dir, self.dir / "none"])],
