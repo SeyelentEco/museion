@@ -227,45 +227,46 @@ class HarnessTest(unittest.TestCase):
         self.assertIn("max_calls for calculate must be a whole number, 1 or more",
                       problems_of(spec(max_calls={"calculate": 0})))
 
-    def test_a_plan_left_unsaved_gets_a_last_round_to_save_it(self):
+    def test_a_plan_left_unsaved_when_the_rounds_run_out_is_saved_from_the_answer(self):
         notes_dir = self.dir / "notes"
         notes_dir.mkdir()
-        s = spec(tools=["calculate", "write_note"], guards=[], max_rounds=2, saves="plan.md")
-        plan = ("write_note", {"name": "plan.md", "text": "Potatoes, 40 m2."})
-        chat = ScriptedChat(calls(("calculate", {"expression": "10*4"})), calls(("calculate", {"expression": "40/2"})),
-                            calls(plan), says("Plant potatoes: 40 m2."))
+        lib = FakeLibrary()
+        lib.gather = lambda query, notes_dir=None: ([hit(1), hit(2)], False)
+        s = spec(tools=["search_library", "calculate", "write_note"], guards=[], max_rounds=2, saves="plan.md")
+        chat = ScriptedChat(calls(("search_library", {"query": "potatoes"})),
+                            calls(("calculate", {"expression": "10*4"})),
+                            says("Plant potatoes on 40 m2 [2]."))
         person = Approving("allow")
-        answer = Harness(s, Setting(chat=chat, notes_dir=notes_dir, person=person)).run("plan it")
-        self.assertEqual(answer.text, "Plant potatoes: 40 m2.")
-        self.assertEqual((notes_dir / "plan.md").read_text(encoding="utf-8"), "Potatoes, 40 m2.\n")
+        answer = Harness(s, Setting(chat=chat, library=lib, notes_dir=notes_dir, person=person)).run("plan it")
+        # The last round is told its answer is the plan, and offered no tools.
+        self.assertEqual(chat.calls[2][0][-1]["content"], guards.answer_is_saved("plan.md"))
+        self.assertIsNone(chat.calls[2][1])
+        self.assertEqual(answer.text, "Plant potatoes on 40 m2 [1].")
+        self.assertEqual((notes_dir / "plan.md").read_text(encoding="utf-8"),
+                         "Plant potatoes on 40 m2 [1].\n\nSources:\n[1] Book 2, page 2\n")
         self.assertEqual(answer.files, ["notes/plan.md"])
-        self.assertEqual(len(person.requests), 1, "the person still allows the save")
-        # The save round offers write_note alone, and the round after it nothing.
-        self.assertEqual([t["function"]["name"] for t in chat.calls[2][1]], ["write_note"])
-        self.assertEqual(chat.calls[2][0][-1]["content"], guards.save_now("plan.md"))
-        self.assertIsNone(chat.calls[3][1])
-        self.assertEqual(chat.calls[3][0][-1]["content"], guards.NO_MORE_TOOLS)
+        self.assertEqual([r.tool for r in person.requests], ["write_note"], "the person still allows it")
 
-    def test_no_save_round_when_saved_declined_or_nothing_found(self):
+    def test_no_saving_when_saved_declined_nothing_worked_out_or_answered_early(self):
         notes_dir = self.dir / "notes"
         notes_dir.mkdir()
-        s = spec(tools=["calculate", "write_note"], guards=[], max_rounds=2, saves="plan.md")
-        saved = ScriptedChat(calls(("write_note", {"name": "other.md", "text": "x"})),
-                             calls(("calculate", {"expression": "1+1"})), says("Done."))
-        declined = ScriptedChat(calls(("calculate", {"expression": "1+1"})),
-                                calls(("write_note", {"name": "plan.md", "text": "x"})), says("Done."))
-        nothing = ScriptedChat(calls(("list_notes", {})), calls(("list_notes", {})), says("Done."))
-        cases = [(saved, "allow"), (declined, "deny")]
-        for chat, decision in cases:
-            with self.subTest(decision):
-                Harness(s, Setting(chat=chat, notes_dir=notes_dir, person=Approving(decision))).run("plan it")
-                self.assertIsNone(chat.calls[-1][1])
-                self.assertEqual(chat.calls[-1][0][-1]["content"], guards.NO_MORE_TOOLS)
-        # Nothing searched or worked out: nothing to save, whatever was written.
-        s = spec(tools=["list_notes", "write_note"], guards=[], max_rounds=2, saves="plan.md")
-        Harness(s, Setting(chat=nothing, notes_dir=notes_dir)).run("plan it")
-        self.assertIsNone(nothing.calls[-1][1])
-        self.assertEqual(nothing.calls[-1][0][-1]["content"], guards.NO_MORE_TOOLS)
+        s = spec(tools=["calculate", "list_notes", "write_note"], guards=[], max_rounds=2, saves="plan.md")
+        runs = {
+            "saved already": (ScriptedChat(calls(("write_note", {"name": "other.md", "text": "x"})),
+                                           calls(("calculate", {"expression": "1+1"})), says("Done.")), "allow"),
+            "declined": (ScriptedChat(calls(("calculate", {"expression": "1+1"})),
+                                      calls(("write_note", {"name": "plan.md", "text": "x"})), says("Done.")), "deny"),
+            "nothing worked out": (ScriptedChat(calls(("list_notes", {})), calls(("list_notes", {})), says("Done.")),
+                                   "allow"),
+            "answered early": (ScriptedChat(calls(("calculate", {"expression": "1+1"})), says("It is 2.")), "allow"),
+        }
+        for why, (chat, decision) in runs.items():
+            with self.subTest(why):
+                person = Approving(decision)
+                Harness(s, Setting(chat=chat, notes_dir=notes_dir, person=person)).run("plan it")
+                self.assertNotIn(guards.answer_is_saved("plan.md"), [m["content"] for m in chat.calls[-1][0]])
+                self.assertFalse((notes_dir / "plan.md").exists())
+                self.assertLessEqual(len(person.requests), 1)
         self.assertIn("saves names a note, but write_note is not one of its tools",
                       problems_of(spec(saves="plan.md")))
 

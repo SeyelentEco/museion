@@ -121,6 +121,7 @@ class Harness:
         self.max_rounds = spec.max_rounds
         self.allowed: set[str] = set()  # calls the person allowed for the rest of the run
         self.declined: set[str] = set()  # tools the person said no to in this run
+        self.saving = False  # the rounds ran out with the plan unsaved: the answer is saved
         self.log = None
         self.started = time.monotonic()
 
@@ -166,7 +167,6 @@ class Harness:
 
         fired: set[str] = set()
         room = self.room()
-        crowded = was_saving = False
         while True:
             self.check_stop()
             # Another tool result must fit beside everything already here, or
@@ -182,23 +182,15 @@ class Harness:
                 if prompt_chars(messages) > room:
                     self.mark("context nearly full; answering from what was found")
                     self.round = spec.max_rounds
-                    crowded = True
-            # On the last round the tools are withheld so the model must answer,
-            # unless its plan is still to be saved: then that round is for
-            # write_note alone, and one more is for the answer.
-            saving = self.round == spec.max_rounds and not crowded and self.unsaved()
-            last = (self.round >= spec.max_rounds or not self.tools) and not saving
-            if saving:
-                messages.append(llama.user(guards.save_now(spec.saves)))
-                self.event("save_now", note=spec.saves)
-            elif (self.round == spec.max_rounds and self.tools) or (self.round == spec.max_rounds + 1 and was_saving):
-                messages.append(llama.user(guards.NO_MORE_TOOLS))
-            was_saving = saving
+            # On the last round the tools are withheld so the model must answer.
+            # If its plan is not saved yet, it is told that its answer will be.
+            last = self.round >= spec.max_rounds or not self.tools
+            if self.round == spec.max_rounds and self.tools:
+                self.saving = self.unsaved()
+                messages.append(llama.user(guards.answer_is_saved(spec.saves) if self.saving
+                                           else guards.NO_MORE_TOOLS))
             self.round += 1
-            if saving:
-                schemas = [self.tools["write_note"].schema()]
-            else:
-                schemas = None if last else [t.schema() for t in self.tools.values()]
+            schemas = None if last else [t.schema() for t in self.tools.values()]
             turn = self.chat.turn(messages, schemas, spec.answer_tokens, on_token)
             self.turns += 1
             self.mark(f"turn {self.round}: {len(turn.tool_calls)} tool call(s), {len(turn.text)} chars")
@@ -238,6 +230,8 @@ class Harness:
                               self.calculations, self.used, self.turns, self.files)
             cited = [n for n in cited_numbers(text) if n <= len(self.sources)]
             used = [self.sources[n - 1] for n in cited]
+            if self.saving and self.unsaved():
+                self.save_answer(renumber_citations(text, cited), used)
             notes_only = bool(used) and all(h.book == NOTES_BOOK for h in used)
             return Answer(renumber_citations(text, cited), used, self.reranked,
                           basis_of(bool(used), bool(self.calculations), self.used, notes_only),
@@ -245,10 +239,24 @@ class Harness:
 
     def unsaved(self) -> bool:
         """The agent's plan (agent.toml's saves) is not written yet, though it
-        has found or worked out something to put in it."""
+        has worked something out to put in it. A question with nothing
+        calculated ("what should I do now?") is not a plan to save."""
         name = self.spec.saves
         return bool(name) and "write_note" in self.tools and "write_note" not in self.used \
-            and "write_note" not in self.declined and bool(self.sources or self.calculations)
+            and "write_note" not in self.declined and bool(self.calculations)
+
+    def save_answer(self, text: str, used: list) -> None:
+        """The rounds ran out before the agent saved its plan: its answer,
+        the plan, is saved instead, once the person allows it, with its
+        sources listed so the note's [1] still means something. On the 35B,
+        offered only write_note, it wrote the plan as its answer instead."""
+        listed = [f"[{i}] {h.doc_title}" + (f", page {h.page}" if h.page else "")
+                  for i, h in enumerate(used, 1)]
+        note = text.strip() + ("\n\nSources:\n" + "\n".join(listed) if listed else "")
+        args = json.dumps({"name": self.spec.saves, "text": note}, ensure_ascii=False)
+        call = {"id": "save_answer", "type": "function", "function": {"name": "write_note", "arguments": args}}
+        self.event("save_answer", note=self.spec.saves)
+        self.call(call, f"The plan, saved as {self.spec.saves} so it can be found and changed later.")
 
     def guard_names(self) -> list[str]:
         """The agent's guards, plus those it gets for having a tool."""

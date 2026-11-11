@@ -48,8 +48,8 @@ class AgentSpec:
     # tool's own limit (ask_person: 2). Past it the tool is taken away.
     max_calls: dict = field(default_factory=dict)
     # The person's note its work ends in (garden-plan.md). If the rounds run
-    # out before it is written, the last round offers only write_note, to save
-    # it, and then it answers.
+    # out before it is written, its answer is saved as that note instead
+    # (harness.save_answer), once the person allows it.
     saves: str = ""
     answer_tokens: int = 1500
     max_continuations: int = 2

@@ -50,12 +50,11 @@ NO_MORE_TOOLS = (
 
 
 
-def save_now(name: str) -> str:
-    """Said on the last round to an agent whose plan is not saved yet
-    (agent.toml's saves): only write_note is on offer."""
-    return (f"You are out of rounds for searching and calculating. If you were working out a plan, "
-            f"save it now as {name} with write_note, from what you have found and worked out; then "
-            "you will answer. If the question was not for a plan, answer now instead.")
+def answer_is_saved(name: str) -> str:
+    """Said on the last round, instead of NO_MORE_TOOLS, to an agent whose
+    plan is not saved yet (agent.toml's saves)."""
+    return (NO_MORE_TOOLS + f" Your answer will be saved as {name} once the person allows it, "
+            "so give the whole plan in it, from what you found and worked out.")
 
 
 # Said once to a tool call that came back as text, while tools are still on
