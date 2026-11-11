@@ -294,13 +294,15 @@ class RecordKind:
     title: str
     about: str
     columns: list[str]
+    start_with: str = ""  # a CSV beside records.toml whose rows a new record starts with
 
 
 def record_kinds() -> list[RecordKind]:
     """The records Museion knows how to start (records.toml)."""
     import tomllib
     data = tomllib.loads(Path(__file__).with_name("records.toml").read_text(encoding="utf-8"))
-    return [RecordKind(r["file"], r["title"], r["about"], list(r["columns"])) for r in data["records"]]
+    return [RecordKind(r["file"], r["title"], r["about"], list(r["columns"]), r.get("start_with", ""))
+            for r in data["records"]]
 
 
 def start_record(folder: Path, file: str) -> Path:
@@ -311,7 +313,10 @@ def start_record(folder: Path, file: str) -> Path:
         raise NoteError(f"There is no kind of record called {file}.")
     path = path_of(folder, file)
     if not path.exists():
-        write(folder, file, ",".join(kind.columns))
+        text = ",".join(kind.columns)
+        if kind.start_with:
+            text = Path(__file__).with_name(kind.start_with).read_text(encoding="utf-8")
+        write(folder, file, text)
     return path
 
 

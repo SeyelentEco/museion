@@ -26,6 +26,7 @@ text editor opens them too and they survive Museion itself:
 | `people.csv` | name, skills, where, how_to_reach, notes | you |
 | `household.csv` | name, age, needs, daily_medicines, notes | First steps reads it |
 | `radio-messages.csv` | time, direction, from, to, channel, text | the radio ([radio.md](radio.md)) |
+| `almanac.csv` | task, kind, when, notes | you; the Garden planner reads it (see below) |
 
 The kinds are defined in `museion/records.toml`; add a line there for a new one.
 Dates are written `YYYY-MM-DD`.
@@ -43,8 +44,38 @@ Both you and the agents:
   card that shows exactly what it will add or change (new lines, or a diff of
   the changed ones). Deny, and nothing is written.
 
-Reading is free: `list_notes`, `read_note` and `check_dates` (what expires or
-falls due soon, from a date column) need no permission.
+Reading is free: `list_notes`, `read_note`, `check_dates` (what expires or
+falls due soon, from a date column) and `almanac` (what is coming up, below)
+need no permission.
+
+## Coming up, and the almanac
+
+The Notes tab opens on **Coming up**: what to do now and in the next six
+weeks. It lists the almanac's tasks, maintenance that is due
+(`maintenance.csv`: last done plus every so many days) and medicines that
+run out (`medicines.csv`), with whatever is overdue first. Museion works the
+dates out itself (`museion/almanac.py`), not the model.
+
+The **almanac** (`almanac.csv`) is the year's work: planting, preserving,
+animals, the house. Each task says *when* the way growers say it:
+
+| When | Means |
+| --- | --- |
+| `6-8 weeks before last frost` | from 8 to 6 weeks before your average last spring frost |
+| `2 weeks after last frost`, `at first frost` | the week from that day |
+| `March`, `early March`, `mid March`, `late March`, `March to May` | that part of the year (early is the 1st to 10th, mid the 11th to 20th) |
+| `04-15`, `15 April`, `04-15 to 05-10` | a date (the week from it) or dates |
+
+Two rows of kind `frost` hold your average frost dates as month-day
+(`last frost,frost,04-20,`). Timing from them is what makes one list fit any
+climate, in either hemisphere; Coming up has a form to set them.
+
+Starting the almanac (Coming up's button, or New record… Almanac) gives you
+common rules of thumb for the garden, preserving, animals and the house
+(`museion/almanac-start.csv`), each marked as such. They are general
+practice, not from your library: keep them, change them to fit, or delete
+them, and check timings against your seed packets and the library. Add your
+own rows the same way.
 
 ## How they are searched and cited
 
@@ -71,7 +102,9 @@ wrote. Open the citation and it opens the note.
   `medicines.csv`.
 - **Power keeper** keeps `power.csv` and `maintenance.csv`: what the power you
   have can run, how long the fuel lasts, what servicing is due.
-- **Garden planner** keeps `garden-plan.md`.
+- **Garden planner** keeps `garden-plan.md`, and answers "what should I be
+  doing in the garden now?" from the almanac (its `almanac` tool), adding
+  the how-to from the library.
 
 An agent's test cases put their files in a scratch notes folder
 (`given_files = { "notes/stores.csv" = "..." }`), so a test never touches yours.

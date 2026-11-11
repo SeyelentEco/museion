@@ -82,7 +82,7 @@ COMMANDS = {f.__name__: f for f in [
     agent_commands.test_agent, agent_commands.agent_tests, agent_commands.export_agent,
     agent_commands.import_agent,
     notes_commands.list_notes, notes_commands.read_note, notes_commands.save_note, notes_commands.new_note,
-    notes_commands.open_notes_folder,
+    notes_commands.open_notes_folder, notes_commands.coming_up, notes_commands.set_frost_dates,
     map_commands.list_maps, map_commands.list_places, map_commands.add_place, map_commands.open_maps_folder,
     map_commands.find_place, map_commands.map_plan, map_commands.make_map, map_commands.stop_map,
     radio_commands.radio_state, radio_commands.find_radios, radio_commands.connect_radio,

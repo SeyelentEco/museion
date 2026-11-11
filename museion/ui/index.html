@@ -125,10 +125,31 @@
               <button id="note-folder" type="button" class="small">Open the notes folder</button>
             </aside>
             <div class="note-detail" id="note-detail">
-              <div class="empty" id="note-empty">
-                <h1>Your notes</h1>
-                <p>Write down what you learn, what you have and what worked: a repair, a remedy, which seeds grew. Records such as stores, medicines and maintenance are tables that agents keep up to date for you, after you press Allow.</p>
-                <p class="muted">They are plain files in the library's notes folder, so any text editor opens them too. Every change keeps the version before in the folder's .history.</p>
+              <div id="note-empty">
+                <section class="coming-up" id="coming-up">
+                  <h1>Coming up</h1>
+                  <p class="muted small-print" id="coming-about">What to do now and in the next weeks, from your almanac, maintenance and medicines.</p>
+                  <ul id="coming-items" class="coming-items"></ul>
+                  <div id="coming-start" class="coming-note" hidden>
+                    <p>Start an almanac: common garden, preserving, animal and house tasks, timed from your frost dates so they fit where you live. You keep, change or delete them; it is a record like the others.</p>
+                    <button id="coming-start-go" type="button" class="primary small">Start the almanac</button>
+                  </div>
+                  <form id="frost-form" class="coming-note">
+                    <p id="frost-about" class="small-print">Your average frost dates, as month-day. Local growers, old seed packets or the library's climate maps say.</p>
+                    <div class="row">
+                      <label class="small-print">Last spring frost <input id="frost-last" type="text" placeholder="04-20" size="8" /></label>
+                      <label class="small-print">First autumn frost <input id="frost-first" type="text" placeholder="10-15" size="8" /></label>
+                      <button type="submit" class="small">Save</button>
+                    </div>
+                    <p id="frost-state" class="small-print"></p>
+                  </form>
+                  <ul id="coming-problems" class="muted small-print"></ul>
+                </section>
+                <div class="empty">
+                  <h2>Your notes</h2>
+                  <p>Write down what you learn, what you have and what worked: a repair, a remedy, which seeds grew. Records such as stores, medicines and maintenance are tables that agents keep up to date for you, after you press Allow.</p>
+                  <p class="muted">They are plain files in the library's notes folder, so any text editor opens them too. Every change keeps the version before in the folder's .history.</p>
+                </div>
               </div>
               <div id="note-edit" hidden>
                 <div class="note-head">

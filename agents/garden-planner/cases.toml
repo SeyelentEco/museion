@@ -11,3 +11,10 @@ id = "seed-saving"
 prompt = "How do I save bean seed for next year?"
 expect_any = ["dry", "seed", "pod"]
 expect_basis = "library"
+
+[[cases]]
+id = "what-now"
+prompt = "It's March. What should I be doing in the garden now?"
+given_files = { "notes/almanac.csv" = "task,kind,when,notes\nlast frost,frost,04-20,\nfirst frost,frost,10-15,\nStart tomatoes and peppers indoors,garden,6-8 weeks before last frost,\nSow peas outdoors,garden,3-6 weeks before last frost,\nPlant garlic,garden,1-3 weeks after first frost,\n" }
+expect_tool = ["almanac"]
+expect_any = ["tomato", "pea"]

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from museion import notes
+from museion import almanac, notes
 from museion.appstate import AppState, UiError
 
 
@@ -68,6 +68,24 @@ def new_note(state: AppState, name: str, record: str = "") -> dict:
     except notes.NoteError as e:
         raise UiError(str(e)) from None
     return read_note(state, name)
+
+
+def coming_up(state: AppState) -> dict:
+    """What is due now and in the next weeks (almanac.py): the Notes tab's
+    first page."""
+    found = almanac.coming_up(folder(state))
+    out = found.as_dict()
+    out["can_start"] = not found.has_almanac
+    return out
+
+
+def set_frost_dates(state: AppState, last: str = "", first: str = "") -> dict:
+    """The person's average frost dates, written into almanac.csv."""
+    try:
+        almanac.set_frosts(folder(state), last, first)
+    except (almanac.WhenError, notes.NoteError) as e:
+        raise UiError(str(e)) from None
+    return coming_up(state)
 
 
 def open_notes_folder(state: AppState) -> None:

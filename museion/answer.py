@@ -79,7 +79,7 @@ class Answer:
 # agent that searched, found nothing, noted the household size and then gave
 # a dose from memory must still be labelled unverified.
 READ_FILE_TOOLS = frozenset({"read_file", "list_files", "library_files", "read_note", "list_notes",
-                             "check_dates"})
+                             "check_dates", "almanac"})
 
 
 def basis_of(cited: bool, calculated: bool, tools: Sequence[str] = (), notes_only: bool = False) -> str:

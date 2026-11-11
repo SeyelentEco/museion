@@ -1,5 +1,7 @@
 // The Notes tab: the person's own notes and records (museion/notes.py). A
-// list of the files, an editor, and for a record a table of its rows.
+// list of the files, an editor, and for a record a table of its rows. Its
+// first page is "Coming up": what is due now and soon, from the almanac,
+// maintenance and medicines (museion/almanac.py).
 
 import { invoke } from './api.js';
 import { $, el } from './dom.js';
@@ -30,6 +32,11 @@ async function refresh() {
   kinds = data.kinds;
   const list = $('#note-items');
   list.textContent = '';
+  const coming = el('li', current ? 'coming' : 'coming active');
+  coming.append(el('div', 't', 'Coming up'));
+  coming.append(el('div', 'meta', 'what to do now and soon'));
+  coming.addEventListener('click', () => void showComing());
+  list.append(coming);
   if (!data.notes.length) list.append(el('li', 'empty-note', 'No notes yet.'));
   for (const n of data.notes) {
     const li = el('li', current?.name === n.name ? 'active' : undefined);
@@ -64,6 +71,69 @@ export async function openNote(name) {
   show(note);
 }
 
+const KIND = { garden: 'Garden', preserving: 'Preserving', animals: 'Animals', maintenance: 'Maintenance',
+  medicines: 'Medicines', stores: 'Stores' };
+
+function whenText(item) {
+  if (item.status === 'overdue') return `Overdue ${-item.days} d`;
+  if (item.status === 'now') return 'Now';
+  return item.days === 1 ? 'Tomorrow' : `In ${item.days} days`;
+}
+
+/** The first page: what is due now and in the next weeks. */
+export async function showComing() {
+  if (dirty() && !confirm(`${current.name} has changes that are not saved. Leave it anyway?`)) return;
+  current = null;
+  $('#note-edit').hidden = true;
+  $('#note-empty').hidden = false;
+  document.querySelectorAll('#note-items li').forEach((li) => li.classList.toggle('active', li.classList.contains('coming')));
+  let data;
+  try {
+    data = await invoke('coming_up');
+  } catch (e) {
+    $('#coming-items').textContent = '';
+    $('#coming-about').textContent = String(e);
+    return;
+  }
+  drawComing(data);
+}
+
+function drawComing(data) {
+  const list = $('#coming-items');
+  list.textContent = '';
+  for (const item of data.items) {
+    const li = el('li', item.status);
+    li.append(el('span', 'when', whenText(item)));
+    const what = el('div', 'what');
+    what.append(el('div', 't', item.task));
+    const until = item.status === 'now' && item.end > data.today ? ` · until ${item.end}` : '';
+    const meta = el('div', 'meta', `${KIND[item.kind] ?? item.kind}${item.when ? ` · ${item.when}` : ''}${until} · `);
+    const open = el('button', undefined, item.source);
+    open.type = 'button';
+    open.title = `Open ${item.source}`;
+    open.addEventListener('click', () => void openNote(item.source));
+    meta.append(open);
+    if (item.notes) meta.title = item.notes;
+    what.append(meta);
+    li.append(what);
+    list.append(li);
+  }
+  if (!data.items.length) {
+    list.append(el('li', 'none', `Nothing is due in the next ${data.weeks} weeks.`));
+  }
+  $('#coming-start').hidden = !data.can_start;
+  const waiting = Object.entries(data.needs_frost);
+  $('#frost-form').hidden = data.can_start;
+  $('#frost-last').value = data.frosts.last ?? '';
+  $('#frost-first').value = data.frosts.first ?? '';
+  $('#frost-about').textContent = waiting.length
+    ? `${waiting.map(([w, n]) => `${n} task${n === 1 ? ' is' : 's are'} timed from your ${w} frost`).join(', and ')}: give your average frost dates, as month-day. Local growers, old seed packets or the library's climate maps say.`
+    : 'Your average frost dates, as month-day. The almanac times its tasks from them.';
+  const problems = $('#coming-problems');
+  problems.textContent = '';
+  for (const p of data.problems) problems.append(el('li', undefined, p));
+}
+
 function show(note) {
   current = { name: note.name, text: note.text };
   $('#note-empty').hidden = true;
@@ -78,6 +148,28 @@ function show(note) {
   drawTable();
   document.querySelectorAll('#note-items li').forEach((li) => li.classList.toggle('active', li.dataset.name === note.name));
 }
+
+$('#coming-start-go').addEventListener('click', async () => {
+  try {
+    await invoke('new_note', { name: '', record: 'almanac.csv' });
+    await refresh();
+    await showComing();
+    $('#frost-last').focus();
+  } catch (e) {
+    alert(String(e));
+  }
+});
+
+$('#frost-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    drawComing(await invoke('set_frost_dates', { last: $('#frost-last').value, first: $('#frost-first').value }));
+    $('#frost-state').textContent = 'Saved in almanac.csv.';
+    await refresh();
+  } catch (err) {
+    $('#frost-state').textContent = String(err);
+  }
+});
 
 /** A CSV line split into cells, with "quoted, cells" kept whole. */
 function cells(line) {
@@ -188,4 +280,7 @@ export async function openCitedNote(name) {
   await openNote(name);
 }
 
-onTab('notes', refresh);
+onTab('notes', async () => {
+  await refresh();
+  if (!current) await showComing();
+});

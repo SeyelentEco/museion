@@ -98,6 +98,7 @@ and the unit tests. A change shows in a new chat; no restart is needed.
 | Agents: the harness, its tools, chats | `agents/` (one folder each), `museion/harness.py`, `agent_tools/` (one tool per file), `agents.py` (settings), `chat_commands.py`, `agent_commands.py`; see `docs/agents.md` |
 | The command line | `museion/cli.py`, `catalog_cli.py`, `drive_cli.py`, `map_cli.py` |
 | The person's notes and records (the Notes tab), and their kinds | `museion/notes.py`, `records.toml`, `notes_commands.py`, `agent_tools/write_note.py` and the other note tools; see `docs/notes.md` |
+| Coming up and the almanac (the Notes tab's first page) | `museion/almanac.py` (reading `when`, what is due), `almanac-start.csv` (the starter tasks), `agent_tools/almanac.py`, `ui/notes.js`; see `docs/notes.md` |
 | Offline maps and places (the Map tab) | `museion/maps.py`, `map_commands.py`, `ui/map.js`; see `docs/maps.md` |
 | Making a map from OpenStreetMap, and drawing it | `museion/osm.py` (download), `mapmaker.py` (tiles), `mvt.py` and `protobuf.py` (the tile format), `map_cli.py` (`make-map`); in the page `ui/mvt.js` (reading tiles), `ui/mapdraw.js` (the map's style and labels) |
 | The optional Meshtastic radio (the Radio tab) | `museion/radio.py`, `radio_commands.py`, `ui/radio.js`; see `docs/radio.md` |
