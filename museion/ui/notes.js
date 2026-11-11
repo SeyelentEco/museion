@@ -126,9 +126,13 @@ function drawComing(data) {
   $('#frost-form').hidden = data.can_start;
   $('#frost-last').value = data.frosts.last ?? '';
   $('#frost-first').value = data.frosts.first ?? '';
+  const zone = data.zone ? ` Hardiness zone ${data.zone}.` : '';
   $('#frost-about').textContent = waiting.length
     ? `${waiting.map(([w, n]) => `${n} task${n === 1 ? ' is' : 's are'} timed from your ${w} frost`).join(', and ')}: give your average frost dates, as month-day. Local growers, old seed packets or the library's climate maps say.`
-    : 'Your average frost dates, as month-day. The almanac times its tasks from them.';
+    : `Your average frost dates, as month-day. The almanac times its tasks from them.${zone}`;
+  $('#frost-form').title = data.frost_note ?? '';
+  $('#climate-look').hidden = !data.climate;
+  $('#climate-place').title = data.climate ? `Towns in the climate table's region: ${data.climate}` : '';
   const problems = $('#coming-problems');
   problems.textContent = '';
   for (const p of data.problems) problems.append(el('li', undefined, p));
@@ -165,6 +169,53 @@ $('#frost-form').addEventListener('submit', async (e) => {
   try {
     drawComing(await invoke('set_frost_dates', { last: $('#frost-last').value, first: $('#frost-first').value }));
     $('#frost-state').textContent = 'Saved in almanac.csv.';
+    await refresh();
+  } catch (err) {
+    $('#frost-state').textContent = String(err);
+  }
+});
+
+let looked = null;  // the last look-up, until it is used
+
+async function lookUp(pick = 0) {
+  const result = $('#climate-result');
+  result.hidden = false;
+  $('#climate-use').hidden = true;
+  result.textContent = 'Looking up…';
+  try {
+    looked = await invoke('climate_lookup', { place: $('#climate-place').value, pick });
+  } catch (err) {
+    looked = null;
+    // A new search that failed has nothing to pick from; a pick that failed
+    // (a town far outside the table) leaves the others to pick.
+    if (!pick) $('#climate-pick').hidden = true;
+    result.textContent = String(err);
+    return;
+  }
+  const choose = $('#climate-pick');
+  choose.textContent = '';
+  looked.places.forEach((p, i) => choose.append(new Option(p.label, String(i), false, i === looked.picked)));
+  choose.hidden = looked.places.length < 2;
+  result.textContent = looked.text;
+  const e = looked.estimate;
+  $('#climate-use').hidden = !(e.last_frost || e.first_frost || e.zone);
+}
+
+$('#climate-go').addEventListener('click', () => void lookUp());
+$('#climate-place').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    void lookUp();
+  }
+});
+$('#climate-pick').addEventListener('change', () => void lookUp(Number($('#climate-pick').value)));
+$('#climate-use').addEventListener('click', async () => {
+  if (!looked) return;
+  const e = looked.estimate;
+  try {
+    drawComing(await invoke('set_frost_dates', { last: e.last_frost, first: e.first_frost, zone: e.zone, note: looked.text }));
+    $('#frost-state').textContent = 'Saved in almanac.csv, with where the dates came from.';
+    $('#climate-use').hidden = true;
     await refresh();
   } catch (err) {
     $('#frost-state').textContent = String(err);

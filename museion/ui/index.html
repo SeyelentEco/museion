@@ -142,6 +142,15 @@
                       <button type="submit" class="small">Save</button>
                     </div>
                     <p id="frost-state" class="small-print"></p>
+                    <div id="climate-look" hidden>
+                      <div class="row">
+                        <label class="small-print">Or look them up for <input id="climate-place" type="text" placeholder="your town, or lat, lon" size="24" /></label>
+                        <button id="climate-go" type="button" class="small">Look up</button>
+                        <select id="climate-pick" class="small-print" hidden></select>
+                      </div>
+                      <p id="climate-result" class="small-print" hidden></p>
+                      <button id="climate-use" type="button" class="primary small" hidden>Use these dates</button>
+                    </div>
                   </form>
                   <ul id="coming-problems" class="muted small-print"></ul>
                 </section>

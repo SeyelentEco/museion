@@ -39,6 +39,28 @@ def starting_day(text: str, today: datetime.date) -> datetime.date:
     return datetime.date(year, month, 1)
 
 
+def has_climate(run) -> bool:
+    from museion import climate
+    lib = getattr(run.setting, "library_dir", None)
+    return lib is not None and (lib / climate.FOLDER / climate.STATIONS).is_file()
+
+
+def frosts_for(place: str, run) -> tuple[dict[str, str], str]:
+    """Frost dates for a place from the library's climate table, for the
+    almanac to use where almanac.csv gives none, and what to say of them."""
+    from museion import climate, maps
+    lib = getattr(run.setting, "library_dir", None)
+    if lib is None:
+        raise ToolError("There is no library here, so no climate table to look the place up in.")
+    try:
+        _, chosen, e = climate.look_up(lib, place, maps.places(getattr(run.setting, "notes_dir", None)))
+    except climate.ClimateError as err:
+        raise ToolError(str(err)) from None
+    said = (climate.describe(e, chosen.label) + " Used where almanac.csv has no frost dates; the person can "
+            "save them with Look up in the Notes tab's Coming up.")
+    return {"last": e.last_frost, "first": e.first_frost}, said
+
+
 def describe(item: almanac.Item, today: datetime.date) -> str:
     where = f"{item.kind}, {item.source}"
     if item.status == "overdue":
@@ -56,17 +78,27 @@ def run(args: dict, run) -> str:
     weeks = max(1, min(int(args.get("weeks") or almanac.WEEKS), 26))
     today = datetime.date.today()
     start = starting_day(args.get("starting", ""), today)
-    found = almanac.coming_up(folder(run), start, weeks)
+    place = (args.get("place") or "").strip()
+    fill, looked = {}, ""
+    if place:
+        fill, looked = frosts_for(place, run)
+    found = almanac.coming_up(folder(run), start, weeks, fill)
     lines = [f"Today is {today.isoformat()}. Looking from {start.isoformat()} for {weeks} weeks."]
+    if looked:
+        lines.append(looked)
     if not found.has_almanac:
         lines.append("The person has no almanac.csv yet; they can start one in the Notes tab (New record, Almanac). "
                      "Only maintenance and medicines are shown.")
     if found.frosts:
-        lines.append("Frost dates in almanac.csv: " + ", ".join(f"{k} frost {v}" for k, v in found.frosts.items()) + ".")
+        lines.append(("Frost dates used: " if looked else "Frost dates in almanac.csv: ")
+                     + ", ".join(f"{k} frost {v}" for k, v in found.frosts.items()) + ".")
     for which, count in found.needs_frost.items():
         lines.append(f"{count} task(s) are timed from the {which} frost, which almanac.csv does not give yet. "
-                     f"Ask the person for their average {which} frost date (month-day, like "
-                     f"{'04-20' if which == 'last' else '10-15'}) and write it in the {which} frost row.")
+                     + ("Call almanac again with place: the person's town, to use weather-station averages; "
+                        "if you do not know their town, ask for it (not for the dates)."
+                        if has_climate(run) and not place else
+                        f"Ask the person for their average {which} frost date (month-day, like "
+                        f"{'04-20' if which == 'last' else '10-15'})."))
     if found.items:
         lines += [describe(i, start) for i in found.items]
     else:
@@ -84,6 +116,8 @@ TOOL = Tool(
         "starting": {"type": "string", "description": "Leave out to look from today (Museion knows the date). "
                      "Only for another time the person names: a month like March, or a date"},
         "weeks": {"type": "integer", "description": "How many weeks ahead to look (default 6)"},
+        "place": {"type": "string", "description": "The person's town, only when almanac.csv has no frost "
+                  "dates: they are then taken from weather-station averages"},
     },
     required=[],
     risk=READ,

@@ -6,7 +6,7 @@
 name = "Garden planner"
 goal = "Plan a food garden: what to plant, when, spacing and how much seed, for the plot and climate."
 min_tier = "Capable"
-tools = ["search_library", "read_page", "calculate", "almanac", "notes", "read_note", "write_note", "ask_person"]
+tools = ["search_library", "read_page", "calculate", "almanac", "climate", "notes", "read_note", "write_note", "ask_person"]
 guards = ["calculate_first", "call_again", "search_first", "cite_or_stand"]
 # 14, not 10: on the 35B a first plan took nine searches and the rounds ran
 # out before it could calculate or save garden-plan.md.

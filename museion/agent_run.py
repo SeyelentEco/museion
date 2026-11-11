@@ -155,6 +155,10 @@ class CaseRunner:
             # Its own notes too: a case's given notes/... files, and never
             # the person's.
             setting.notes_dir = scratch / "notes"
+            # A case that gives a climate table looks places up in it, not
+            # in the library's own.
+            if any(Path(name).parts[0] == "climate" for name in case.given_files):
+                setting.library_dir = scratch
             spec = prepared(self.env.get(self.spec.id), self.tuning)
             return Harness(spec, setting, scratch if spec.memory != "none" else None).run(case.prompt)
         finally:

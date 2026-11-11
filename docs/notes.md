@@ -80,6 +80,57 @@ practice, not from your library: keep them, change them to fit, or delete
 them, and check timings against your seed packets and the library. Add your
 own rows the same way.
 
+### Frost dates and hardiness zones by place
+
+If you don't know your frost dates, Museion can look them up from weather
+stations near you, with no internet, once the library has a **climate
+table** for your region (`<library>/climate/`). Type your town (or
+`lat, lon`, or a saved place) under the frost form and press **Look up**:
+
+> Station averages for Bellevue, Washington, US: last spring frost about
+> 03-28 (1 year in 10 as late as 04-20); first autumn frost about 11-02 (1
+> year in 10 as early as 10-20); about 218 frost-free days; hardiness zone
+> 8b (average coldest night -7.9 °C). From 3 weather stations (...)
+
+**Use these dates** writes them into `almanac.csv`, with the zone in a row
+of kind `zone` and where they came from in the rows' notes. Dates typed by
+hand afterwards replace them. The garden planner and the `almanac` tool look
+your town up the same way when `almanac.csv` has no frost dates, and the
+`climate` tool answers "what zone am I in?".
+
+How it is worked out (`museion/climate.py`):
+
+- The records are NOAA's daily weather-station records, **GHCN-Daily**,
+  which are public domain, for 1991-2020. Each station needs 20 of those
+  years with readings.
+- A *frost* is a daily low at or below 0 °C. The frost dates are the median
+  of the station's years. The "1 year in 10" dates are passed only one year
+  in ten: later in spring, earlier in autumn.
+- The **zone** is the USDA's: the average of each year's coldest night (zone
+  1 starts at -60 °F, each zone is 10 °F wide, with halves *a* and *b*).
+  It's worked out from station data the USDA's way. It is not the official
+  USDA map.
+- A place's estimate weighs the nearest stations (up to 3 within 60 km) by
+  1/distance². When the town's height is known, 100 m of height difference
+  counts like 10 km. If no station is within 60 km, the nearest one is
+  used and the answer says it's only a rough guide. A place 250 km or more
+  from every station is outside the table's region, and is refused.
+- These are averages: a frost pocket or a sheltered garden can be a week or
+  two off. Correct them once you know your own.
+
+**Making the table** needs the internet once, on any computer:
+
+    python -m museion climate build --region US-WA --library <library>
+    python -m museion climate lookup "Bellevue, Washington" --library <library>
+
+`--region` takes countries by their GHCN code (`US`, `UK`, `CA`, ...),
+states or provinces (`US-WA CA-BC`), or `box:south,west,north,east`, several
+at once. The build downloads NOAA's station list and each of the region's
+stations' records, plus GeoNames' towns of 1,000 people or more (CC BY 4.0)
+for finding a place by name. It keeps them in `climate/sources/`, keeping
+only the daily lows, so `--offline` can make the table again with no
+internet. The table and town list are a few MB at most.
+
 ## How they are searched and cited
 
 Notes are indexed on their own (`notes/.index.db`, rebuilt by itself when a

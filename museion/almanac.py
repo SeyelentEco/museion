@@ -37,6 +37,7 @@ from museion import notes
 
 FILE = "almanac.csv"
 WEEKS = 6  # how far ahead "coming up" looks
+LOOKED_UP = "Station averages"  # how climate.describe begins
 
 MONTHS = {name.lower(): i for i, name in enumerate(calendar.month_name) if name}
 MONTHS.update({name.lower(): i for i, name in enumerate(calendar.month_abbr) if name})
@@ -184,11 +185,13 @@ class Almanac:
     needs_frost: dict[str, int]  # tasks timed from a frost date that is not set
     problems: list[str]
     has_almanac: bool
+    zone: str = ""  # the hardiness zone row, if any: "8b"
+    frost_note: str = ""  # where the frost dates came from, from the frost rows' notes
 
     def as_dict(self) -> dict:
         return {"today": self.today.isoformat(), "weeks": self.weeks, "items": [i.as_dict() for i in self.items],
                 "frosts": self.frosts, "needs_frost": self.needs_frost, "problems": self.problems,
-                "has_almanac": self.has_almanac}
+                "has_almanac": self.has_almanac, "zone": self.zone, "frost_note": self.frost_note}
 
 
 def rows(folder: Path, name: str) -> list[dict[str, str]] | None:
@@ -218,18 +221,24 @@ def frost_dates(table: list[dict[str, str]], problems: list[str]) -> dict[str, t
     return out
 
 
-def coming_up(folder: Path, today: datetime.date | None = None, weeks: int = WEEKS) -> Almanac:
+def coming_up(folder: Path, today: datetime.date | None = None, weeks: int = WEEKS,
+              fill: dict[str, str] | None = None) -> Almanac:
     """What is due now and in the next `weeks` weeks, soonest first: the
-    almanac's tasks, maintenance that is due and medicines running out."""
+    almanac's tasks, maintenance that is due and medicines running out.
+    `fill` gives frost dates ("last": "04-20") for those almanac.csv lacks,
+    such as a look-up from the climate table."""
     today = today or datetime.date.today()
     horizon = today + datetime.timedelta(weeks=weeks)
     problems: list[str] = []
     items: list[Item] = []
     table = rows(folder, FILE)
     frosts = frost_dates(table or [], problems)
+    for which, md in (fill or {}).items():
+        if which not in frosts and md and month_day(md):
+            frosts[which] = month_day(md)
     needs: dict[str, int] = {}
     for r in table or []:
-        if r.get("kind", "").lower() == "frost" or not r.get("task"):
+        if r.get("kind", "").lower() in ("frost", "zone") or not r.get("task"):
             continue
         try:
             when = parse_when(r.get("when", ""))
@@ -255,7 +264,9 @@ def coming_up(folder: Path, today: datetime.date | None = None, weeks: int = WEE
     order = {"overdue": 0, "now": 1, "soon": 2}
     items.sort(key=lambda i: (order[i.status], i.days, i.task.lower()))
     shown = {k: f"{v[0]:02d}-{v[1]:02d}" for k, v in frosts.items()}
-    return Almanac(today, weeks, items, shown, needs, problems, table is not None)
+    zone = next((r.get("when", "") for r in table or [] if r.get("kind", "").lower() == "zone"), "")
+    note = next((r.get("notes", "") for r in table or [] if r.get("kind", "").lower() == "frost" and r.get("notes")), "")
+    return Almanac(today, weeks, items, shown, needs, problems, table is not None, zone, note)
 
 
 def dated(folder: Path, name: str, column: str, every: str | None, kind: str, today, horizon, problems,
@@ -281,9 +292,12 @@ def dated(folder: Path, name: str, column: str, every: str | None, kind: str, to
     return out
 
 
-def set_frosts(folder: Path, last: str, first: str) -> None:
+def set_frosts(folder: Path, last: str, first: str, zone: str = "", note: str = "") -> None:
     """Write this place's average frost dates into almanac.csv (starting it
-    if there is none), as month-day. Either may be left empty."""
+    if there is none), as month-day. Either may be left empty. A hardiness
+    zone ("8b") goes in a row of kind zone, and `note` (where the dates came
+    from) in the frost rows' notes. Dates typed by hand clear a note from an
+    earlier look-up, which no longer says where they came from."""
     import csv
     import io
     told = {}
@@ -302,16 +316,25 @@ def set_frosts(folder: Path, last: str, first: str) -> None:
     if not {"task", "kind", "when"} <= set(cols):
         raise WhenError(f"{FILE} needs the columns task, kind and when.")
     t, k, w = cols.index("task"), cols.index("kind"), cols.index("when")
-    for which, value in told.items():
+    n = cols.index("notes") if "notes" in cols else None
+    zone = zone.strip()
+    if zone and not re.fullmatch(r"\d{1,2}[ab]?", zone):
+        raise WhenError(f"{zone!r} is not a hardiness zone like 8b.")
+    wanted = [(f"{which} frost", "frost", which, value) for which, value in told.items()]
+    if zone:
+        wanted.append(("hardiness zone", "zone", "zone", zone))
+    for at, (task, kind, word, value) in enumerate(wanted):
         for r in body:
             r += [""] * (len(cols) - len(r))
-            if r[k].strip().lower() == "frost" and which in r[t].lower():
-                r[w] = value
+            if r[k].strip().lower() == kind and word in r[t].lower():
                 break
         else:
-            row = [""] * len(cols)
-            row[t], row[k], row[w] = f"{which} frost", "frost", value
-            body.insert(0 if which == "last" else 1, row)
+            r = [""] * len(cols)
+            r[t], r[k] = task, kind
+            body.insert(at, r)
+        r[w] = value
+        if n is not None and (note.strip() or r[n].startswith(LOOKED_UP)):
+            r[n] = note.strip()
     out = io.StringIO()
     csv.writer(out, lineterminator="\n").writerows([header, *body])
     notes.write(folder, FILE, out.getvalue())

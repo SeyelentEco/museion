@@ -73,19 +73,49 @@ def new_note(state: AppState, name: str, record: str = "") -> dict:
 def coming_up(state: AppState) -> dict:
     """What is due now and in the next weeks (almanac.py): the Notes tab's
     first page."""
+    from museion import climate
     found = almanac.coming_up(folder(state))
     out = found.as_dict()
     out["can_start"] = not found.has_almanac
+    where = climate_dir(state)
+    # The region a climate table covers, when the library has one: the page
+    # then offers to look the frost dates up.
+    out["climate"] = (climate.about(where).get("region") or "your region") \
+        if where is not None and (where / climate.STATIONS).is_file() else None
     return out
 
 
-def set_frost_dates(state: AppState, last: str = "", first: str = "") -> dict:
-    """The person's average frost dates, written into almanac.csv."""
+def climate_dir(state: AppState) -> Path | None:
+    from museion import climate
+    lib = state.config().library_dir
+    return Path(lib) / climate.FOLDER if lib else None
+
+
+def set_frost_dates(state: AppState, last: str = "", first: str = "", zone: str = "", note: str = "") -> dict:
+    """The person's average frost dates (and zone, and where they came
+    from), written into almanac.csv."""
     try:
-        almanac.set_frosts(folder(state), last, first)
+        almanac.set_frosts(folder(state), last, first, zone, note)
     except (almanac.WhenError, notes.NoteError) as e:
         raise UiError(str(e)) from None
     return coming_up(state)
+
+
+def climate_lookup(state: AppState, place: str, pick: int = 0) -> dict:
+    """Frost dates and zone for a place, from the library's climate table
+    (climate.py): the places that match what was typed, and the estimate
+    for the one picked. Offline: the region's towns, saved places, or
+    "lat, lon"."""
+    from museion import climate, maps
+    where = climate_dir(state)
+    if where is None:
+        raise UiError("No library is set up yet, so there is no climate table.")
+    try:
+        found, chosen, e = climate.look_up(where.parent, place, maps.places(state.notes_dir(state.config())), pick)
+    except climate.ClimateError as err:
+        raise UiError(str(err)) from None
+    return {"places": [{"name": p.name, "label": p.label} for p in found],
+            "picked": found.index(chosen), "estimate": e.as_dict(), "text": climate.describe(e, chosen.label)}
 
 
 def open_notes_folder(state: AppState) -> None:
