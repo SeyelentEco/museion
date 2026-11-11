@@ -150,7 +150,12 @@ class ToolTest(unittest.TestCase):
         self.assertEqual(starting_day("March", today), D(2027, 3, 1))
         self.assertEqual(starting_day("december", today), D(2026, 12, 1))
         self.assertEqual(starting_day("November", today), today)
-        self.assertEqual(starting_day("2026-05-02", today), D(2026, 5, 2))
+        self.assertEqual(starting_day("2026-11-20", today), D(2026, 11, 20))
+        for now in ("", "today", "Now", "this month"):
+            self.assertEqual(starting_day(now, today), today)
+        # A model that does not know the date guesses one from its training.
+        with self.assertRaisesRegex(ToolError, "2023-10-01 is in the past: today is 2026-11-11"):
+            starting_day("2023-10-01", today)
 
 
 if __name__ == "__main__":

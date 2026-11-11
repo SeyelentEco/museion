@@ -10,19 +10,29 @@ from museion.agent_tools import READ, Tool, ToolError
 from museion.agent_tools._notes import folder
 
 
+NOW = {"", "today", "now", "this month", "this week", "current", "currently"}
+
+
 def starting_day(text: str, today: datetime.date) -> datetime.date:
     """A date (2026-03-01) or a month (March): the next time it comes,
-    counting this month as come."""
+    counting this month as come. Nothing, "today" or "now" is today: a model
+    does not know the date, and on the 35B guessed 2023-10-01."""
     text = (text or "").strip().lower()
-    if not text:
+    if text in NOW:
         return today
     try:
-        return datetime.date.fromisoformat(text[:10])
+        day = datetime.date.fromisoformat(text[:10])
     except ValueError:
         pass
+    else:
+        if (today - day).days > 31:
+            raise ToolError(f"{day.isoformat()} is in the past: today is {today.isoformat()}. "
+                            "Leave starting out to look from today.")
+        return day
     month = almanac.MONTHS.get(text)
     if month is None:
-        raise ToolError(f"{text!r} is not a date like 2026-03-01 or a month like March.")
+        raise ToolError(f"{text!r} is not a date like {today.isoformat()} or a month like March. "
+                        f"Leave starting out to look from today ({today.isoformat()}).")
     if month == today.month:
         return today
     year = today.year if month > today.month else today.year + 1
@@ -44,9 +54,10 @@ def describe(item: almanac.Item, today: datetime.date) -> str:
 
 def run(args: dict, run) -> str:
     weeks = max(1, min(int(args.get("weeks") or almanac.WEEKS), 26))
-    start = starting_day(args.get("starting", ""), datetime.date.today())
+    today = datetime.date.today()
+    start = starting_day(args.get("starting", ""), today)
     found = almanac.coming_up(folder(run), start, weeks)
-    lines = [f"Looking from {start.isoformat()} for {weeks} weeks."]
+    lines = [f"Today is {today.isoformat()}. Looking from {start.isoformat()} for {weeks} weeks."]
     if not found.has_almanac:
         lines.append("The person has no almanac.csv yet; they can start one in the Notes tab (New record, Almanac). "
                      "Only maintenance and medicines are shown.")
@@ -70,8 +81,8 @@ TOOL = Tool(
                  "animal and house tasks timed from their frost dates), maintenance that is due and medicines "
                  "running out. The dates are worked out for you. Use it for 'what should I be doing now?'"),
     parameters={
-        "starting": {"type": "string", "description": "Optional: look from another time, a date like 2026-03-01 "
-                     "or a month like March (default today)"},
+        "starting": {"type": "string", "description": "Leave out to look from today (Museion knows the date). "
+                     "Only for another time the person names: a month like March, or a date"},
         "weeks": {"type": "integer", "description": "How many weeks ahead to look (default 6)"},
     },
     required=[],

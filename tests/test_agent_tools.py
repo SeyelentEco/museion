@@ -73,7 +73,7 @@ class FileToolsTest(unittest.TestCase):
 
     def test_notes(self):
         notes = tool("notes")
-        self.assertEqual(notes.run({"action": "read"}, self.run), "You have no notes yet.")
+        self.assertTrue(notes.run({"action": "read"}, self.run).startswith("Your own working notes are empty."))
         notes.run({"action": "add", "text": "We are 4."}, self.run)
         self.assertIn("We are 4.", notes.run({"action": "read"}, self.run))
         notes.run({"action": "replace", "text": "We are 5."}, self.run)

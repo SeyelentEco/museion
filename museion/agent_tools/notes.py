@@ -14,7 +14,9 @@ def run(args: dict, run) -> str:
     path = inside(run, "notes.md")
     action = args.get("action", "read")
     if action == "read":
-        return path.read_text(encoding="utf-8") if path.is_file() else "You have no notes yet."
+        if path.is_file():
+            return path.read_text(encoding="utf-8")
+        return "Your own working notes are empty. (The person's notes and records are separate: list_notes, read_note.)"
     text = (args.get("text") or "").strip()
     if not text:
         raise ToolError("Give the text to note.")
