@@ -789,3 +789,14 @@ td.fail { color: var(--bad); font-weight: 600; }
 #note-items li.coming .t { font-weight: 600; }
 #note-empty .empty { margin-top: 2rem; max-width: 44rem; }
 #note-empty .empty h2 { font-size: 1.15rem; margin: 0 0 0.5rem; }
+
+/* Your home area (home.js), in Settings and first-run set-up. */
+.home-area > * + * { margin-top: 0.5rem; }
+.home-area .home-find input { flex: 1 1 auto; min-width: 0; }
+.field .home-area label.home-map { display: inline; font-weight: 400; }
+.home-area .home-found { flex: 0 0 auto; overflow: visible; }
+.home-area .home-found:empty { display: none; }
+.home-area .home-found li.chosen { outline: 2px solid var(--accent); }
+.home-area .good { color: var(--good, #2f9a4b); }
+.home-area .err { color: var(--bad, #c0392b); }
+#climate-setup[hidden] { display: none; }

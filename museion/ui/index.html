@@ -151,6 +151,8 @@
                       <p id="climate-result" class="small-print" hidden></p>
                       <button id="climate-use" type="button" class="primary small" hidden>Use these dates</button>
                     </div>
+                    <p id="climate-setup" class="small-print muted" hidden>Or <a href="#" id="climate-setup-link">set up
+                      your home area</a> in Settings, and Museion fills them in.</p>
                   </form>
                   <ul id="coming-problems" class="muted small-print"></ul>
                 </section>
@@ -386,6 +388,11 @@
               </p>
             </div>
 
+            <div class="card" id="card-home">
+              <h2>Your home area</h2>
+              <div id="home-settings" class="home-area"></div>
+            </div>
+
             <div class="card folders">
               <h2>Other content folders</h2>
               <p class="muted">
@@ -605,6 +612,12 @@
                 <button id="wiz-pick-tools" type="button">Choose…</button>
               </div>
               <dl id="wiz-plan"><dd class="muted">Working out what this machine needs…</dd></dl>
+              <div class="field">
+                <label>Your home area <span class="opt">optional</span></label>
+                <span class="what">Where you live, so the almanac knows your frost dates and hardiness zone with no
+                  internet. You can set it up later in Settings.</span>
+                <div id="home-welcome" class="home-area"></div>
+              </div>
               <div class="row">
                 <select id="wiz-bundle" aria-label="Content bundle"></select>
                 <button id="wiz-go" type="button" class="primary">Set up this machine</button>
@@ -613,6 +626,7 @@
                 <div class="bar"><div class="fill" id="wiz-fill"></div></div>
                 <div class="label" id="wiz-label"></div>
               </div>
+              <button id="wiz-done" type="button" class="primary" hidden>Go to Ask</button>
             </div>
 
             <p class="hint">

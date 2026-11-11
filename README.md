@@ -105,8 +105,9 @@ time cut off, all in plain files on the same disk:
   weeks: garden, preserving, animal and house tasks timed from your own frost dates, so
   they fit where you live, plus servicing that is due and medicines about to expire. The
   Garden planner answers "what should I be doing now?" from it. Don't know your frost
-  dates? With a climate table for your region (built once from NOAA weather-station
-  records), Museion looks up your town's frost dates and hardiness zone offline.
+  dates? Set up **your home area** once (in Settings, or at the end of first-run set-up):
+  Museion downloads the NOAA weather-station records around it and works out its frost
+  dates and hardiness zone, for the almanac and the agents, with no internet after.
 - **First steps.** Tell the First steps agent what happened (the grid is down; the power
   is on but the phones and internet are not; a long isolation; a flood) and it reads your
   records, works out what runs out first, asks the water planner, clinic and power keeper

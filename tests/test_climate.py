@@ -164,7 +164,9 @@ class TableTest(unittest.TestCase):
         self.assertEqual([p.label for p in climate.find_place("Bellevue, Nebraska", self.dir)],
                          ["Bellevue, Nebraska, US"])
         saved = [{"name": "Home", "lat": 47.5, "lon": -122.0}]
-        self.assertEqual(climate.find_place("home", self.dir, saved)[0].label, "Your saved place")
+        self.assertEqual(climate.find_place("home", self.dir, saved)[0].label, "Home (your saved place)")
+        saved = [{"name": "Hilltop", "kind": "home", "lat": 47.5, "lon": -122.0}]
+        self.assertEqual(climate.find_place("hilltop", self.dir, saved)[0].label, "Hilltop (your home area)")
         self.assertEqual(climate.find_place("47.61, -122.33", self.dir)[0].lat, 47.61)
         self.assertEqual(climate.find_place("Atlantis", self.dir), [])
         self.assertEqual(found[0].elev_m, 40.0)
@@ -244,35 +246,47 @@ def dly(station, days):
     return "\n".join(out) + "\n"
 
 
+LONDON = "UK000003772  51.4789   -0.4489   25.3    LONDON HEATHROW"
+
+
+def fake_sources(more: dict | None = None):
+    """A stand-in for NOAA and GeoNames: get(url) and the URLs it was asked."""
+    import io as _io
+    import urllib.error
+    import zipfile
+    cities = _io.BytesIO()
+    with zipfile.ZipFile(cities, "w") as z:
+        row = lambda gid, name, lat, lon, cc, a1, pop, elev, dem: "\t".join(
+            [gid, name, name, "", lat, lon, "P", "PPL", cc, "", a1, "", "", "", pop, elev, dem, "", ""])
+        z.writestr("cities1000.txt", "\n".join([
+            row("1", "SeaTac", "47.44", "-122.29", "US", "WA", "29000", "", "110"),
+            row("2", "Lincoln", "40.81", "-96.70", "US", "NE", "290000", "358", "357"),
+            row("3", "Hounslow", "51.47", "-0.36", "GB", "ENG", "103337", "", "20"),
+        ]) + "\n")
+    files = {
+        "ghcnd-stations.txt": STATIONS, "ghcnd-inventory.txt": INVENTORY,
+        "all/USW00024233.dly": dly("USW00024233", lows(lat=47.44)),
+        "all/UK000003772.dly": dly("UK000003772", lows(lat=51.48, coldest=-1, warmest=14)),
+        "admin1CodesASCII.txt": "US.WA\tWashington\tWashington\t5815135\nGB.ENG\tEngland\tEngland\t6269131\n",
+        "cities1000.zip": cities.getvalue(),
+        **(more or {}),
+    }
+    asked = []
+
+    def get(url):
+        asked.append(url)
+        name = url.split("/daily/")[-1].split("/dump/")[-1]
+        if name not in files:
+            raise urllib.error.HTTPError(url, 404, "Not Found", None, None)
+        data = files[name]
+        return data.encode("utf-8") if isinstance(data, str) else data
+
+    return get, asked
+
+
 class BuildTest(unittest.TestCase):
     def test_a_region_is_downloaded_once_and_can_be_made_again_offline(self):
-        import io as _io
-        import zipfile
-        cities = _io.BytesIO()
-        with zipfile.ZipFile(cities, "w") as z:
-            row = lambda gid, name, lat, lon, cc, a1, pop, elev, dem: "\t".join(
-                [gid, name, name, "", lat, lon, "P", "PPL", cc, "", a1, "", "", "", pop, elev, dem, "", ""])
-            z.writestr("cities1000.txt", "\n".join([
-                row("1", "SeaTac", "47.44", "-122.29", "US", "WA", "29000", "", "110"),
-                row("2", "Lincoln", "40.81", "-96.70", "US", "NE", "290000", "358", "357"),
-            ]) + "\n")
-        files = {
-            "ghcnd-stations.txt": STATIONS, "ghcnd-inventory.txt": INVENTORY,
-            "all/USW00024233.dly": dly("USW00024233", lows(lat=47.44)),
-            "admin1CodesASCII.txt": "US.WA\tWashington\tWashington\t5815135\n",
-            "cities1000.zip": cities.getvalue(),
-        }
-        asked = []
-
-        def get(url):
-            asked.append(url)
-            name = url.split("/daily/")[-1].split("/dump/")[-1]
-            if name not in files:
-                import urllib.error
-                raise urllib.error.HTTPError(url, 404, "Not Found", None, None)
-            data = files[name]
-            return data.encode("utf-8") if isinstance(data, str) else data
-
+        get, asked = fake_sources()
         lib = Path(tempfile.mkdtemp())
         steps = []
         info = climate.build(lib, "US-WA", get, report=lambda step, done, total: steps.append(step))
@@ -289,8 +303,61 @@ class BuildTest(unittest.TestCase):
         climate.build(lib, "US-WA", None, offline=True)
         self.assertEqual(climate.read_table(lib / "climate"), table)
         # A region with nothing in it says so.
-        with self.assertRaisesRegex(climate.ClimateError, "No station in US-NE"):
+        with self.assertRaisesRegex(climate.ClimateError, "No weather station in US-NE"):
             climate.build(lib, "US-NE", get)
+
+    def test_an_area_around_a_point_adds_to_the_table(self):
+        get, _ = fake_sources()
+        lib = Path(tempfile.mkdtemp())
+        climate.build(lib, "US-WA", get)
+        info = climate.build(lib, "near:51.47,-0.40,50", get, label="within 50 km of Hounslow")
+        self.assertEqual(info["region"], "US-WA; within 50 km of Hounslow")
+        self.assertEqual(sorted(r["id"] for r in climate.read_table(lib / "climate")), ["UK000003772", "USW00024233"],
+                         "the earlier region's stations stay")
+        self.assertEqual(sorted(t.name for t in climate.read_towns(lib / "climate")), ["Hounslow", "SeaTac"])
+        # Made again, the area is not named twice; without keep, it stands alone.
+        self.assertEqual(climate.build(lib, "near:51.47,-0.40,50", get, label="within 50 km of Hounslow")["region"],
+                         "US-WA; within 50 km of Hounslow")
+        self.assertEqual(climate.build(lib, "near:51.47,-0.40,50", get, keep=False)["stations"], 1)
+        e = climate.at_point(lib, 51.47, -0.36)
+        self.assertEqual((e.elev_m, e.stations[0].row["id"]), (20.0, "UK000003772"), "the height is Hounslow's")
+        with self.assertRaisesRegex(climate.ClimateError, "km from the nearest station"):
+            climate.at_point(lib, 47.44, -122.29)
+        with self.assertRaisesRegex(climate.ClimateError, "No weather station within 5 km of Lincoln"):
+            climate.build(lib, "near:40.81,-96.70,5", get, label="within 5 km of Lincoln")
+
+    def test_stop_keeps_what_was_downloaded(self):
+        import threading
+        get, asked = fake_sources()
+        lib = Path(tempfile.mkdtemp())
+        stop = threading.Event()
+        stop.set()
+        with self.assertRaisesRegex(climate.ClimateError, "Stopped"):
+            climate.build(lib, "US-WA", get, stop=stop)
+        self.assertFalse((lib / "climate" / climate.STATIONS).exists())
+        self.assertTrue((lib / "climate" / "sources" / "ghcnd-stations.txt.gz").is_file(), "kept, gzipped")
+        asked.clear()
+        climate.build(lib, "US-WA", get)
+        self.assertNotIn(f"{climate.NOAA}/ghcnd-stations.txt", asked, "carried on from what was kept")
+
+
+class AreaTest(unittest.TestCase):
+    def test_a_circle_and_thinning_a_city_s_cluster(self):
+        stations = climate.read_stations(STATIONS.splitlines())
+        region = climate.parse_region("near:47.6,-122.2,50")
+        self.assertIn(stations["USW00024233"], region)
+        self.assertNotIn(stations["UK000003772"], region)
+        for bad in ("near:47.6,-122.2", "near:95,0,10", "near:47,-122,0"):
+            with self.subTest(bad), self.assertRaises(climate.ClimateError):
+                climate.parse_region(bad)
+        # Twenty stations crowded in a city, and five spread around it.
+        city = [climate.Station(f"C{i:02d}", 47.6 + i * 0.001, -122.2, 50.0, "WA", "CITY") for i in range(20)]
+        spread = [climate.Station(f"S{i}", 47.6 + d, -122.2 + d, 50.0, "WA", "OUT")
+                  for i, d in enumerate((0.3, -0.3, 0.6, -0.6, 0.9))]
+        taken = climate.thin(city + spread, 47.6, -122.2, 10)
+        self.assertEqual(len(taken), 10)
+        self.assertEqual([s.id for s in taken[:5]], ["C00", "C01", "C02", "C03", "C04"], "the nearest half")
+        self.assertEqual({s.id for s in taken[5:]}, {"S0", "S1", "S2", "S3", "S4"}, "then spread out")
 
 
 if __name__ == "__main__":

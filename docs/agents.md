@@ -28,7 +28,7 @@ person or by a coding agent on the local model.
 | `stores-keeper` | Keeps `stores.csv` in the notes; how long things last, what expires soon | Capable |
 | `clinic` | The sick and injured, from the library's medical books (danger signs first, doses only from a cited passage); keeps the health log and medicine list | Capable |
 | `power-keeper` | What the power you have can run, how long fuel lasts, what servicing is due (`power.csv`, `maintenance.csv`) | Capable |
-| `garden-planner` | A food garden: what, when, spacing and seed; "what now?" from the almanac, with frost dates looked up for your town when the almanac has none; keeps `garden-plan.md` | Capable |
+| `garden-planner` | A food garden: what, when, spacing and seed; "what now?" from the almanac, with frost dates from your home area (or looked up for your town) when the almanac has none; keeps `garden-plan.md` | Capable |
 | `repair-helper` | Fixing a tool or machine step by step from the repair guides | Capable |
 | `ration-scaler` | Scales a recipe or ration to a number of people | Modest |
 | `study-guide` | Turns a topic into a numbered lesson with sources | Capable |

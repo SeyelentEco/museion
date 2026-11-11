@@ -49,8 +49,8 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
-from museion import (agent_commands, chat_commands, commands, drives, library, map_commands, maps,
-                     notes_commands, radio_commands, services, sidecar)
+from museion import (agent_commands, chat_commands, commands, drives, home_commands, library, map_commands,
+                     maps, notes_commands, radio_commands, services, sidecar)
 from museion.appstate import AppState, UiError, open_state
 
 UI_DIR = Path(__file__).with_name("ui")
@@ -86,6 +86,7 @@ COMMANDS = {f.__name__: f for f in [
     notes_commands.climate_lookup,
     map_commands.list_maps, map_commands.list_places, map_commands.add_place, map_commands.open_maps_folder,
     map_commands.find_place, map_commands.map_plan, map_commands.make_map, map_commands.stop_map,
+    home_commands.home_area, home_commands.set_up_home, home_commands.stop_home,
     radio_commands.radio_state, radio_commands.find_radios, radio_commands.connect_radio,
     radio_commands.disconnect_radio, radio_commands.radio_messages, radio_commands.send_radio_message,
 ]}

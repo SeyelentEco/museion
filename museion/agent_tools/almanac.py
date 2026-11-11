@@ -61,6 +61,26 @@ def frosts_for(place: str, run) -> tuple[dict[str, str], str]:
     return {"last": e.last_frost, "first": e.first_frost}, said
 
 
+def frosts_at_home(run) -> tuple[dict[str, str], str]:
+    """Frost dates for the person's home area (Settings), when it is set
+    and the climate table covers it; else nothing."""
+    from museion import climate, maps
+    lib = getattr(run.setting, "library_dir", None)
+    try:
+        home = maps.home(getattr(run.setting, "notes_dir", None))
+    except Exception:  # noqa: BLE001 - an unreadable places.csv is no home
+        home = None
+    if lib is None or home is None or not has_climate(run):
+        return {}, ""
+    try:
+        e = climate.at_point(lib, home["lat"], home["lon"])
+    except climate.ClimateError:
+        return {}, ""
+    said = (climate.describe(e, f"the person's home area, {home['name']}") + " Used where almanac.csv has no "
+            "frost dates.")
+    return {"last": e.last_frost, "first": e.first_frost}, said
+
+
 def describe(item: almanac.Item, today: datetime.date) -> str:
     where = f"{item.kind}, {item.source}"
     if item.status == "overdue":
@@ -83,6 +103,10 @@ def run(args: dict, run) -> str:
     if place:
         fill, looked = frosts_for(place, run)
     found = almanac.coming_up(folder(run), start, weeks, fill)
+    if found.needs_frost and not place:
+        fill, looked = frosts_at_home(run)
+        if fill:
+            found = almanac.coming_up(folder(run), start, weeks, fill)
     lines = [f"Today is {today.isoformat()}. Looking from {start.isoformat()} for {weeks} weeks."]
     if looked:
         lines.append(looked)

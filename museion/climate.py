@@ -224,16 +224,19 @@ def tmin_years(lines: Iterable[str]) -> dict[str, tuple[int, int]]:
 @dataclass
 class Region:
     """Which stations a table covers: countries by GHCN's two-letter code
-    (US, UK, CA ...), states or provinces (US-WA, CA-BC), and boxes
-    (box:south,west,north,east)."""
+    (US, UK, CA ...), states or provinces (US-WA, CA-BC), boxes
+    (box:south,west,north,east) and circles (near:lat,lon,km, which is
+    what a home area is)."""
     countries: set[str] = field(default_factory=set)
     states: set[tuple[str, str]] = field(default_factory=set)
     boxes: list[tuple[float, float, float, float]] = field(default_factory=list)
+    circles: list[tuple[float, float, float]] = field(default_factory=list)
     text: str = ""
 
     def __contains__(self, s: Station) -> bool:
         return (s.country in self.countries or (s.country, s.state) in self.states
-                or any(b[0] <= s.lat <= b[2] and b[1] <= s.lon <= b[3] for b in self.boxes))
+                or any(b[0] <= s.lat <= b[2] and b[1] <= s.lon <= b[3] for b in self.boxes)
+                or any(km(c[0], c[1], s.lat, s.lon) <= c[2] for c in self.circles))
 
 
 def parse_region(text: str) -> Region:
@@ -248,14 +251,22 @@ def parse_region(text: str) -> Region:
             except ValueError:
                 raise ClimateError(f"{part!r}: a box is box:south,west,north,east, like box:45.5,-124.8,49,-116.9") from None
             region.boxes.append((min(s, n), min(w, e), max(s, n), max(w, e)))
+        elif part.lower().startswith("near:"):
+            try:
+                lat, lon, r = (float(v) for v in part[5:].split(","))
+            except ValueError:
+                raise ClimateError(f"{part!r}: a circle is near:lat,lon,km, like near:47.61,-122.20,150") from None
+            if not (-90 <= lat <= 90 and -180 <= lon <= 180 and 0 < r <= 2000):
+                raise ClimateError(f"{part!r}: that is not a point on the map with a radius up to 2000 km.")
+            region.circles.append((lat, lon, r))
         elif len(part) == 2 and part.isalpha():
             region.countries.add(part.upper())
         elif len(part) == 5 and part[2] == "-" and part.replace("-", "").isalpha():
             region.states.add((part[:2].upper(), part[3:].upper()))
         else:
             raise ClimateError(f"{part!r} is not a region: use a country code like US or UK, a state like US-WA, "
-                               "or box:south,west,north,east.")
-    if not (region.countries or region.states or region.boxes):
+                               "box:south,west,north,east or near:lat,lon,km.")
+    if not (region.countries or region.states or region.boxes or region.circles):
         raise ClimateError("Say which region: a country code like US or UK, a state like US-WA, "
                            "or box:south,west,north,east.")
     return region
@@ -273,6 +284,21 @@ def candidates(stations: dict[str, Station], inventory: dict[str, tuple[int, int
         if overlap >= min_years:
             out.append(s)
     return out
+
+
+def thin(stations: list[Station], lat: float, lon: float, most: int, apart_km: float = 15) -> list[Station]:
+    """At most `most` of the stations, for an area around a point: the
+    nearest half, then, further out, ones at least `apart_km` from every
+    station already taken, so a city's cluster of stations does not use
+    up the whole area's share. Nearest first."""
+    by_distance = sorted(stations, key=lambda s: km(lat, lon, s.lat, s.lon))
+    taken = by_distance[:most // 2]
+    for s in by_distance[most // 2:]:
+        if len(taken) >= most:
+            break
+        if all(km(s.lat, s.lon, t.lat, t.lon) >= apart_km for t in taken):
+            taken.append(s)
+    return taken
 
 
 # ── building the table ───────────────────────────────────────────────────────
@@ -328,7 +354,9 @@ class Fetcher:
         return path
 
     def text(self, name: str, url: str) -> list[str]:
-        return self.file(name, url).read_text(encoding="utf-8", errors="replace").splitlines()
+        """A text file, kept gzipped (NOAA's station lists shrink to a fifth)."""
+        path = self.file(name + ".gz", url, gzip.compress)
+        return gzip.decompress(path.read_bytes()).decode("utf-8", errors="replace").splitlines()
 
     def lows(self, station: str) -> list[str]:
         """A station's TMIN lines; only those are kept, gzipped."""
@@ -342,37 +370,66 @@ class Fetcher:
         return gzip.decompress(path.read_bytes()).decode("ascii").splitlines()
 
 
+STOPPED = "Stopped. What was downloaded is kept, so starting again carries on from there."
+
+
 def build(library_dir: Path, region_text: str, get: Callable[[str], bytes] | None = http_get,
           offline: bool = False, years: tuple[int, int] = YEARS, min_years: int = MIN_YEARS,
-          report: Callable[[str, int, int], None] = lambda step, done, total: None) -> dict:
+          report: Callable[[str, int, int], None] = lambda step, done, total: None,
+          label: str = "", most: int | None = None, stop=None, keep: bool = True) -> dict:
     """Make <library>/climate/stations.csv (and towns.csv) for a region:
     download the station list and each of the region's stations' daily
     lows from NOAA and the towns from GeoNames, once, and work out each
     station's frost dates and zone. What was downloaded stays in sources/,
-    so it can be made again with no internet (offline=True)."""
+    so it can be made again with no internet (offline=True).
+
+    `label` names the region in words ("within 150 km of Lewes"); `most`
+    caps how many stations an area around one point takes (thin); `stop`
+    (a threading.Event) stops it between stations. With `keep`, the
+    stations of an earlier table (worked out over the same years) that this
+    region does not cover stay in the table, so a home area added to a
+    bigger region's table does not shrink it."""
     region = parse_region(region_text)
+    name = label.strip() or region.text
     where = Path(library_dir) / FOLDER
     fetch = Fetcher(where / SOURCES, get, offline)
     report("stations", 0, 1)
     stations = read_stations(fetch.text("ghcnd-stations.txt", f"{NOAA}/ghcnd-stations.txt"))
+    report("bytes", fetch.downloaded, 0)
     inventory = tmin_years(fetch.text("ghcnd-inventory.txt", f"{NOAA}/ghcnd-inventory.txt"))
+    report("bytes", fetch.downloaded, 0)
     picked = candidates(stations, inventory, region, years, min_years)
     if not picked:
-        raise ClimateError(f"No station in {region.text} has daily lows for {min_years} of the years "
-                           f"{years[0]}-{years[1]}.")
+        raise ClimateError(f"No weather station {'' if region.circles else 'in '}{name} has daily lows for "
+                           f"{min_years} of the years {years[0]}-{years[1]}.")
+    if most and region.circles and len(picked) > most:
+        lat, lon, _ = region.circles[0]
+        picked = thin(picked, lat, lon, most)
     rows = []
     for i, s in enumerate(picked):
+        if stop is not None and stop.is_set():
+            raise ClimateError(STOPPED)
         report("station", i, len(picked))
         st = station_stats(s.lat, dly_lows(fetch.lows(s.id)), years, min_years)
+        report("bytes", fetch.downloaded, 0)
         if st is not None:
             rows.append(row_of(s, st))
     report("station", len(picked), len(picked))
     if not rows:
-        raise ClimateError(f"None of the {len(picked)} stations in {region.text} had enough readings.")
+        raise ClimateError(f"None of the {len(picked)} weather stations {'' if region.circles else 'in '}{name} "
+                           "had enough readings.")
+    regions = [name]
+    before = about(where)
+    if keep and (where / STATIONS).is_file() and before.get("years") == list(years) \
+            and before.get("min_years") == min_years:
+        have = {r["id"] for r in rows}
+        rows += [r for r in read_table(where) if r["id"] not in have]
+        regions = [r for r in str(before.get("region", "")).split("; ") if r and r != name] + regions
     report("towns", 0, 1)
     towns = near_towns(fetch, rows)
+    report("bytes", fetch.downloaded, 0)
     write_towns(where, towns)
-    info = {"region": region.text, "years": list(years), "min_years": min_years, "stations": len(rows),
+    info = {"region": "; ".join(regions), "years": list(years), "min_years": min_years, "stations": len(rows),
             "towns": len(towns), "built": datetime.date.today().isoformat(), "source": SOURCE}
     write_table(where, rows, info)
     report("towns", 1, 1)
@@ -585,13 +642,15 @@ def find_place(text: str, folder: Path, saved: list[dict] = ()) -> list[Place]:
         raise ClimateError("Type a town, or a latitude and longitude like 47.61, -122.33.")
     point = parse_coords(text)
     if point:
-        return [Place(f"{point[0]:.4f}, {point[1]:.4f}", "The point you typed", *point)]
+        where = f"{point[0]:.4f}, {point[1]:.4f}"
+        return [Place(where, where, *point)]
     want = _plain(text.split(",")[0])
     rest = _plain(" ".join(text.split(",")[1:]))
     found: list[tuple[int, int, Place]] = []
     for p in saved:
         if _plain(p.get("name", "")) == want:
-            found.append((0, 0, Place(p["name"], "Your saved place", p["lat"], p["lon"])))
+            whose = "your home area" if p.get("kind", "").strip().lower() == "home" else "your saved place"
+            found.append((0, 0, Place(p["name"], f"{p['name']} ({whose})", p["lat"], p["lon"])))
     for p in read_towns(folder):
         name = _plain(p.name)
         if name == want or name.startswith(want + " "):
@@ -637,6 +696,24 @@ def describe(e: Estimate, place: str = "") -> str:
     return text
 
 
+def at_point(library_dir: Path, lat: float, lon: float) -> Estimate:
+    """The estimate at a point, such as the home area's: its height is the
+    nearest town's, when one is within a few km."""
+    where = Path(library_dir) / FOLDER
+    e = estimate(read_table(where), lat, lon, height_near(where, lat, lon))
+    if e.stations[0].km > FAR_KM:
+        raise ClimateError(f"That point is {e.stations[0].km:,.0f} km from the nearest station in the climate "
+                           f"table, which covers {about(where).get('region', 'another region')}.")
+    return e
+
+
+def height_near(folder: Path, lat: float, lon: float) -> float | None:
+    """The height of the nearest town in the table's town list, when it is
+    within a few km: a saved place or a typed point has none of its own."""
+    town = min(read_towns(folder), key=lambda t: km(lat, lon, t.lat, t.lon), default=None)
+    return town.elev_m if town is not None and km(lat, lon, town.lat, town.lon) <= 5 else None
+
+
 def look_up(library_dir: Path, text: str, saved: list[dict] = (), pick: int = 0) -> tuple[list[Place], Place, Estimate]:
     """The places matching `text`, the one picked, and its estimate."""
     where = Path(library_dir) / FOLDER
@@ -647,7 +724,8 @@ def look_up(library_dir: Path, text: str, saved: list[dict] = (), pick: int = 0)
                            f"({about(where).get('region', 'unknown')}). Try a bigger town nearby, "
                            "or a latitude and longitude like 47.61, -122.33.")
     chosen = found[min(max(pick, 0), len(found) - 1)]
-    e = estimate(table, chosen.lat, chosen.lon, chosen.elev_m)
+    elev = chosen.elev_m if chosen.elev_m is not None else height_near(where, chosen.lat, chosen.lon)
+    e = estimate(table, chosen.lat, chosen.lon, elev)
     if e.stations[0].km > FAR_KM:
         raise ClimateError(f"{chosen.label} is {e.stations[0].km:,.0f} km from the nearest station in the climate "
                            f"table, which covers {about(where).get('region', 'another region')}: a table for that "

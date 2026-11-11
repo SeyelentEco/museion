@@ -132,6 +132,8 @@ function drawComing(data) {
     : `Your average frost dates, as month-day. The almanac times its tasks from them.${zone}`;
   $('#frost-form').title = data.frost_note ?? '';
   $('#climate-look').hidden = !data.climate;
+  $('#climate-setup').hidden = Boolean(data.climate);
+  if (data.home && !$('#climate-place').value) $('#climate-place').value = data.home;
   $('#climate-place').title = data.climate ? `Towns in the climate table's region: ${data.climate}` : '';
   const problems = $('#coming-problems');
   problems.textContent = '';

@@ -14,9 +14,20 @@ def library(run):
 
 
 def run(args: dict, run) -> str:
+    place = (args.get("place") or "").strip()
+    saved = maps.places(getattr(run.setting, "notes_dir", None))
+    if not place:
+        home = next((p for p in saved if p["kind"].strip().lower() == maps.HOME), None)
+        if home is None:
+            raise ToolError("The person has not set their home area (Settings, Your home area), so say which "
+                            "place: ask the person for their town.")
+        try:
+            e = climate.at_point(library(run), home["lat"], home["lon"])
+        except climate.ClimateError as err:
+            raise ToolError(str(err)) from None
+        return climate.describe(e, f"the person's home area, {home['name']}")
     try:
-        found, chosen, e = climate.look_up(library(run), args.get("place", ""),
-                                           maps.places(getattr(run.setting, "notes_dir", None)))
+        found, chosen, e = climate.look_up(library(run), place, saved)
     except climate.ClimateError as err:
         raise ToolError(str(err)) from None
     lines = [climate.describe(e, chosen.label)]
@@ -36,10 +47,10 @@ TOOL = Tool(
                  "names their town and their frost dates or zone are not known."),
     parameters={
         "place": {"type": "string", "description": "A town (\"Bellevue, Washington\"), a saved place, "
-                  "or a latitude and longitude"},
+                  "or a latitude and longitude. Leave out for the person's own home area"},
     },
-    required=["place"],
+    required=[],
     risk=READ,
     run=run,
-    describe=lambda a: f"look up the climate of {a.get('place', '')}",
+    describe=lambda a: f"look up the climate of {a.get('place') or 'your home area'}",
 )

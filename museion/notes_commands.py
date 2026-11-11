@@ -82,6 +82,12 @@ def coming_up(state: AppState) -> dict:
     # then offers to look the frost dates up.
     out["climate"] = (climate.about(where).get("region") or "your region") \
         if where is not None and (where / climate.STATIONS).is_file() else None
+    from museion import maps
+    try:
+        home = maps.home(folder(state))
+    except notes.NoteError:
+        home = None
+    out["home"] = home["name"] if home else ""
     return out
 
 

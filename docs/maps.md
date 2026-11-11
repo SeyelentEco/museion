@@ -111,3 +111,6 @@ shelter, medical, power, people, route, danger, other). It is added as a row of
 text editor (`name,kind,lat,lon,notes`, latitude and longitude in decimal
 degrees). Because it is a note, the librarian and the agents find it when they
 search: "where is the nearest clean water?" can cite your own spring.
+
+One place has the kind `home`: your home area, set in Settings (see
+[notes.md](notes.md#your-home-area)). Setting it up again moves that row.

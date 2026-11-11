@@ -167,6 +167,43 @@ def places(notes_dir: Path | None) -> list[dict]:
     return out
 
 
+HOME = "home"  # the kind of the place that is the person's home area
+
+
+def home(notes_dir: Path | None) -> dict | None:
+    """The person's home area: the place of kind "home" in places.csv."""
+    return next((p for p in places(notes_dir) if p["kind"].strip().lower() == HOME), None)
+
+
+def set_home(notes_dir: Path, name: str, lat: float, lon: float, about: str = "") -> None:
+    """Make this the home area: the one place of kind "home" in places.csv.
+    An earlier home row is moved here (its notes kept unless new ones are
+    given); places.csv keeps its previous version, as every note does."""
+    name = name.strip()
+    if not name:
+        raise MapError("Give the place a name.")
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        raise MapError("That position is not on the map.")
+    if (notes_dir / PLACES).is_file():
+        import csv
+        import io
+        header, rows = notes.rows_of(notes.read(notes_dir, PLACES))
+        cols = [h.strip().lower() for h in header]
+        if all(c in cols for c in ("name", "kind", "lat", "lon")):
+            at = {c: cols.index(c) for c in ("name", "kind", "lat", "lon", "notes") if c in cols}
+            for r in rows:
+                if at["kind"] < len(r) and r[at["kind"]].strip().lower() == HOME:
+                    r.extend([""] * (len(header) - len(r)))
+                    r[at["name"]], r[at["lat"]], r[at["lon"]] = name, f"{lat:.6f}", f"{lon:.6f}"
+                    if about.strip() and "notes" in at:
+                        r[at["notes"]] = about.strip()
+                    out = io.StringIO()
+                    csv.writer(out, lineterminator="\n").writerows([header, *rows])
+                    notes.write(notes_dir, PLACES, out.getvalue())
+                    return
+    add_place(notes_dir, name, HOME, lat, lon, about)
+
+
 def add_place(notes_dir: Path, name: str, kind: str, lat: float, lon: float, about: str = "") -> None:
     """Add a place to places.csv, starting the record if need be."""
     name = name.strip()

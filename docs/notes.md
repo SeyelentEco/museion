@@ -80,11 +80,37 @@ practice, not from your library: keep them, change them to fit, or delete
 them, and check timings against your seed packets and the library. Add your
 own rows the same way.
 
+### Your home area
+
+**Settings → Your home area** (also offered at the end of first-run set-up)
+is where you say where you live, once, while there is internet. Type your
+town, press **Find**, pick the right one and press **Set up my home area**.
+Museion then:
+
+1. keeps it in `places.csv` as the one place of kind `home` (doing it again
+   moves that row rather than adding another);
+2. downloads the weather records of the stations around it (up to 40 within
+   150 km: the nearest 20, then ones spread further out) and builds the
+   climate table below from them, added to any table the library already
+   has;
+3. puts its frost dates and hardiness zone in `almanac.csv` (starting it if
+   there is none), unless the file has frost dates you typed yourself;
+4. if you tick it, makes a map of the area (as the Map tab's **Make a map**).
+
+It downloads about 100-200 MB (NOAA's station list and inventory, 1-4 MB
+per station, GeoNames' towns) and keeps about 20 MB of it in
+`<library>/climate/sources/`, so it can be done again with no internet.
+**Stop** stops it between stations; starting again carries on. With a home
+area set, the `almanac` tool uses its frost dates when `almanac.csv` has
+none, and the `climate` tool answers "what zone am I in?" without being
+told the town. The code is `museion/home_commands.py` and `ui/home.js`.
+
 ### Frost dates and hardiness zones by place
 
 If you don't know your frost dates, Museion can look them up from weather
 stations near you, with no internet, once the library has a **climate
-table** for your region (`<library>/climate/`). Type your town (or
+table** (`<library>/climate/`): setting up your home area makes one, or
+`museion climate build` makes one for a whole region. Type your town (or
 `lat, lon`, or a saved place) under the frost form and press **Look up**:
 
 > Station averages for Bellevue, Washington, US: last spring frost about
@@ -124,12 +150,14 @@ How it is worked out (`museion/climate.py`):
     python -m museion climate lookup "Bellevue, Washington" --library <library>
 
 `--region` takes countries by their GHCN code (`US`, `UK`, `CA`, ...),
-states or provinces (`US-WA CA-BC`), or `box:south,west,north,east`, several
-at once. The build downloads NOAA's station list and each of the region's
+states or provinces (`US-WA CA-BC`), `box:south,west,north,east`, or
+`near:lat,lon,km` (what a home area is), several at once. A whole state can
+mean a few hundred stations and a GB or more of downloads; a home area is
+capped at 40. Each build adds to the table already there. The build downloads NOAA's station list and each of the region's
 stations' records, plus GeoNames' towns of 1,000 people or more (CC BY 4.0)
 for finding a place by name. It keeps them in `climate/sources/`, keeping
-only the daily lows, so `--offline` can make the table again with no
-internet. The table and town list are a few MB at most.
+only the daily lows (gzipped), so `--offline` can make the table again with
+no internet. The table and town list are a few MB at most.
 
 ## How they are searched and cited
 
