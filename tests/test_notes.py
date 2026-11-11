@@ -14,7 +14,7 @@ from museion.runs import read_log
 from museion.agent_tools import ToolError, all_tools
 from museion.agents import AgentSpec
 from museion.harness import Harness, Person, Setting
-from museion.index import Index
+from museion.index import Hit, Index
 from museion.tuning import defaults as default_tuning
 from agent_fakes import FakeRun, ScriptedChat, calls, says
 
@@ -150,6 +150,25 @@ class ToolsTest(unittest.TestCase):
         said = write.summary({"name": "a.csv", "text": "item,quantity\nrice,12\nbeans,4\n"}, self.run)
         self.assertEqual(said, "change your note a.csv (+ added, - removed):\n-rice,10\n+rice,12")
         self.assertEqual(write.risk, "ask")
+
+    def test_a_note_lists_the_sources_it_cites(self):
+        def found(n, page):
+            return Hit(doc_title=f"Book {n}", author="", book="b", file=f"{n}.pdf", page=page, snippet="",
+                       rank=0.0, coverage=1.0, body="")
+        self.run.sources = [found(1, 4), found(2, 0), found(3, 9)]
+        write = tool("write_note")
+        plan = "# Plan\nPotatoes, 40 m2 [3]. Beans [1][3]. Kale [7]."
+        listed = "\n\nSources:\n[1] Book 1, page 4\n[3] Book 3, page 9"
+        self.assertTrue(write.summary({"name": "plan.md", "text": plan}, self.run).endswith(listed[2:]),
+                        "the card shows the list too")
+        write.run({"name": "plan.md", "text": plan}, self.run)
+        self.assertEqual(notes.read(self.dir, "plan.md"), plan + listed + "\n")
+        # A record, a note with its own list, or one citing nothing is left as it is.
+        for name, text in (("seeds.csv", "item,source\nbeans,[2]"), ("own.md", "Beans [2].\n\n## Sources\n[2] Mine"),
+                           ("bare.md", "Water the beans.")):
+            with self.subTest(name):
+                write.run({"name": name, "text": text}, self.run)
+                self.assertEqual(notes.read(self.dir, name), text + "\n")
 
     def test_check_dates(self):
         soon = (datetime.date.today() + datetime.timedelta(days=3)).isoformat()

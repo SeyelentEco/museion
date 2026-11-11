@@ -231,7 +231,7 @@ class Harness:
             cited = [n for n in cited_numbers(text) if n <= len(self.sources)]
             used = [self.sources[n - 1] for n in cited]
             if self.saving and self.unsaved():
-                self.save_answer(renumber_citations(text, cited), used)
+                self.save_answer(text)
             notes_only = bool(used) and all(h.book == NOTES_BOOK for h in used)
             return Answer(renumber_citations(text, cited), used, self.reranked,
                           basis_of(bool(used), bool(self.calculations), self.used, notes_only),
@@ -245,15 +245,12 @@ class Harness:
         return bool(name) and "write_note" in self.tools and "write_note" not in self.used \
             and "write_note" not in self.declined and bool(self.calculations)
 
-    def save_answer(self, text: str, used: list) -> None:
+    def save_answer(self, text: str) -> None:
         """The rounds ran out before the agent saved its plan: its answer,
-        the plan, is saved instead, once the person allows it, with its
-        sources listed so the note's [1] still means something. On the 35B,
-        offered only write_note, it wrote the plan as its answer instead."""
-        listed = [f"[{i}] {h.doc_title}" + (f", page {h.page}" if h.page else "")
-                  for i, h in enumerate(used, 1)]
-        note = text.strip() + ("\n\nSources:\n" + "\n".join(listed) if listed else "")
-        args = json.dumps({"name": self.spec.saves, "text": note}, ensure_ascii=False)
+        the plan, is saved instead, once the person allows it (write_note
+        lists the sources it cites). On the 35B, offered only write_note for
+        a last round, it wrote the plan as its answer instead."""
+        args = json.dumps({"name": self.spec.saves, "text": text.strip()}, ensure_ascii=False)
         call = {"id": "save_answer", "type": "function", "function": {"name": "write_note", "arguments": args}}
         self.event("save_answer", note=self.spec.saves)
         self.call(call, f"The plan, saved as {self.spec.saves} so it can be found and changed later.")

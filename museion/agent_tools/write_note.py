@@ -7,11 +7,31 @@ them to press Allow. The version before is kept in notes/.history/.
 from museion import notes
 from museion.agent_tools import ASK, Tool, ToolError
 from museion.agent_tools._notes import folder, written
+from museion.model_text import cited_numbers
+
+
+def with_sources(name: str, text: str, run) -> str:
+    """A note that cites passages the agent found ([2]) lists them at its
+    end, so its numbers still lead somewhere once the chat is gone. On the
+    35B a saved garden plan cited [1] to [6] and named none of them. Not for
+    a record (.csv), nor a note that has its own list of sources."""
+    sources = getattr(run, "sources", None) or []
+    if not sources or name.strip().lower().endswith(".csv"):
+        return text
+    if any(line.strip().strip("#*_: ").lower() in ("source", "sources") for line in text.splitlines()):
+        return text
+    cited = sorted({n for n in cited_numbers(text) if 1 <= n <= len(sources)})
+    if not cited:
+        return text
+    listed = [f"[{n}] {sources[n - 1].doc_title}" + (f", page {sources[n - 1].page}" if sources[n - 1].page else "")
+              for n in cited]
+    return text.rstrip() + "\n\nSources:\n" + "\n".join(listed)
 
 
 def run(args: dict, run) -> str:
     try:
-        notes.write(folder(run), args["name"], args["text"], bool(args.get("append")))
+        notes.write(folder(run), args["name"], with_sources(args["name"], args["text"], run),
+                    bool(args.get("append")))
     except notes.NoteError as e:
         raise ToolError(str(e)) from None
     written(run, args["name"])
@@ -27,6 +47,8 @@ def describe(a: dict, run=None) -> str:
     seen: the lines added, or for a rewrite of an existing note the lines
     that differ from what is there now."""
     text = a.get("text", "")
+    if run is not None:
+        text = with_sources(a.get("name", ""), text, run)
     old = None
     if run is not None and not a.get("append"):
         try:

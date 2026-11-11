@@ -54,7 +54,7 @@ def answer_is_saved(name: str) -> str:
     """Said on the last round, instead of NO_MORE_TOOLS, to an agent whose
     plan is not saved yet (agent.toml's saves)."""
     return (NO_MORE_TOOLS + f" Your answer will be saved as {name} once the person allows it, "
-            "so give the whole plan in it, from what you found and worked out.")
+            "so give the whole plan in it, from what you found and worked out, under a title.")
 
 
 # Said once to a tool call that came back as text, while tools are still on

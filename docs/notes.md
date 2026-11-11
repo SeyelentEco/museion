@@ -42,7 +42,10 @@ Both you and the agents:
 - **You**, in the Notes tab (Save, or Ctrl+S) or in any editor.
 - **An agent**, with `write_note`, but only after you press **Allow** on a
   card that shows exactly what it will add or change (new lines, or a diff of
-  the changed ones). Deny, and nothing is written.
+  the changed ones). Deny, and nothing is written. A note (not a record)
+  that cites what the agent found, like `[2]`, gets a **Sources** list at its
+  end naming those books and pages, so the numbers still mean something
+  later.
 
 Reading is free: `list_notes`, `read_note`, `check_dates` (what expires or
 falls due soon, from a date column) and `almanac` (what is coming up, below)
