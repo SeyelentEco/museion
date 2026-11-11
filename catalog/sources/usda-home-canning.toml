@@ -1,0 +1,27 @@
+# Written by python -m museion sync-source -- do not hand-edit size_bytes or sha256.
+# Regenerate with: python -m museion sync-source https://download.kiwix.org/zim/other/usda-2015_en_2025-04.zim --category survival --id usda-home-canning --license "Public domain (U.S. government work)" --attribution "U.S. Department of Agriculture; packaged by Kiwix"
+id = "usda-home-canning"
+title = "USDA Guide to Home Canning"
+description = "Research-based recommendations for canning safer and better quality food at home"
+claims_fulltext_index = false
+category = "survival"
+filename = "usda-2015_en_2025-04.zim"
+version = "2025-04"
+size_bytes = 19787133
+sha256 = "089738e934f54c3b0343a01b1d93364b953d9fd40f53f62d0656973340cc4081"
+urls = [
+  "https://download.kiwix.org/zim/other/usda-2015_en_2025-04.zim",
+]
+mirrors = [
+  "https://lb.download.kiwix.org/zim/other/usda-2015_en_2025-04.zim",
+  "https://www.mirrorservice.org/sites/download.kiwix.org/zim/other/usda-2015_en_2025-04.zim",
+  "https://ny.mirror.driftle.ss/kiwix/zim/other/usda-2015_en_2025-04.zim",
+  "https://wi.mirror.driftle.ss/kiwix/zim/other/usda-2015_en_2025-04.zim",
+  "https://mirror.download.kiwix.org/zim/other/usda-2015_en_2025-04.zim",
+  "https://mirrors.dotsrc.org/kiwix/zim/other/usda-2015_en_2025-04.zim",
+  "https://mirror-sites-in.mblibrary.info/mirror-sites/download.kiwix.org/zim/other/usda-2015_en_2025-04.zim",
+  "https://ftp.nluug.nl/pub/kiwix/zim/other/usda-2015_en_2025-04.zim",
+]
+torrent = "https://download.kiwix.org/zim/other/usda-2015_en_2025-04.zim.torrent"
+magnet = "magnet:?xt=urn:btih:a223028deac322ed4e6dc15d8476671759c2b673&xt=urn:md5:016b6796f387a4ab119f05d0b801bea4&xl=19787133&dn=usda-2015_en_2025-04.zim&as=https://lb.download.kiwix.org/zim/other/usda-2015_en_2025-04.zim&tr=https://tracker.openzim.org/announce&tr=udp://tracker.openzim.org:6969/announce&ws=https://https://ny.mirror.driftle.ss/kiwix/zim/other/usda-2015_en_2025-04.zim&ws=https://https://wi.mirror.driftle.ss/kiwix/zim/other/usda-2015_en_2025-04.zim&ws=https://https://mirror.download.kiwix.org/zim/other/usda-2015_en_2025-04.zim&ws=https://https://mirrors.dotsrc.org/kiwix/zim/other/usda-2015_en_2025-04.zim&ws=https://https://mirror-sites-in.mblibrary.info/mirror-sites/download.kiwix.org/zim/other/usda-2015_en_2025-04.zim&ws=https://https://ftp.nluug.nl/pub/kiwix/zim/other/usda-2015_en_2025-04.zim&xs=https://lb.download.kiwix.org/zim/other/usda-2015_en_2025-04.zim.torrent"
+license = { name = "Public domain (U.S. government work)", attribution = "U.S. Department of Agriculture; packaged by Kiwix" }

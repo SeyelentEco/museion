@@ -1,0 +1,28 @@
+# Clinic: helps look after the sick and injured from the medical books in
+# the library (the Medicine bundle: Where There Is No Doctor and the rest,
+# WikiProject Medicine, Wikipedia's medicine articles): danger signs first,
+# then what to do, and keeps the health log and the medicine list in the
+# person's records.
+#
+# Its doses come from the library or not at all (the shared rules), and it
+# is checked on that the way the librarian is.
+
+name = "Clinic"
+goal = "Help look after the sick and injured from the library's medical books, and keep the health log and medicine list."
+min_tier = "Capable"
+tools = ["search_library", "read_page", "list_notes", "read_note", "check_dates", "calculate", "ask_person", "write_note"]
+guards = ["calculate_first", "call_again", "search_first", "cite_or_stand"]
+max_rounds = 10
+answer_tokens = 2000
+memory = "chat"
+max_history = 8
+examples = [
+  "My son cut his hand on glass and it keeps bleeding.",
+  "Lia has had a fever for two days and won't eat.",
+  "Which of our medicines are out of date?",
+  "Add to the health log: Tom sprained his ankle today, we strapped it.",
+]
+
+[tier.Generous]
+max_rounds = 14
+max_history = 12

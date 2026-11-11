@@ -2,12 +2,21 @@
 #
 # This is the highest-value and highest-risk material here, and it is worth
 # being deliberate about that. See docs/safety.md.
+#
+# Military Medicine is US forces' field manuals: first aid, wounds and
+# burns, sanitation, care with no hospital, written for exactly the case of
+# no doctor nearby. MedlinePlus explains conditions and tests for patients,
+# and NHS Medicines says what each common medicine is for and how to take
+# it, which the clinic agent leans on when it reads the medicine list.
 
 id = "medicine"
 title = "Medicine"
 description = "Clinical reference for when professional care is unavailable."
 sources = [
   "zimgit-medicine",
+  "military-medicine",
   "mdwiki_en_all_maxi",
+  "medlineplus",
+  "nhs-medicines",
   "wikipedia_en_medicine_nopic",
 ]

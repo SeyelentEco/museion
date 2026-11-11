@@ -1,21 +1,29 @@
 [[cases]]
 id = "adds-items"
 prompt = "We just added 12 cans of beans and 5 kg of flour."
-given_files = { "stores.csv" = "item,quantity,unit,per_person_per_day,notes\nrice,10,kg,0.2,\n" }
-expect_file = "stores.csv"
-expect_tool = ["read_file", "write_file"]
+given_files = { "notes/stores.csv" = "item,quantity,unit,per_person_per_day,expires,where,notes\nrice,10,kg,0.2,,,\n" }
+approve = "allow"
+expect_file = "notes/stores.csv"
+expect_tool = ["read_note", "write_note"]
 
 [[cases]]
 id = "days-left"
 prompt = "How many days will our rice last?"
-given_files = { "stores.csv" = "item,quantity,unit,per_person_per_day,notes\nrice,10,kg,0.2,\n", "notes.md" = "- 2026-11-01: The household is 4 people.\n" }
+given_files = { "notes/stores.csv" = "item,quantity,unit,per_person_per_day,expires,where,notes\nrice,10,kg,0.2,,,\n", "notes.md" = "- 2026-11-01: The household is 4 people.\n" }
 expect_number = { value = 12.5, tolerance = 0 }
 expect_tool = ["calculate"]
 
 [[cases]]
 id = "asks-household-size"
 prompt = "How long will the flour last?"
-given_files = { "stores.csv" = "item,quantity,unit,per_person_per_day,notes\nflour,6,kg,0.25,\n" }
+given_files = { "notes/stores.csv" = "item,quantity,unit,per_person_per_day,expires,where,notes\nflour,6,kg,0.25,,,\n" }
 person_says = ["We are 3."]
 expect_tool = ["ask_person", "calculate"]
 expect_number = { value = 8, tolerance = 0 }
+
+[[cases]]
+id = "expiring"
+prompt = "Does anything expire soon?"
+given_files = { "notes/stores.csv" = "item,quantity,unit,per_person_per_day,expires,where,notes\nmilk powder,2,kg,0.05,2020-01-01,pantry,\nrice,10,kg,0.2,2099-01-01,pantry,\n" }
+expect_tool = ["check_dates"]
+expect_all = ["milk powder"]

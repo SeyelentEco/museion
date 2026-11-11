@@ -16,6 +16,7 @@ Hand-typed hashes rot. Always regenerate.
 
 from __future__ import annotations
 
+import html
 import re
 import shlex
 import tomllib
@@ -34,6 +35,9 @@ USER_AGENT = "Mozilla/5.0 (Museion sync-source)"
 KIWIX_CATALOGUE = "https://library.kiwix.org/catalog/v2/entries"
 HEADER = "# Written by python -m museion sync-source -- do not hand-edit size_bytes or sha256.\n"
 RECIPE = "# Regenerate with: "
+# What most Kiwix archives are under, and so what an entry says unless told.
+DEFAULT_LICENSE = "CC-BY-SA-4.0"
+DEFAULT_ATTRIBUTION = "Kiwix and contributors"
 
 # fetch(url, method): for GET the body, for HEAD the Content-Length ("" when
 # the server gives none). Raises on any failure, a 404 included.
@@ -121,10 +125,9 @@ def _field(entry: str, tag: str) -> str:
     m = re.search(rf"<{tag}>(.*?)</{tag}>", entry, re.S)
     if not m:
         return ""
-    text = m.group(1).strip()
-    for escaped, plain in (("&lt;", "<"), ("&gt;", ">"), ("&quot;", '"'), ("&#39;", "'"), ("&amp;", "&")):
-        text = text.replace(escaped, plain)
-    return text
+    # Every XML entity, &apos; and numbered ones too: "NHS&apos; Medicines"
+    # is not a title to show anyone.
+    return html.unescape(m.group(1).strip())
 
 
 def parse_zim_name(filename: str) -> tuple[str, str | None]:
@@ -132,13 +135,16 @@ def parse_zim_name(filename: str) -> tuple[str, str | None]:
 
       zimgit-post-disaster_en_2024-05.zim       -> zimgit-post-disaster_en, 2024-05
       wikipedia_en_chemistry_nopic_2026-07.zim  -> wikipedia_en_chemistry_nopic, 2026-07
+      nhs.uk_en_medicines_2026-09b.zim          -> nhs.uk_en_medicines, 2026-09b
 
     Kiwix names are project_lang_selection_flavour_date, and the number of
     segments varies, so only the trailing YYYY-MM is parsed. Finding the
     language segment by position gets "nopic" wrong and leaks the date into
     the id, which then breaks the staleness check -- the one thing the date
-    is for."""
-    m = re.fullmatch(r"(.+)_(\d{4}-\d{2})\.zim", filename)
+    is for. A letter after the date is a second release that month; it
+    sorts after the first and before next month's, as text, which is how
+    the dates are compared."""
+    m = re.fullmatch(r"(.+)_(\d{4}-\d{2}[a-z]?)\.zim", filename)
     return (m.group(1), m.group(2)) if m else (filename.removesuffix(".zim"), None)
 
 
@@ -166,21 +172,29 @@ def mirrors_for(url: str, magnet: str | None) -> list[str]:
     return unique
 
 
-def recipe(url: str, category: str, id: str, title: str | None) -> str:
+def recipe(url: str, category: str, id: str, title: str | None,
+           license: str = DEFAULT_LICENSE, attribution: str = DEFAULT_ATTRIBUTION) -> str:
     """The command that writes the entry again. It names --id, so a change
     to how ids are made from filenames can never turn a regeneration into a
     second entry beside a stale one. A --title given by hand is part of it
     too: upstream calls both the 12 GB summaries edition and the 49 GB
     full-text edition of Wikipedia simply "Wikipedia", and regenerating from
-    upstream alone turned two distinguishable entries into two identical ones."""
+    upstream alone turned two distinguishable entries into two identical ones.
+    A licence other than the usual is kept the same way, so that writing the
+    entry again does not quietly relabel a public-domain manual CC-BY-SA."""
+    quote = lambda v: f'"{v}"' if '"' not in v else shlex.quote(v)  # noqa: E731
     words = ["python -m museion sync-source", url, "--category", category, "--id", id]
+    if license != DEFAULT_LICENSE:
+        words += ["--license", quote(license)]
+    if attribution != DEFAULT_ATTRIBUTION:
+        words += ["--attribution", quote(attribution)]
     if title:
-        words += ["--title", f'"{title}"' if '"' not in title else shlex.quote(title)]
+        words += ["--title", quote(title)]  # last: what follows --title is the title
     return " ".join(words)
 
 
 def source_entry(url: str, category: str, id: str | None = None, title: str | None = None,
-                 license: str = "CC-BY-SA-4.0", attribution: str = "Kiwix and contributors",
+                 license: str = DEFAULT_LICENSE, attribution: str = DEFAULT_ATTRIBUTION,
                  get: Fetch = fetch, say: Callable[[str], None] = print) -> tuple[str, str]:
     """The catalogue id and TOML text for the archive at `url`."""
     if category not in CATEGORIES:
@@ -225,12 +239,12 @@ def source_entry(url: str, category: str, id: str | None = None, title: str | No
     if p.magnet:
         fields["magnet"] = p.magnet
     fields["license"] = {"name": license, "attribution": attribution}
-    text = HEADER + RECIPE + recipe(url, category, id, title) + "\n" + toml_lines(fields)
+    text = HEADER + RECIPE + recipe(url, category, id, title, license, attribution) + "\n" + toml_lines(fields)
     return id, text
 
 
 def sync_source(url: str, category: str, id: str | None = None, title: str | None = None,
-                license: str = "CC-BY-SA-4.0", attribution: str = "Kiwix and contributors",
+                license: str = DEFAULT_LICENSE, attribution: str = DEFAULT_ATTRIBUTION,
                 sources_dir: Path | None = None, get: Fetch = fetch,
                 say: Callable[[str], None] = print) -> Path:
     """Write (or rewrite) catalog/sources/<id>.toml and return where."""
@@ -262,7 +276,7 @@ def check(sources_dir: Path | None = None, get: Fetch = fetch, say: Callable[[st
                 stale += 1
                 continue
         stem, _ = parse_zim_name(data["filename"])
-        found = re.findall(rf"{re.escape(stem)}_(\d{{4}}-\d{{2}})\.zim(?!\.)", listings[folder])
+        found = re.findall(rf"{re.escape(stem)}_(\d{{4}}-\d{{2}}[a-z]?)\.zim(?!\.)", listings[folder])
         latest = max(found, default=None)
         have = data.get("version")
         if latest and have and latest > have:

@@ -22,6 +22,7 @@ const BASIS_LABELS = {
   library_and_calculation: ['From your library, with calculation', ''],
   computed: ['Computed', ''],
   own_files: ['From the files it checked', ''],
+  notes: ['From your own notes — not checked against the library', 'note'],
   general_knowledge: ['General knowledge — not from your library. Unverified.', 'warn'],
 };
 
@@ -43,6 +44,12 @@ function stepText(s) {
         delegate: `Asked ${a.agent ?? 'another agent'}: ${a.task ?? ''}`,
         library_files: 'Listed the library folder',
         add_source: `Added ${a.file ?? ''} to the catalogue`,
+        list_notes: 'Looked at your notes',
+        read_note: `Read your note ${a.name ?? ''}`,
+        write_note: `${a.append ? 'Added to' : 'Wrote'} your note ${a.name ?? ''}`,
+        check_dates: `Checked the dates in ${a.name ?? ''}`,
+        radio_messages: 'Read the radio messages',
+        send_radio: `Sent by radio to ${a.to || 'everyone in range'}: ${a.text ?? ''}`,
       }[s.tool] ?? `Used ${s.tool}`;
     case 'approval':
       return s.decision === 'deny' ? `You declined ${s.tool}` : `You allowed ${s.tool}`;
@@ -114,7 +121,10 @@ function renderReply(exchange, reply) {
     }
     exchange.append(box);
   }
-  if (reply.files?.length) exchange.append(el('div', 'files', `Saved in the agent's folder: ${reply.files.join(', ')}`));
+  const inNotes = (reply.files ?? []).filter((f) => f.startsWith('notes/')).map((f) => f.slice(6));
+  const own = (reply.files ?? []).filter((f) => !f.startsWith('notes/'));
+  if (inNotes.length) exchange.append(el('div', 'files', `Saved in your notes: ${inNotes.join(', ')}`));
+  if (own.length) exchange.append(el('div', 'files', `Saved in the agent's folder: ${own.join(', ')}`));
   if (reply.sources?.length) exchange.append(sourceList(reply.sources));
 }
 
@@ -124,7 +134,8 @@ function sourceList(sources) {
   for (const s of sources) {
     const row = el('div', 'source');
     row.setAttribute('data-n', String(s.n));
-    row.title = s.page > 0 ? `Open the PDF at page ${s.page}` : 'Open the article';
+    const note = s.book === 'notes';
+    row.title = note ? 'Open your note' : s.page > 0 ? `Open the PDF at page ${s.page}` : 'Open the article';
     row.addEventListener('click', () => void openSource(s));
     row.append(el('span', 'n', String(s.n)));
     const body = el('div');
@@ -132,7 +143,9 @@ function sourceList(sources) {
     t.append(el('span', 'open', '↗'));
     body.append(t);
     // Articles from Wikipedia-style archives have no page; name the archive.
-    const meta = [s.author, s.page > 0 ? `page ${s.page}` : s.book].filter(Boolean).join(' — ');
+    const meta = note
+      ? `your own note — part ${s.page}`
+      : [s.author, s.page > 0 ? `page ${s.page}` : s.book].filter(Boolean).join(' — ');
     body.append(el('div', 'meta', meta));
     row.append(body);
     box.append(row);
@@ -226,7 +239,11 @@ function showCard(w) {
   card.hidden = !w?.kind;
   if (!w?.kind) return;
   if (w.kind === 'approve') {
-    card.append(el('div', 'card-title', `${w.agent} wants to ${w.summary}`));
+    // The first line says what; the lines after it (a note's changed lines)
+    // show exactly what would be written.
+    const [what, ...detail] = (w.summary ?? '').split('\n');
+    card.append(el('div', 'card-title', `${w.agent} wants to ${what}`));
+    if (detail.length) card.append(el('pre', 'card-detail', detail.join('\n')));
     if (w.reason) card.append(el('div', 'muted', w.reason));
     const note = el('input');
     note.type = 'text';

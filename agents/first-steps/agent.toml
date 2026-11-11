@@ -1,0 +1,29 @@
+# First steps: what to do first when something big has happened -- the
+# grid is down, phones and the internet are gone but the power is on, a long
+# isolation, a flood -- for this household, from what it has.
+#
+# It reads the person's records (household.csv, stores.csv, medicines.csv)
+# to work out with the calculator what runs out first, hands each area to the
+# agent that knows it (water planner, clinic, power keeper, the librarian)
+# with delegate, so only their short cited answers fill its own context, and
+# saves the plan as a note the person ticks off. It replaced the 72-hour
+# planner, which did this for one scenario only.
+
+name = "First steps"
+goal = "Say what to do first after a disaster, for this household and what it has, and save the plan as a note."
+min_tier = "Capable"
+tools = ["list_notes", "read_note", "check_dates", "calculate", "delegate", "ask_person", "write_note"]
+guards = ["calculate_first", "call_again", "cite_or_stand"]
+max_rounds = 14
+answer_tokens = 2500
+memory = "chat"
+examples = [
+  "A huge solar storm hit. Phones and the internet are dead but we still have power. What do we do first?",
+  "The power and water have been out since this morning. We are a family of four.",
+  "There is an outbreak and we have to stay home for months.",
+  "The river flooded the lower town last night.",
+]
+
+[tier.Generous]
+max_rounds = 18
+answer_tokens = 3500

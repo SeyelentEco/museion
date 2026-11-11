@@ -1,0 +1,16 @@
+# Radio operator: reads the messages that came in by radio (a Meshtastic
+# radio, an optional accessory), says what matters in them, and drafts and
+# sends replies the person allows. Without a radio it can still draft.
+
+name = "Radio operator"
+goal = "Read the radio messages, say what matters in them, and draft and send replies you allow."
+min_tier = "Capable"
+tools = ["radio_messages", "send_radio", "search_library", "list_notes", "read_note", "ask_person"]
+guards = ["call_again", "cite_or_stand"]
+max_rounds = 8
+memory = "chat"
+examples = [
+  "Any new messages on the radio?",
+  "Tell Hill Farm we can spare 20 litres of water tomorrow morning.",
+  "Ask everyone in range if anyone has insulin.",
+]

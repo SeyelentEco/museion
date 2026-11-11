@@ -63,6 +63,9 @@ class Config:
     # Museion wants to ask something. Off for those who would rather the GPU
     # stay free until they choose -- the model holds nearly all of it.
     autostart: bool = True
+    # A Meshtastic radio, if one is used: its serial port (COM5,
+    # /dev/ttyUSB0) or tcp:<host> for one on the network. Empty: none.
+    radio: str = ""
     # Set when running from a drive: paths are stored relative to this
     # folder and resolved against it, so the drive's letter can change.
     # Not part of the file.
@@ -109,6 +112,8 @@ class Config:
                 value = [str(a) for a in value]
             elif f.name == "autostart":
                 value = bool(value)
+            elif f.name == "radio":
+                value = str(value).strip()
             else:
                 value = int(value)
             setattr(c, f.name, value)

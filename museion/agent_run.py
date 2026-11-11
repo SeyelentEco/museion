@@ -51,6 +51,11 @@ class Agents:
             raise KeyError(agent_id)
         return agents.load(agent_id, self.overrides, self.tier, self.model_id, self.shipped)
 
+    @property
+    def notes_dir(self) -> Path:
+        """The person's notes and records, beside agent-work and chats."""
+        return self.work.parent / "notes"
+
     def workspace(self, spec: AgentSpec, chat_id: str | None = None) -> Path | None:
         return agents.workspace(self.work, spec, chat_id)
 
@@ -68,8 +73,13 @@ class Agents:
                 spec.problems.append(why)
             return spec
 
+        try:
+            from museion.notes import adopt_old_files
+            adopt_old_files(self.work, self.notes_dir)
+        except RuntimeError:
+            pass  # no library: nothing to adopt
         return Setting(
-            chat=chat, library=library, library_dir=self.library_dir,
+            chat=chat, library=library, library_dir=self.library_dir, notes_dir=self.notes_dir,
             person=person or Person(), find_agent=find,
             workspace_for=lambda spec: self.workspace(spec, chat_id),
             open_log=(lambda spec: RunLog(self.work / spec.id / "runs")) if log else (lambda spec: None),
@@ -137,7 +147,14 @@ class CaseRunner:
                 target.write_text(text, encoding="utf-8")
             setting = self.env.setting(self.chat, self.library, ScriptedPerson(case.approve, case.person_says),
                                        tuning=self.tuning, log=False)
+            # Each case's run log (and its helpers'), beside the test results:
+            # what a failed case asked, searched and was told.
+            logs = tests_dir(self.env, self.spec) / "logs"
+            setting.open_log = lambda spec: RunLog(logs)
             setting.workspace_for = lambda spec: scratch / spec.id
+            # Its own notes too: a case's given notes/... files, and never
+            # the person's.
+            setting.notes_dir = scratch / "notes"
             spec = prepared(self.env.get(self.spec.id), self.tuning)
             return Harness(spec, setting, scratch if spec.memory != "none" else None).run(case.prompt)
         finally:

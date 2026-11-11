@@ -37,6 +37,8 @@ class AppState:
         self._lock = threading.Lock()
         self._hardware: hardware.Hardware | None = None
         self._stats: tuple[float, tuple[int, int, int]] | None = None
+        # The Meshtastic radio's link, if one is connected (radio_commands.py).
+        self.radio_link = None
         cfg = config.load(config_path)
         if drive:
             cfg = cfg.resolved(drive.root)
@@ -113,6 +115,14 @@ class AppState:
         if not cfg.library_dir:
             return None
         wanted = cfg.library_dir / "evals"
+        return self.drive.writable_or_cache(wanted) if self.drive else wanted
+
+    def notes_dir(self, cfg: Config) -> Path | None:
+        """The person's notes and records: the library's notes folder, or on
+        a write-protected drive one on this computer (as agent-work is)."""
+        if not cfg.library_dir:
+            return None
+        wanted = cfg.library_dir / "notes"
         return self.drive.writable_or_cache(wanted) if self.drive else wanted
 
     def hardware(self) -> hardware.Hardware:

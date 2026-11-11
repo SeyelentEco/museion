@@ -1,0 +1,27 @@
+# Written by python -m museion sync-source -- do not hand-edit size_bytes or sha256.
+# Regenerate with: python -m museion sync-source https://download.kiwix.org/zim/zimit/medlineplus.gov_en_all_2025-01.zim --category medicine --id medlineplus --license "Public domain (US government), except parts used under licence" --attribution "U.S. National Library of Medicine; drug information (c) ASHP and the medical encyclopedia (c) A.D.A.M., used under licence; via Kiwix"
+id = "medlineplus"
+title = "MedlinePlus"
+description = "Trusted Health Information for You"
+claims_fulltext_index = true
+category = "medicine"
+filename = "medlineplus.gov_en_all_2025-01.zim"
+version = "2025-01"
+size_bytes = 1944841111
+sha256 = "3ce8933e8b249cf685f5f108e8f10d9a7e3becb2ee4e91f3aedb5b0cf4d2e596"
+urls = [
+  "https://download.kiwix.org/zim/zimit/medlineplus.gov_en_all_2025-01.zim",
+]
+mirrors = [
+  "https://lb.download.kiwix.org/zim/zimit/medlineplus.gov_en_all_2025-01.zim",
+  "https://www.mirrorservice.org/sites/download.kiwix.org/zim/zimit/medlineplus.gov_en_all_2025-01.zim",
+  "https://ny.mirror.driftle.ss/kiwix/zim/zimit/medlineplus.gov_en_all_2025-01.zim",
+  "https://wi.mirror.driftle.ss/kiwix/zim/zimit/medlineplus.gov_en_all_2025-01.zim",
+  "https://mirrors.dotsrc.org/kiwix/zim/zimit/medlineplus.gov_en_all_2025-01.zim",
+  "https://ftp.nluug.nl/pub/kiwix/zim/zimit/medlineplus.gov_en_all_2025-01.zim",
+  "https://mirror-sites-in.mblibrary.info/mirror-sites/download.kiwix.org/zim/zimit/medlineplus.gov_en_all_2025-01.zim",
+  "https://mirror.download.kiwix.org/zim/zimit/medlineplus.gov_en_all_2025-01.zim",
+]
+torrent = "https://download.kiwix.org/zim/zimit/medlineplus.gov_en_all_2025-01.zim.torrent"
+magnet = "magnet:?xt=urn:btih:13d8dc4005c50c5a3a537b95fa60dafba97edbdb&xt=urn:md5:a99ee14fb793367c6839c50ce0115798&xl=1944841111&dn=medlineplus.gov_en_all_2025-01.zim&as=https://lb.download.kiwix.org/zim/zimit/medlineplus.gov_en_all_2025-01.zim&tr=https://tracker.openzim.org/announce&tr=udp://tracker.openzim.org:6969/announce&ws=https://https://ny.mirror.driftle.ss/kiwix/zim/zimit/medlineplus.gov_en_all_2025-01.zim&ws=https://https://wi.mirror.driftle.ss/kiwix/zim/zimit/medlineplus.gov_en_all_2025-01.zim&ws=https://https://mirrors.dotsrc.org/kiwix/zim/zimit/medlineplus.gov_en_all_2025-01.zim&ws=https://https://ftp.nluug.nl/pub/kiwix/zim/zimit/medlineplus.gov_en_all_2025-01.zim&ws=https://https://mirror-sites-in.mblibrary.info/mirror-sites/download.kiwix.org/zim/zimit/medlineplus.gov_en_all_2025-01.zim&ws=https://https://mirror.download.kiwix.org/zim/zimit/medlineplus.gov_en_all_2025-01.zim&xs=https://lb.download.kiwix.org/zim/zimit/medlineplus.gov_en_all_2025-01.zim.torrent"
+license = { name = "Public domain (US government), except parts used under licence", attribution = "U.S. National Library of Medicine; drug information (c) ASHP and the medical encyclopedia (c) A.D.A.M., used under licence; via Kiwix" }

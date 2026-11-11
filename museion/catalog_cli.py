@@ -43,8 +43,10 @@ def add_commands(commands) -> None:
                    help="the Library tab's shelf for it")
     c.add_argument("--id", help="the catalogue id (default: the file name without its date)")
     c.add_argument("--title", help="what the Library tab shows (default: the Kiwix catalogue's title)")
-    c.add_argument("--license", default="CC-BY-SA-4.0", help="default CC-BY-SA-4.0")
-    c.add_argument("--attribution", default="Kiwix and contributors", help="default: Kiwix and contributors")
+    c.add_argument("--license", default=catalog_sync.DEFAULT_LICENSE,
+                   help=f"default {catalog_sync.DEFAULT_LICENSE}; give the archive's own where it differs")
+    c.add_argument("--attribution", default=catalog_sync.DEFAULT_ATTRIBUTION,
+                   help=f"default: {catalog_sync.DEFAULT_ATTRIBUTION}")
     c.set_defaults(run=lambda a: print("wrote", catalog_sync.sync_source(
         a.url, a.category, a.id, a.title, a.license, a.attribution)))
 

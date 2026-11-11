@@ -66,7 +66,7 @@ tab is reloaded; no bundle or index change is needed.
 
 ## Changing an agent
 
-Agents (the librarian, the stores keeper, the 72-hour planner...) are folders
+Agents (the librarian, the stores keeper, first steps...) are folders
 in `agents/`: `agent.toml` (settings), `prompt.md` (what it is told),
 `cases.toml` (its tests). `docs/agents.md` explains every setting. To change
 what an agent does, change its `prompt.md` or `agent.toml`; to add one, run
@@ -96,7 +96,11 @@ and the unit tests. A change shows in a new chat; no restart is needed.
 | This editing set-up | `museion/edit.py` |
 | The benchmark of questions and expected answers | `evals/benchmark.toml`, `museion/evals.py`; retrieval alone: `evals/retrieval.toml`, `retrieval_eval.py` |
 | Agents: the harness, its tools, chats | `agents/` (one folder each), `museion/harness.py`, `agent_tools/` (one tool per file), `agents.py` (settings), `chat_commands.py`, `agent_commands.py`; see `docs/agents.md` |
-| The command line | `museion/cli.py`, `catalog_cli.py`, `drive_cli.py` |
+| The command line | `museion/cli.py`, `catalog_cli.py`, `drive_cli.py`, `map_cli.py` |
+| The person's notes and records (the Notes tab), and their kinds | `museion/notes.py`, `records.toml`, `notes_commands.py`, `agent_tools/write_note.py` and the other note tools; see `docs/notes.md` |
+| Offline maps and places (the Map tab) | `museion/maps.py`, `map_commands.py`, `ui/map.js`; see `docs/maps.md` |
+| Making a map from OpenStreetMap, and drawing it | `museion/osm.py` (download), `mapmaker.py` (tiles), `mvt.py` and `protobuf.py` (the tile format), `map_cli.py` (`make-map`); in the page `ui/mvt.js` (reading tiles), `ui/mapdraw.js` (the map's style and labels) |
+| The optional Meshtastic radio (the Radio tab) | `museion/radio.py`, `radio_commands.py`, `ui/radio.js`; see `docs/radio.md` |
 
 `docs/` explains the design: `retrieval.md` (how search works and why),
 `python.md` (how this Python version works), `portable.md` (drives),

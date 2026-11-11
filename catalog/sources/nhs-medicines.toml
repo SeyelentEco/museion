@@ -1,0 +1,26 @@
+# Written by python -m museion sync-source -- do not hand-edit size_bytes or sha256.
+# Regenerate with: python -m museion sync-source https://download.kiwix.org/zim/zimit/nhs.uk_en_medicines_2026-09b.zim --category medicine --id nhs-medicines --license "OGL-UK-3.0" --attribution "NHS website (nhs.uk), Crown copyright, under the Open Government Licence; via Kiwix" --title "NHS Medicines A to Z"
+id = "nhs-medicines"
+title = "NHS Medicines A to Z"
+description = "How medicines work, how and when to take them"
+claims_fulltext_index = true
+category = "medicine"
+filename = "nhs.uk_en_medicines_2026-09b.zim"
+version = "2026-09b"
+size_bytes = 15322705
+sha256 = "349f7bc833aa1cfedd1cdd10fbb9ae575aac63b22e17639bfaee6568b6668b62"
+urls = [
+  "https://download.kiwix.org/zim/zimit/nhs.uk_en_medicines_2026-09b.zim",
+]
+mirrors = [
+  "https://lb.download.kiwix.org/zim/zimit/nhs.uk_en_medicines_2026-09b.zim",
+  "https://www.mirrorservice.org/sites/download.kiwix.org/zim/zimit/nhs.uk_en_medicines_2026-09b.zim",
+  "https://ny.mirror.driftle.ss/kiwix/zim/zimit/nhs.uk_en_medicines_2026-09b.zim",
+  "https://wi.mirror.driftle.ss/kiwix/zim/zimit/nhs.uk_en_medicines_2026-09b.zim",
+  "https://mirrors.dotsrc.org/kiwix/zim/zimit/nhs.uk_en_medicines_2026-09b.zim",
+  "https://ftp.nluug.nl/pub/kiwix/zim/zimit/nhs.uk_en_medicines_2026-09b.zim",
+  "https://mirror.download.kiwix.org/zim/zimit/nhs.uk_en_medicines_2026-09b.zim",
+]
+torrent = "https://download.kiwix.org/zim/zimit/nhs.uk_en_medicines_2026-09b.zim.torrent"
+magnet = "magnet:?xt=urn:btih:30a2cee23e0d5bf33f20fa69cd90d0f3373007d3&xt=urn:md5:5d2bc671415d1b1fb7d7bce5f4ae1cf2&xl=15322705&dn=nhs.uk_en_medicines_2026-09b.zim&as=https://lb.download.kiwix.org/zim/zimit/nhs.uk_en_medicines_2026-09b.zim&tr=https://tracker.openzim.org/announce&tr=udp://tracker.openzim.org:6969/announce&ws=https://https://ny.mirror.driftle.ss/kiwix/zim/zimit/nhs.uk_en_medicines_2026-09b.zim&ws=https://https://wi.mirror.driftle.ss/kiwix/zim/zimit/nhs.uk_en_medicines_2026-09b.zim&ws=https://https://mirrors.dotsrc.org/kiwix/zim/zimit/nhs.uk_en_medicines_2026-09b.zim&ws=https://https://ftp.nluug.nl/pub/kiwix/zim/zimit/nhs.uk_en_medicines_2026-09b.zim&ws=https://https://mirror.download.kiwix.org/zim/zimit/nhs.uk_en_medicines_2026-09b.zim&xs=https://lb.download.kiwix.org/zim/zimit/nhs.uk_en_medicines_2026-09b.zim.torrent"
+license = { name = "OGL-UK-3.0", attribution = "NHS website (nhs.uk), Crown copyright, under the Open Government Licence; via Kiwix" }

@@ -5,6 +5,7 @@ import { invoke, listen } from './api.js';
 import { $, el, gb, statusMsg } from './dom.js';
 import { refreshSetup } from './settings.js';
 import { onTab, showTab } from './tabs.js';
+import { openCitedNote } from './notes.js';
 
 /**
  * The address of a source: the article itself, or the PDF opened at the
@@ -24,6 +25,11 @@ async function sourceUrl(s) {
 }
 
 export async function openSource(s) {
+  // One of the person's own notes opens in the Notes tab.
+  if (s.book === 'notes') {
+    await openCitedNote(s.file);
+    return;
+  }
   if (!s.book.startsWith('folder:')) {
     const status = await invoke('get_status');
     if (!status.kiwix_running) {

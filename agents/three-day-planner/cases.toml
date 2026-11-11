@@ -1,8 +1,0 @@
-[[cases]]
-id = "family-of-four"
-prompt = "The power and water have been out since this morning. We are a family of four, no pets, it is cold. Make us a plan."
-expect_tool = ["delegate"]
-expect_any = ["water", "sanitation", "food"]
-min_steps = 4
-min_sources = 2
-expect_basis = "library|library_and_calculation"

@@ -2,7 +2,11 @@
 #
 # This is the bundle that turns a survival kit into a reference library:
 # Appropedia for appropriate technology, iFixit for repair, Wikibooks for
-# instruction, and Wikipedia in summary for everything else.
+# instruction, and Wikipedia in summary for everything else. Energypedia
+# (solar, batteries, mini-grids, biogas, stoves) and CD3WD (900 practical
+# documents on water, power, building and farming for places without a grid)
+# are the power shelf the power keeper agent reads, and the USDA's canning
+# guide is how to keep a harvest through the winter without poisoning anyone.
 
 id = "homestead"
 title = "Homestead"
@@ -11,9 +15,12 @@ sources = [
   "zimgit-post-disaster",
   "zimgit-water",
   "zimgit-food-preparation",
+  "usda-home-canning",
   "zimgit-knots",
   "zimgit-medicine",
   "appropedia_en_all_maxi",
+  "energypedia_en_all_maxi",
+  "cd3wdproject",
   "ifixit_en_all",
   "wikibooks_en_all_nopic",
   "wikipedia_en_all_mini",

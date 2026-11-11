@@ -34,6 +34,17 @@ the exact byte length, the torrent, and the mirror list harvested from the magne
 webseeds — without downloading the archive. Its first lines record the command, so the
 entry can be written again from upstream rather than edited by hand.
 
+The licence defaults to CC-BY-SA-4.0, which most Kiwix archives are under. Give the
+archive's own where it differs, and the recipe line keeps it:
+
+```bash
+python -m museion sync-source \
+  https://download.kiwix.org/zim/zimit/irp.fas.org_en_military-medicine_2026-10.zim \
+  --category medicine --id military-medicine \
+  --license "Public domain (US government works)" \
+  --attribution "U.S. Department of Defense manuals, collected by the Federation of American Scientists (irp.fas.org), via Kiwix"
+```
+
 Browse what's available at [browse.library.kiwix.org](https://browse.library.kiwix.org) or
 the raw index at [download.kiwix.org/zim](https://download.kiwix.org/zim/).
 

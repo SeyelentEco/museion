@@ -1,0 +1,25 @@
+# Written by python -m museion sync-source -- do not hand-edit size_bytes or sha256.
+# Regenerate with: python -m museion sync-source https://download.kiwix.org/zim/zimit/irp.fas.org_en_military-medicine_2026-10.zim --category medicine --id military-medicine --license "Public domain (US government works)" --attribution "U.S. Department of Defense manuals, collected by the Federation of American Scientists (irp.fas.org), via Kiwix"
+id = "military-medicine"
+title = "Military Medicine"
+description = "Doctrinal and Instructional manuals"
+claims_fulltext_index = true
+category = "medicine"
+filename = "irp.fas.org_en_military-medicine_2026-10.zim"
+version = "2026-10"
+size_bytes = 64986090
+sha256 = "9fc5e5d0302504f57a33e0d3aad9c94761cfd6caab22354ed04b9e9bad2ff57f"
+urls = [
+  "https://download.kiwix.org/zim/zimit/irp.fas.org_en_military-medicine_2026-10.zim",
+]
+mirrors = [
+  "https://lb.download.kiwix.org/zim/zimit/irp.fas.org_en_military-medicine_2026-10.zim",
+  "https://www.mirrorservice.org/sites/download.kiwix.org/zim/zimit/irp.fas.org_en_military-medicine_2026-10.zim",
+  "https://wi.mirror.driftle.ss/kiwix/zim/zimit/irp.fas.org_en_military-medicine_2026-10.zim",
+  "https://mirrors.dotsrc.org/kiwix/zim/zimit/irp.fas.org_en_military-medicine_2026-10.zim",
+  "https://ftp.nluug.nl/pub/kiwix/zim/zimit/irp.fas.org_en_military-medicine_2026-10.zim",
+  "https://mirror.download.kiwix.org/zim/zimit/irp.fas.org_en_military-medicine_2026-10.zim",
+]
+torrent = "https://download.kiwix.org/zim/zimit/irp.fas.org_en_military-medicine_2026-10.zim.torrent"
+magnet = "magnet:?xt=urn:btih:b32b745c87f9f59df44843db3ec0032808be25a9&xt=urn:md5:f9049e0774477fde838e2c8178f9630b&xl=64986090&dn=irp.fas.org_en_military-medicine_2026-10.zim&as=https://lb.download.kiwix.org/zim/zimit/irp.fas.org_en_military-medicine_2026-10.zim&tr=https://tracker.openzim.org/announce&tr=udp://tracker.openzim.org:6969/announce&ws=https://https://wi.mirror.driftle.ss/kiwix/zim/zimit/irp.fas.org_en_military-medicine_2026-10.zim&ws=https://https://mirrors.dotsrc.org/kiwix/zim/zimit/irp.fas.org_en_military-medicine_2026-10.zim&ws=https://https://ftp.nluug.nl/pub/kiwix/zim/zimit/irp.fas.org_en_military-medicine_2026-10.zim&ws=https://https://mirror.download.kiwix.org/zim/zimit/irp.fas.org_en_military-medicine_2026-10.zim&xs=https://lb.download.kiwix.org/zim/zimit/irp.fas.org_en_military-medicine_2026-10.zim.torrent"
+license = { name = "Public domain (US government works)", attribution = "U.S. Department of Defense manuals, collected by the Federation of American Scientists (irp.fas.org), via Kiwix" }

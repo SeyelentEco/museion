@@ -11,7 +11,7 @@ def run(args: dict, run) -> str:
     rows = []
     for path in sorted(root.rglob("*")):
         rel = path.relative_to(root)
-        if path.is_file() and not any(p.startswith(".") for p in rel.parts) and rel.parts[0] not in ("runs", "tests", "chats"):
+        if path.is_file() and not any(p.startswith(".") for p in rel.parts) and rel.parts[0] not in ("runs", "tests", "chats", "notes"):
             rows.append(f"{rel.as_posix()} ({path.stat().st_size} bytes)")
     return "\n".join(rows) if rows else "Your folder is empty."
 

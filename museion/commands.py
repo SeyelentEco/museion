@@ -130,7 +130,9 @@ def ask(state: AppState, question: str, history: list[dict] | None = None) -> di
 
     earlier = [asking.Exchange(h.get("question", ""), h.get("answer", "")) for h in history or []]
     with closing(Index(db)) as index:
-        answer = make_asker(state, cfg, index, chat).ask(question, earlier, on_token)
+        from museion.harness import Setting
+        setting = Setting(chat=chat, notes_dir=state.notes_dir(cfg))
+        answer = make_asker(state, cfg, index, chat).ask(question, earlier, on_token, setting)
     # Nothing streams when retrieval found nothing, and that answer -- the
     # library saying it does not cover this -- must still be shown.
     if not streamed and answer.text:

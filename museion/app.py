@@ -49,7 +49,8 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
-from museion import agent_commands, chat_commands, commands, drives, library, services, sidecar
+from museion import (agent_commands, chat_commands, commands, drives, library, map_commands, maps,
+                     notes_commands, radio_commands, services, sidecar)
 from museion.appstate import AppState, UiError, open_state
 
 UI_DIR = Path(__file__).with_name("ui")
@@ -80,6 +81,12 @@ COMMANDS = {f.__name__: f for f in [
     agent_commands.agent_runs, agent_commands.read_run, agent_commands.save_test_case,
     agent_commands.test_agent, agent_commands.agent_tests, agent_commands.export_agent,
     agent_commands.import_agent,
+    notes_commands.list_notes, notes_commands.read_note, notes_commands.save_note, notes_commands.new_note,
+    notes_commands.open_notes_folder,
+    map_commands.list_maps, map_commands.list_places, map_commands.add_place, map_commands.open_maps_folder,
+    map_commands.find_place, map_commands.map_plan, map_commands.make_map, map_commands.stop_map,
+    radio_commands.radio_state, radio_commands.find_radios, radio_commands.connect_radio,
+    radio_commands.disconnect_radio, radio_commands.radio_messages, radio_commands.send_radio_message,
 ]}
 
 # The page's kinds of file. Spelled out rather than asked of the mimetypes
@@ -164,6 +171,8 @@ class Server(ThreadingHTTPServer):
             return
         self.stopping.set()
         self.state.supervisor.release_all()
+        if self.state.radio_link is not None:
+            self.state.radio_link.stop()
         threading.Thread(target=self.shutdown, daemon=True).start()
 
     def watch_idle(self) -> None:
@@ -193,6 +202,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(200, {"app": "museion"})
         if url.path == "/file":
             return self.send_content_file(urllib.parse.parse_qs(url.query).get("path", [""])[0])
+        if url.path.startswith("/tiles/"):
+            return self.send_tile(url.path)
         self.send_ui_file(url.path)
 
     def do_POST(self) -> None:
@@ -352,6 +363,36 @@ class Handler(BaseHTTPRequestHandler):
             pass
 
 
+    def send_tile(self, path: str) -> None:
+        """One map tile, /tiles/<map>/<z>/<x>/<y>, from a map in the library
+        found by its name: nothing in the address is used as a path."""
+        m = re.fullmatch(r"/tiles/([A-Za-z0-9._-]+)/(\d{1,2})/(\d{1,7})/(\d{1,7})(?:\.\w+)?", path)
+        found = None
+        if m and self.headers.get("Sec-Fetch-Site") != "cross-site":
+            file = map_commands.find_map(self.server.state, m[1])
+            if file is not None:
+                try:
+                    found = maps.tile(file, int(m[2]), int(m[3]), int(m[4]))
+                except (OSError, sqlite3.Error):
+                    found = None
+        if found is None:
+            # No tile there is normal at the map's edge: an empty answer, not
+            # an error the console complains about.
+            self.send_response(204)
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            return
+        data, kind, encoding = found
+        self.send_response(200)
+        self.send_header("Content-Type", kind)
+        if encoding:
+            self.send_header("Content-Encoding", encoding)
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "max-age=3600")
+        self.end_headers()
+        self.wfile.write(data)
+
+
 def plain_relative(name: str) -> bool:
     """Is this a plain name inside a folder: no drive, no share, no root and
     no "..", read the Windows way and the Unix way alike?"""
@@ -401,6 +442,7 @@ def serve(port: int = DEFAULT_PORT, open_browser: bool = True, stay: bool = Fals
     events = Events()
     state = open_state(config_dir, events.emit)
     server = Server(state, events, port)
+    radio_commands.start_saved(state)
     url = f"http://127.0.0.1:{server.port}/"
     print(f"\nMuseion is at {url}\n"
           f"Settings: {state.config_path}\n"

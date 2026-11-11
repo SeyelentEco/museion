@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from museion import agents, evals, hardware
-from museion.agent_run import Agents, CaseRunner, save_case
+from museion.agent_run import Agents, CaseRunner, save_case, tests_dir
 from museion.runs import ChatStore, title_from
 from agent_fakes import ScriptedChat, calls, says
 
@@ -40,14 +40,14 @@ class CaseRunnerTest(unittest.TestCase):
 [[cases]]
 id = "days"
 prompt = "How long will the rice last?"
-given_files = { "stores.csv" = "item,quantity,unit,per_person_per_day,notes\\nrice,10,kg,0.2,\\n" }
+given_files = { "notes/stores.csv" = "item,quantity,unit,per_person_per_day,notes\\nrice,10,kg,0.2,\\n" }
 person_says = ["We are 4."]
-expect_tool = ["read_file", "ask_person", "calculate"]
+expect_tool = ["read_note", "ask_person", "calculate"]
 expect_number = { value = 12.5, tolerance = 0 }
 max_rounds_used = 5
 ''', agent=True)
         chat = ScriptedChat(
-            calls(("read_file", {"name": "stores.csv"})),
+            calls(("read_note", {"name": "stores.csv"})),
             calls(("ask_person", {"question": "How many of you?"})),
             calls(("calculate", {"expression": "10 / (0.2 * 4)"})),
             says("The rice lasts 12.5 days."),
@@ -56,7 +56,9 @@ max_rounds_used = 5
         self.assertTrue(run.cases[0].passed, run.cases[0].checks)
         read = [m["content"] for m in chat.calls[1][0] if m["role"] == "tool"][0]
         self.assertIn("rice,10,kg", read)
-        self.assertFalse((root / "library").exists())  # the real folder was not touched
+        # Nothing in the library but the case's log, where test results go.
+        written = [f for f in (root / "library").rglob("*") if f.is_file()]
+        self.assertEqual([f.parent for f in written], [tests_dir(env, spec) / "logs"])
 
     def test_save_case(self):
         root = Path(tempfile.mkdtemp())

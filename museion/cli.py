@@ -26,7 +26,7 @@ import sys
 from contextlib import closing
 from pathlib import Path
 
-from museion import (agent_cli, app, ask, calc, catalog_cli, drive_cli, evals, fit, hardware, indexer,
+from museion import (agent_cli, app, ask, calc, catalog_cli, drive_cli, evals, fit, hardware, indexer, map_cli,
                      retrieval_eval, tools, tuning)
 from museion.appstate import UiError
 from museion.index import Index
@@ -49,6 +49,7 @@ BASIS_LABELS = {
     ask.LIBRARY_AND_CALCULATION: "from the library, with calculation",
     ask.COMPUTED: "computed",
     "own_files": "from the files it checked",
+    "notes": "from your own notes, not checked against the library",
     ask.GENERAL_KNOWLEDGE: "GENERAL KNOWLEDGE -- not from the library, unverified",
 }
 
@@ -124,6 +125,7 @@ def parser() -> argparse.ArgumentParser:
     c = commands.add_parser("eval", parents=[where, servers], help="run the benchmark and save the run")
     c.add_argument("--label", default="cli", help="a name for the configuration under test")
     c.add_argument("--only", help="run only this capability, horizon or case id")
+    c.add_argument("--results", help="folder to save the run in (default: evals/ beside the index)")
     c.set_defaults(run=cmd_eval)
 
     c = commands.add_parser("retrieval-eval", parents=[where, servers],
@@ -157,6 +159,7 @@ def parser() -> argparse.ArgumentParser:
 
     catalog_cli.add_commands(commands)
     drive_cli.add_commands(commands)
+    map_cli.add_commands(commands)
     return top
 
 
@@ -297,7 +300,9 @@ def answer_from(args, index: Index, question: str, history: list[ask.Exchange]) 
             shown += text
             print(text, end="", flush=True)
 
-    answer = asker.ask(question, history, show)
+    from museion.harness import Setting
+    notes_dir = Path(args.library) / "notes" if getattr(args, "library", None) else None
+    answer = asker.ask(question, history, show, Setting(chat=asker.chat, notes_dir=notes_dir))
     # Nothing streams when retrieval found nothing, and that answer -- the
     # library saying it does not cover this -- is the one that must not be
     # swallowed.
@@ -332,7 +337,7 @@ def cmd_eval(args) -> None:
     db = db_path(args)
     with closing(Index(db)) as index:
         run = run_benchmark(args, index)
-    path = evals.save_run(db.parent / "evals", run)
+    path = evals.save_run(Path(args.results) if args.results else db.parent / "evals", run)
     print(f"\nSaved {path}\n")
 
 

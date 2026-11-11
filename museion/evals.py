@@ -98,6 +98,11 @@ class CaseResult:
     calculations: list[str]
     seconds: float
     error: str | None = None
+    # The tools it called, in order, and how many model turns it took: what
+    # a failed case did is half of why it failed. Older runs have neither.
+    tools: list[str] = field(default_factory=list)
+    rounds: int = 0
+    log: str = ""  # an agent case's run log: every tool call, its arguments and result
 
 
 @dataclass
@@ -152,7 +157,8 @@ def run(asker, cases: list[Case], label: str,
                 passed=all(c.passed for c in checks), checks=checks, answer=answer.text,
                 basis=answer.basis, sources=sources,
                 calculations=[f"{c.expression} = {c.result}" for c in answer.calculations],
-                seconds=time.monotonic() - t0,
+                seconds=time.monotonic() - t0, tools=list(answer.tools), rounds=answer.rounds,
+                log=answer.log,
             )
         report(i, len(cases), case.id, result.passed)
         results.append(result)

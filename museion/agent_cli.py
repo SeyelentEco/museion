@@ -22,6 +22,7 @@ from pathlib import Path
 
 from museion import agents, appstate, hardware
 from museion.agent_run import Agents, count_cases, prepared, tests_dir
+from museion.runs import WORK
 from museion.agent_run import test as run_tests
 from museion.harness import Approval, Person
 from museion.llama import Llama
@@ -49,6 +50,9 @@ def add_parser(commands, where, servers) -> None:
     c.add_argument("id")
     c.add_argument("--only", help="one case id")
     c.add_argument("--label", default="", help="a name for this run")
+    c.add_argument("--work", help="a folder that takes the library's place for what agents write (agent-work/, "
+                                  "chats/, notes/, test results): to test against a library that must not be "
+                                  "written to")
     c.set_defaults(run=cmd_test)
     c = sub.add_parser("new", help="a new agent's folder, from the template")
     c.add_argument("id", help="lower-case words joined by -, like seed-keeper")
@@ -74,7 +78,8 @@ def environment(args, library: Path | None = None) -> Agents:
         except Exception:  # noqa: BLE001 -- no model running is fine for listing
             model = ""
     lib = library or (Path(args.library) if getattr(args, "library", None) else cfg.library_dir)
-    return Agents(lib, agents.override_dir(state.tuning_path), tier, model)
+    work = Path(args.work) / WORK if getattr(args, "work", None) else None
+    return Agents(lib, agents.override_dir(state.tuning_path), tier, model, work_dir=work)
 
 
 def cmd_list(args) -> None:

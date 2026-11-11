@@ -54,6 +54,23 @@ class SyncSourceTest(unittest.TestCase):
         self.assertEqual(catalog_sync.parse_zim_name("wikipedia_en_chemistry_nopic_2026-07.zim"),
                          ("wikipedia_en_chemistry_nopic", "2026-07"))
         self.assertEqual(catalog_sync.parse_zim_name("found.zim"), ("found", None))
+        # A second release in the same month, and how it sorts.
+        self.assertEqual(catalog_sync.parse_zim_name("nhs.uk_en_medicines_2026-09b.zim"),
+                         ("nhs.uk_en_medicines", "2026-09b"))
+        self.assertTrue("2026-09" < "2026-09b" < "2026-10")
+
+    def test_titles_from_the_catalogue_lose_their_xml_entities(self):
+        entry = "<title>NHS&apos; Medicines A to Z</title><summary>Tom &amp; Jerry&#8217;s &lt;b&gt;</summary>"
+        self.assertEqual(catalog_sync._field(entry, "title"), "NHS' Medicines A to Z")
+        self.assertEqual(catalog_sync._field(entry, "summary"), "Tom & Jerry\u2019s <b>")
+
+    def test_a_licence_given_by_hand_is_kept_in_the_recipe(self):
+        line = catalog_sync.recipe("https://x/y_en_2026-01.zim", "medicine", "y", "Y Manual",
+                                   "Public domain (US government works)", "U.S. Army")
+        self.assertEqual(line, 'python -m museion sync-source https://x/y_en_2026-01.zim --category medicine --id y'
+                               ' --license "Public domain (US government works)" --attribution "U.S. Army"'
+                               ' --title "Y Manual"')
+        self.assertNotIn("--license", catalog_sync.recipe("https://x/y.zim", "making", "y", None))
 
     def test_mirrors_come_from_the_magnet_with_the_doubled_scheme_repaired(self):
         url = "https://download.kiwix.org/zim/other/x_en_2024-08.zim"

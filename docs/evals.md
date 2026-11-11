@@ -10,7 +10,11 @@ python -m museion eval --db /path/to/library/museion-index.db --label "Qwen3.6-3
 python -m museion eval --db ... --only calculate        # a capability
 python -m museion eval --db ... --only month            # a horizon
 python -m museion eval --db ... --only bleach-drum      # one case
+python -m museion eval --db ... --results D:/eval-runs  # saved there, not in evals/ beside the index
 ```
+
+Each case in a saved run keeps the answer, its sources and calculations, and
+the tools it called with how many model turns it took.
 
 **Comparing models.** The Evals tab has a *Chat model to test* picker: every `.gguf` in
 your models folder, or any other file via *Choose…*. Picking one that isn't the configured

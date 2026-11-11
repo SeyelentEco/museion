@@ -17,4 +17,7 @@ TOOL = Tool(
     risk=READ,
     run=run,
     describe=lambda a: f"ask: {a['question']}",
+    max_calls=2,
+    spent=("You cannot ask the person anything more for this answer. Go on with what you "
+           "were told; where something is still unknown, say what you assumed, and finish the work."),
 )

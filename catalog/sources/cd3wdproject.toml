@@ -1,0 +1,25 @@
+# Written by python -m museion sync-source -- do not hand-edit size_bytes or sha256.
+# Regenerate with: python -m museion sync-source https://download.kiwix.org/zim/zimit/cd3wdproject.org_en_all_2026-11.zim --category making --id cd3wdproject --license "Mixed: public domain and copyrighted documents; see each one" --attribution "CD3WD Project, via Kiwix"
+id = "cd3wdproject"
+title = "CD3WD Project"
+description = "Over 900 technical documents covering topics related to sustainable development."
+claims_fulltext_index = true
+category = "making"
+filename = "cd3wdproject.org_en_all_2026-11.zim"
+version = "2026-11"
+size_bytes = 572637480
+sha256 = "17043a699b43dac79b8a3887c99e67cc754d97cfa8df887c2a746bd0c64ed53c"
+urls = [
+  "https://download.kiwix.org/zim/zimit/cd3wdproject.org_en_all_2026-11.zim",
+]
+mirrors = [
+  "https://lb.download.kiwix.org/zim/zimit/cd3wdproject.org_en_all_2026-11.zim",
+  "https://www.mirrorservice.org/sites/download.kiwix.org/zim/zimit/cd3wdproject.org_en_all_2026-11.zim",
+  "https://wi.mirror.driftle.ss/kiwix/zim/zimit/cd3wdproject.org_en_all_2026-11.zim",
+  "https://mirrors.dotsrc.org/kiwix/zim/zimit/cd3wdproject.org_en_all_2026-11.zim",
+  "https://ftp.nluug.nl/pub/kiwix/zim/zimit/cd3wdproject.org_en_all_2026-11.zim",
+  "https://mirror.download.kiwix.org/zim/zimit/cd3wdproject.org_en_all_2026-11.zim",
+]
+torrent = "https://download.kiwix.org/zim/zimit/cd3wdproject.org_en_all_2026-11.zim.torrent"
+magnet = "magnet:?xt=urn:btih:18e977ee1867a83b94fd0b87409002dc705b66dd&xt=urn:md5:3ae03af5a38118eb047b652a8adb4781&xl=572637480&dn=cd3wdproject.org_en_all_2026-11.zim&as=https://lb.download.kiwix.org/zim/zimit/cd3wdproject.org_en_all_2026-11.zim&tr=https://tracker.openzim.org/announce&tr=udp://tracker.openzim.org:6969/announce&ws=https://https://wi.mirror.driftle.ss/kiwix/zim/zimit/cd3wdproject.org_en_all_2026-11.zim&ws=https://https://mirrors.dotsrc.org/kiwix/zim/zimit/cd3wdproject.org_en_all_2026-11.zim&ws=https://https://ftp.nluug.nl/pub/kiwix/zim/zimit/cd3wdproject.org_en_all_2026-11.zim&ws=https://https://mirror.download.kiwix.org/zim/zimit/cd3wdproject.org_en_all_2026-11.zim&xs=https://lb.download.kiwix.org/zim/zimit/cd3wdproject.org_en_all_2026-11.zim.torrent"
+license = { name = "Mixed: public domain and copyrighted documents; see each one", attribution = "CD3WD Project, via Kiwix" }

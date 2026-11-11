@@ -15,10 +15,11 @@ from __future__ import annotations
 
 import json
 import re
+import sqlite3
 import sys
 from collections.abc import Callable, Sequence
 
-from museion import llama
+from museion import llama, notes
 from museion.agents import AgentSpec
 from museion.agents import load as load_agent
 from museion.answer import (COMPUTED, DISCARD, GENERAL_KNOWLEDGE, LIBRARY,  # noqa: F401 -- named here as before
@@ -59,6 +60,10 @@ SEED_RETRIEVE = 20
 
 # Articles fetched per native archive per search.
 NATIVE_PER_BOOK = 4
+
+# Parts of the person's own notes added to the candidates per search. They
+# go through the reranker with everything else.
+NOTES_RETRIEVE = 10
 
 NOTHING_FOUND = (
     "No passages in the library match that. Try different words, or if the question "
@@ -107,7 +112,7 @@ class Asker:
         # file on every question in the app, so a prompt edit needs no restart.
         self.tuning = tuning or default_tuning()
 
-    def gather(self, question: str) -> tuple[list[Hit], bool]:
+    def gather(self, question: str, notes_dir=None) -> tuple[list[Hit], bool]:
         """Retrieve and rerank, returning the passages an answer would be
         built on, and whether the reranker ordered them.
 
@@ -119,9 +124,12 @@ class Asker:
         top."""
         candidates, best_coverage = self.index.search_ungated(question, RETRIEVE)
         candidates.extend(self.native_hits(question, set()))
-        return self.choose(question, candidates, best_coverage)
+        mine, mine_coverage = self.notes_hits(question, notes_dir)
+        candidates.extend(mine)
+        return self.choose(question, candidates, max(best_coverage, mine_coverage))
 
-    def gather_seeded(self, question: str, rewrites: list[str], fetched: set[str]) -> tuple[list[Hit], bool]:
+    def gather_seeded(self, question: str, rewrites: list[str], fetched: set[str],
+                      notes_dir=None) -> tuple[list[Hit], bool]:
         """The seeded search: the question's candidates and the rewritten
         subjects' candidates in one pool, duplicates dropped, reranked once
         against the question *and* its subjects, keeping `keep` in all. The
@@ -142,10 +150,14 @@ class Asker:
         found, best_coverage = self.index.search_ungated(question, RETRIEVE)
         add(found)
         add(self.native_hits(question, fetched))
+        mine, mine_coverage = self.notes_hits(question, notes_dir)
+        add(mine)
+        best_coverage = max(best_coverage, mine_coverage)
         for q in rewrites:
             found, _ = self.index.search_ungated(q, SEED_RETRIEVE)
             add(found)
             add(self.native_hits(q, fetched))
+            add(self.notes_hits(q, notes_dir)[0])
         rank_query = f"{question} ({'; '.join(rewrites)})" if rewrites else question
         return self.choose(rank_query, pool, best_coverage)
 
@@ -186,6 +198,18 @@ class Asker:
         if best_coverage + 1e-9 < Index.MIN_TERM_COVERAGE:
             return []
         return pool[: self.tuning.keep]
+
+    def notes_hits(self, question: str, notes_dir) -> tuple[list[Hit], float]:
+        """The person's own notes that match (notes.py). A notes index that
+        cannot be built -- a folder that cannot be written -- is skipped, not
+        the end of the question."""
+        if notes_dir is None:
+            return [], 0.0
+        try:
+            return notes.search(notes_dir, question, NOTES_RETRIEVE, self.index)
+        except (OSError, RuntimeError, sqlite3.Error) as e:
+            print(f"  (notes not searched: {e})", file=sys.stderr)
+            return [], 0.0
 
     def native_hits(self, question: str, fetched: set[str]) -> list[Hit]:
         """Search the archives that carry their own index, through kiwix-serve,
@@ -290,6 +314,10 @@ def render_search(hits: list[Hit], sources: list[Hit]) -> str:
                        if (s.book, s.page, s.file) == (h.book, h.page, h.file)), 0)
         who = f", {h.author}" if h.author else ""
         where = f" (page {h.page})" if h.page > 0 else f" ({h.book})"
+        if h.book == notes.NOTES_BOOK:
+            # Said in the passage itself, so the model can tell the person's
+            # own words from a book's without a rule in its prompt.
+            who, where = "", f" -- the person's own note, not a book (part {h.page})"
         if number:
             # Shown in full once is enough; repeating it filled the context.
             out += f"[{number}] {h.doc_title}{who}{where}: shown above\n\n"

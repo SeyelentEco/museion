@@ -1,0 +1,27 @@
+[[cases]]
+id = "power-on-comms-down"
+prompt = "A huge solar storm hit. Phones and the internet are dead but we still have power. What do we do first?"
+given_files = { "notes/household.csv" = "name,age,needs,daily_medicines,notes\nAna,41,,,\nTom,44,type 1 diabetes,insulin,\nLia,9,,,\n", "notes/stores.csv" = "item,quantity,unit,per_person_per_day,expires,where,notes\ndrinking water,24,litre,4,,,\nrice,10,kg,0.2,,,\n" }
+approve = "allow"
+expect_tool = ["read_note", "calculate", "delegate"]
+expect_number = { value = 2, tolerance = 0.01 }
+expect_any = ["insulin"]
+expect_all = ["water"]
+min_steps = 4
+expect_file = "notes/first-steps-plan.md"
+
+[[cases]]
+id = "grid-down"
+prompt = "The power and water have been out since this morning. We are a family of four, no pets, it is cold. Make us a plan."
+expect_tool = ["delegate"]
+expect_any = ["water", "sanitation", "food"]
+min_steps = 4
+min_sources = 2
+expect_basis = "library|library_and_calculation"
+
+[[cases]]
+id = "isolation"
+prompt = "There is an outbreak and we have been told to stay home for months. Two adults and a baby."
+expect_tool = ["delegate"]
+expect_any = ["isolat", "hand", "sick room", "infection"]
+min_steps = 4

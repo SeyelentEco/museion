@@ -1,0 +1,24 @@
+# Power keeper: keeps the power on and the machines running. What the
+# panels, batteries and generator can run, how long the fuel lasts, what
+# maintenance is due, and how to do it, from the repair and energy guides in
+# the library (Appropedia, iFixit, the PDFs).
+#
+# Its figures come from the person's records (power.csv, maintenance.csv) and
+# the calculator; its methods from the library.
+
+name = "Power keeper"
+goal = "Keep the power on and the machines running: what the power you have can run, how long fuel lasts, and what maintenance is due."
+min_tier = "Capable"
+tools = ["search_library", "read_page", "list_notes", "read_note", "check_dates", "calculate", "ask_person", "write_note", "notes"]
+guards = ["calculate_first", "call_again", "search_first", "cite_or_stand"]
+max_rounds = 10
+memory = "agent"
+examples = [
+  "What can we run on our solar panels and battery?",
+  "How long will 20 litres of petrol run the generator?",
+  "What maintenance is due?",
+  "I changed the generator oil today.",
+]
+
+[tier.Generous]
+max_rounds = 14

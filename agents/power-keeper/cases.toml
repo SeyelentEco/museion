@@ -1,0 +1,19 @@
+[[cases]]
+id = "daily-use"
+prompt = "How much power do our things use in a day?"
+given_files = { "notes/power.csv" = "thing,kind,watts,hours_per_day,capacity_wh,fuel_per_hour,notes\nfridge,load,100,24,,,\nlights,load,20,5,,,\nbattery,store,,,5000,,lead acid\n" }
+expect_tool = ["read_note", "calculate"]
+expect_number = { value = 2500, tolerance = 0 }
+
+[[cases]]
+id = "fuel"
+prompt = "How many days will 20 litres of petrol run the generator for 4 hours a day? It burns 1.5 litres an hour."
+expect_tool = ["calculate"]
+expect_number = { value = 3.33, tolerance = 0.01 }
+
+[[cases]]
+id = "due"
+prompt = "What maintenance is due?"
+given_files = { "notes/maintenance.csv" = "machine,task,every_days,last_done,notes\ngenerator,change oil,30,2020-01-01,\nsolar panels,clean,90,2099-01-01,\n" }
+expect_tool = ["check_dates"]
+expect_all = ["oil"]

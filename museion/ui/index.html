@@ -22,6 +22,9 @@
         <nav>
           <button class="tab" data-tab="ask" aria-current="true">Ask</button>
           <button class="tab" data-tab="agents">Agents</button>
+          <button class="tab" data-tab="notes">Notes</button>
+          <button class="tab" data-tab="map">Map</button>
+          <button class="tab" data-tab="radio" id="tab-radio" hidden>Radio</button>
           <button class="tab" data-tab="library">Library</button>
           <button class="tab" data-tab="evals">Evals</button>
           <button class="tab" data-tab="setup">Settings</button>
@@ -102,6 +105,132 @@
             </aside>
             <div class="agent-detail" id="agent-detail">
               <div class="empty"><h1>Agents</h1><p>An agent has a goal, tools and rules, and works with the model on this computer. Pick one to see it, change it, or test it.</p></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Notes: the person's own notes and records (museion/notes.py) -->
+        <section id="panel-notes" class="panel">
+          <div class="notes-page">
+            <aside class="note-list">
+              <div class="agent-list-head"><h1>Notes</h1></div>
+              <p class="muted small-print">Your own notes and records. Museion searches them with the library, and an answer that rests on them says so.</p>
+              <ul id="note-items" class="agent-items"></ul>
+              <div class="note-new">
+                <button id="note-new" type="button">New note</button>
+                <select id="note-record" aria-label="Start a record">
+                  <option value="">New record…</option>
+                </select>
+              </div>
+              <button id="note-folder" type="button" class="small">Open the notes folder</button>
+            </aside>
+            <div class="note-detail" id="note-detail">
+              <div class="empty" id="note-empty">
+                <h1>Your notes</h1>
+                <p>Write down what you learn, what you have and what worked: a repair, a remedy, which seeds grew. Records such as stores, medicines and maintenance are tables that agents keep up to date for you, after you press Allow.</p>
+                <p class="muted">They are plain files in the library's notes folder, so any text editor opens them too. Every change keeps the version before in the folder's .history.</p>
+              </div>
+              <div id="note-edit" hidden>
+                <div class="note-head">
+                  <span class="chat-title" id="note-name"></span>
+                  <span class="muted" id="note-state"></span>
+                  <button id="note-save" type="button" class="primary small">Save</button>
+                </div>
+                <p class="muted small-print" id="note-about"></p>
+                <textarea id="note-text" class="prompt-edit note-text" spellcheck="true" aria-label="Note"></textarea>
+                <div id="note-table" class="note-table"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Map: an offline map and the person's places (museion/maps.py) -->
+        <section id="panel-map" class="panel">
+          <div class="notes-page">
+            <aside class="note-list">
+              <div class="agent-list-head"><h1>Map</h1></div>
+              <select id="map-pick" aria-label="Map"></select>
+              <p class="muted small-print">Your places are kept in places.csv in your notes, so the agents can read them too.</p>
+              <ul id="place-items" class="agent-items"></ul>
+              <form id="place-form" class="place-form" hidden>
+                <div class="muted small-print">New place at <span id="place-at"></span></div>
+                <input id="place-name" type="text" placeholder="Name, like Spring by the old mill" aria-label="Name" />
+                <select id="place-kind" aria-label="Kind"></select>
+                <input id="place-notes" type="text" placeholder="Notes (optional)" aria-label="Notes" />
+                <div class="row">
+                  <button type="submit" class="primary small">Save place</button>
+                  <button type="button" id="place-cancel" class="small">Cancel</button>
+                </div>
+              </form>
+              <div class="row">
+                <button id="map-reload" type="button" class="small">Look again</button>
+                <button id="map-folder" type="button" class="small">Open the maps folder</button>
+              </div>
+              <details id="make-map" class="make-map">
+                <summary>Make a map…</summary>
+                <p class="muted small-print">Downloads what OpenStreetMap has for an area (roads, water, buildings,
+                  names, and places like pharmacies and drinking water) and makes a map of it that works with no
+                  internet. It needs the internet while it is made.</p>
+                <form id="make-find" class="row">
+                  <input id="make-where" type="text" placeholder="A town, or 51.50, -0.12" aria-label="Where" />
+                  <button type="submit" class="small">Find</button>
+                </form>
+                <ul id="make-found" class="agent-items"></ul>
+                <div class="row">
+                  <select id="make-size" aria-label="How big">
+                    <option value="5">5 km across</option>
+                    <option value="10" selected>10 km across</option>
+                    <option value="25">25 km across</option>
+                    <option value="50">50 km across</option>
+                  </select>
+                  <label class="small-print"><input id="make-buildings" type="checkbox" checked /> Buildings</label>
+                </div>
+                <p id="make-plan" class="muted small-print"></p>
+                <div class="row">
+                  <button id="make-go" type="button" class="primary small" disabled>Make the map</button>
+                  <button id="make-stop" type="button" class="small" hidden>Stop</button>
+                </div>
+                <p id="make-status" class="small-print"></p>
+              </details>
+            </aside>
+            <div class="map-main">
+              <div class="map-bar">
+                <button id="map-in" type="button" class="small" title="Zoom in">+</button>
+                <button id="map-out" type="button" class="small" title="Zoom out">−</button>
+                <button id="map-add" type="button" class="small">Add a place</button>
+                <span id="map-where" class="muted"></span>
+              </div>
+              <div id="map-note" class="map-note" hidden></div>
+              <div id="map-view" class="map-view">
+                <div id="map-tiles" class="map-layer"></div>
+                <canvas id="map-canvas" class="map-layer" hidden></canvas>
+                <div id="map-area" class="map-area" hidden></div>
+                <div id="map-marks" class="map-layer"></div>
+                <div id="map-credit" class="map-credit"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Radio: messages by a Meshtastic radio, if one is connected (museion/radio.py) -->
+        <section id="panel-radio" class="panel">
+          <div class="notes-page">
+            <aside class="note-list">
+              <div class="agent-list-head"><h1>Radio</h1></div>
+              <p id="radio-status" class="small-print"></p>
+              <h3 class="side-head">Radios heard</h3>
+              <ul id="radio-nodes" class="agent-items"></ul>
+              <p class="muted small-print">Every message sent and received is kept in radio-messages.csv in your notes, so it is searched with them and the agents can read it.</p>
+              <button id="radio-settings" type="button" class="small">Radio settings</button>
+            </aside>
+            <div class="radio-main">
+              <ol id="radio-log" class="radio-log"></ol>
+              <form id="radio-send" class="radio-send">
+                <select id="radio-to" aria-label="Send to"></select>
+                <input id="radio-text" type="text" maxlength="760" autocomplete="off" placeholder="A short message" aria-label="Message" />
+                <button type="submit" class="primary" id="radio-send-button">Send</button>
+              </form>
+              <p class="muted small-print radio-foot"><span id="radio-count"></span>Anyone with a radio on the same channel can read what you send: keep health details, and what you have stored and where, off the air.</p>
             </div>
           </div>
         </section>
@@ -316,6 +445,30 @@
                 <span class="what">Measures the chat model against your GPU and stores the layer split. Set-up did this once; run it again after changing the GPU or the chat model. Stops the chat model to measure, so start services afterwards.</span>
                 <button id="fit-model" type="button">Fit model to this machine</button>
               </div>
+            </div>
+            <div class="card" id="card-radio">
+              <h2>Radio <span class="opt">optional</span></h2>
+              <p class="muted">
+                A Meshtastic radio passes short text messages to other radios nearby, a few
+                kilometres a hop, with no phone network or internet. If you have one, plug it in
+                by USB (or put it on the same network) and connect it here: a Radio tab then shows
+                the messages, and the Radio operator agent can read them and send replies you
+                allow. Without one, nothing changes.
+              </p>
+              <div class="field">
+                <label for="radio-address">Where the radio is</label>
+                <span class="what">Its port: COM5 on Windows, /dev/ttyUSB0 or /dev/ttyACM0 on Linux, /dev/cu.usbserial… on a Mac. For a radio on the network, tcp: and its address, like tcp:192.168.1.40.</span>
+                <div class="row">
+                  <input id="radio-address" type="text" placeholder="COM5" autocomplete="off" />
+                  <button id="radio-find" type="button">Look for a radio</button>
+                </div>
+                <div id="radio-found" class="radio-found"></div>
+              </div>
+              <div class="actions">
+                <button id="radio-connect" type="button">Connect</button>
+                <button id="radio-disconnect" type="button" hidden>Disconnect</button>
+              </div>
+              <p id="radio-card-status" class="status" role="status"></p>
             </div>
             <div class="card" id="card-drive" hidden>
               <h2>This drive</h2>

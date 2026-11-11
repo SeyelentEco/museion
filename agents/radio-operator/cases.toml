@@ -1,0 +1,11 @@
+[[cases]]
+id = "reads-messages"
+prompt = "Any messages on the radio?"
+given_files = { "notes/radio-messages.csv" = "time,direction,from,to,channel,text\n2027-02-01 09:10,in,Hill Farm (!55667788),everyone,0,Bridge on Mill Lane is out. Use the ford.\n" }
+expect_tool = ["radio_messages"]
+expect_any = ["bridge", "Bridge", "ford"]
+
+[[cases]]
+id = "drafts-when-no-radio"
+prompt = "Tell Hill Farm we can spare 20 litres of water tomorrow morning."
+expect_any = ["20 litres", "20 liters", "20 L"]
