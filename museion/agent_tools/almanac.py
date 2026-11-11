@@ -81,15 +81,27 @@ def frosts_at_home(run) -> tuple[dict[str, str], str]:
     return {"last": e.last_frost, "first": e.first_frost}, said
 
 
+MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September",
+               "October", "November", "December"]
+
+
+def day(d: datetime.date) -> str:
+    """13 February 2027: the words a model copies rather than works out."""
+    return f"{d.day} {MONTH_NAMES[d.month - 1]} {d.year}"
+
+
 def describe(item: almanac.Item, today: datetime.date) -> str:
     where = f"{item.kind}, {item.source}"
     if item.status == "overdue":
-        when = f"OVERDUE by {-item.days} day{'s' if item.days != -1 else ''} ({item.start.isoformat()})"
+        when = f"OVERDUE by {-item.days} day{'s' if item.days != -1 else ''} (since {day(item.start)})"
     elif item.status == "now":
-        when = "due now" + (f", until {item.end.isoformat()}" if item.end > today else "")
+        when = (f"due now, from {day(item.start)} to {day(item.end)}" if item.end > item.start
+                else f"due now, on {day(item.start)}")
     else:
-        when = f"in {item.days} day{'s' if item.days != 1 else ''} ({item.start.isoformat()} to {item.end.isoformat()})"
-    told = f"; the record says: {item.when}" if item.when else ""
+        when = f"in {item.days} day{'s' if item.days != 1 else ''}, from {day(item.start)} to {day(item.end)}"
+    # The 35B, given only the rule, worked the dates out again, and wrongly
+    # (peas "6 to 21 March" for 3-6 weeks before a last frost of 27 March).
+    told = f" (worked out from \"{item.when}\")" if item.when else ""
     extra = f". Note: {item.notes}" if item.notes else ""
     return f"- {item.task} ({where}): {when}{told}{extra}"
 
@@ -124,6 +136,8 @@ def run(args: dict, run) -> str:
                         f"Ask the person for their average {which} frost date (month-day, like "
                         f"{'04-20' if which == 'last' else '10-15'})."))
     if found.items:
+        lines.append("Each task's dates are worked out already: give them as they are, and do not work dates out "
+                     "again from the rules. A task not listed is not due in this time.")
         lines += [describe(i, start) for i in found.items]
     else:
         lines.append("Nothing is due in that time.")

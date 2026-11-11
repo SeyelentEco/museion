@@ -140,9 +140,13 @@ def station_stats(lat: float, lows: Iterable[tuple[datetime.date, float]], years
     first, last = years
     by_season: dict[int, dict[int, float]] = {}
     by_year: dict[int, list[float]] = {}
+    winter_days: dict[int, int] = {}  # readings in a year's three coldest months
+    winter = (6, 7, 8) if south else (12, 1, 2)
     for day, low in lows:
         if first <= day.year <= last:
             by_year.setdefault(day.year, []).append(low)
+            if day.month in winter:
+                winter_days[day.year] = winter_days.get(day.year, 0) + 1
         if day.month == 2 and day.day == 29:
             continue  # seasons are counted in years of 365 days
         y = day.year if not south or day.month >= 7 else day.year - 1
@@ -167,7 +171,9 @@ def station_stats(lat: float, lows: Iterable[tuple[datetime.date, float]], years
         frosty += s is not None or a is not None
     if counted < min_years:
         return None
-    lows_by_year = [min(v) for v in by_year.values() if len(v) >= 330]
+    # A year's coldest night counts when its coldest months are as well
+    # covered as a frost season must be; a gap in summer does not matter.
+    lows_by_year = [min(v) for y, v in by_year.items() if winter_days.get(y, 0) >= COVERAGE * 90]
     coldest = round(sum(lows_by_year) / len(lows_by_year), 1) if len(lows_by_year) >= min_years else None
 
     def spring_day(share: float) -> str:
@@ -714,15 +720,22 @@ def height_near(folder: Path, lat: float, lon: float) -> float | None:
     return town.elev_m if town is not None and km(lat, lon, town.lat, town.lon) <= 5 else None
 
 
-def look_up(library_dir: Path, text: str, saved: list[dict] = (), pick: int = 0) -> tuple[list[Place], Place, Estimate]:
-    """The places matching `text`, the one picked, and its estimate."""
+def look_up(library_dir: Path, text: str, saved: list[dict] = (), pick: int = 0,
+            search: Callable[[str], list[dict]] | None = None) -> tuple[list[Place], Place, Estimate]:
+    """The places matching `text`, the one picked, and its estimate.
+    `search` (the page's online place search) is asked when nothing is
+    found offline: the town list has only places of 1,000 people or more,
+    so not a mountain pass or a hamlet."""
     where = Path(library_dir) / FOLDER
     table = read_table(where)
     found = find_place(text, where, saved)
+    if not found and search is not None:
+        found = [Place(r["name"], r.get("label") or r["name"], float(r["lat"]), float(r["lon"]))
+                 for r in search(text)][:8]
     if not found:
         raise ClimateError(f"No town called {text.strip()!r} in the climate table's region "
-                           f"({about(where).get('region', 'unknown')}). Try a bigger town nearby, "
-                           "or a latitude and longitude like 47.61, -122.33.")
+                           f"({about(where).get('region', 'unknown')}). Try a bigger town nearby, a place "
+                           "saved on the Map, or a latitude and longitude like 47.61, -122.33.")
     chosen = found[min(max(pick, 0), len(found) - 1)]
     elev = chosen.elev_m if chosen.elev_m is not None else height_near(where, chosen.lat, chosen.lon)
     e = estimate(table, chosen.lat, chosen.lon, elev)

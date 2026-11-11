@@ -138,8 +138,11 @@ class ToolTest(unittest.TestCase):
         almanac.set_frosts(self.dir, "04-20", "10-15")
         said = self.tool.run({"starting": "March", "weeks": 4}, self.run)
         self.assertIn("Frost dates in almanac.csv: last frost 04-20, first frost 10-15.", said)
-        self.assertIn("- Start tomatoes and peppers indoors (garden, almanac.csv): due now, until ", said)
-        self.assertIn("the record says: 6-8 weeks before last frost", said)
+        # 6-8 weeks before 20 April, in words the model gives as they are.
+        self.assertRegex(said, r"- Start tomatoes and peppers indoors \(garden, almanac.csv\): due now, "
+                               r"from 23 February \d{4} to 9 March \d{4}")
+        self.assertIn('(worked out from "6-8 weeks before last frost")', said)
+        self.assertIn("give them as they are", said)
         self.assertNotIn("Plant garlic", said)
         with self.assertRaises(ToolError):
             self.tool.run({"starting": "Smarch"}, self.run)

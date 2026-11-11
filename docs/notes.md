@@ -111,7 +111,9 @@ If you don't know your frost dates, Museion can look them up from weather
 stations near you, with no internet, once the library has a **climate
 table** (`<library>/climate/`): setting up your home area makes one, or
 `museion climate build` makes one for a whole region. Type your town (or
-`lat, lon`, or a saved place) under the frost form and press **Look up**:
+`lat, lon`, or a saved place) under the frost form and press **Look up**. A
+place too small for the town list (a hamlet, a mountain pass) is searched for
+online when there is internet:
 
 > Station averages for Bellevue, Washington, US: last spring frost about
 > 03-28 (1 year in 10 as late as 04-20); first autumn frost about 11-02 (1
@@ -133,7 +135,8 @@ How it is worked out (`museion/climate.py`):
   of the station's years. The "1 year in 10" dates are passed only one year
   in ten: later in spring, earlier in autumn.
 - The **zone** is the USDA's: the average of each year's coldest night (zone
-  1 starts at -60 °F, each zone is 10 °F wide, with halves *a* and *b*).
+  1 starts at -60 °F, each zone is 10 °F wide, with halves *a* and *b*). A
+  year counts when 80% of its three coldest months have readings.
   It's worked out from station data the USDA's way. It is not the official
   USDA map.
 - A place's estimate weighs the nearest stations (up to 3 within 60 km) by

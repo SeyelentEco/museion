@@ -116,8 +116,18 @@ def climate_lookup(state: AppState, place: str, pick: int = 0) -> dict:
     where = climate_dir(state)
     if where is None:
         raise UiError("No library is set up yet, so there is no climate table.")
+    from museion import osm
+
+    def online(text: str) -> list[dict]:
+        # Not in the town list: ask the place search, when there is internet.
+        try:
+            return osm.find_place(text)
+        except osm.OsmError:
+            return []
+
     try:
-        found, chosen, e = climate.look_up(where.parent, place, maps.places(state.notes_dir(state.config())), pick)
+        found, chosen, e = climate.look_up(where.parent, place, maps.places(state.notes_dir(state.config())), pick,
+                                           online)
     except climate.ClimateError as err:
         raise UiError(str(err)) from None
     return {"places": [{"name": p.name, "label": p.label} for p in found],

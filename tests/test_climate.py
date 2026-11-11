@@ -72,6 +72,10 @@ class StationTest(unittest.TestCase):
         self.assertIsNone(climate.station_stats(47.0, lows(years=(2001, 2015))))
         # Readings missing from every spring: no season counts.
         self.assertIsNone(climate.station_stats(47.0, lows(skip=lambda d: d.month in (2, 3))))
+        # A station that misses summer days still gives its coldest night
+        # (as Everett and Kent did not, before).
+        patchy = climate.station_stats(47.0, lows(skip=lambda d: d.month in (6, 7) and d.day % 3 != 0))
+        self.assertEqual((patchy.years, patchy.last_frost, patchy.zone), (30, "03-05", "9a"))
 
     def test_reading_dly_and_by_year_files(self):
         def line(year, month, element, values):
@@ -198,6 +202,12 @@ class UseTest(unittest.TestCase):
         self.assertIn("hardiness zone 8b", said)
         with self.assertRaisesRegex(ToolError, "No town called 'Atlantis'"):
             all_tools()["climate"].run({"place": "Atlantis"}, self.run)
+        # A place too small for the town list, found by the page's online search.
+        pass_ = {"name": "Snoqualmie Pass", "label": "Snoqualmie Pass, Washington", "lat": 47.42, "lon": -121.41}
+        found, chosen, e = climate.look_up(self.lib, "Snoqualmie Pass", search=lambda text: [pass_])
+        self.assertEqual((chosen.label, e.stations[0].row["id"]), ("Snoqualmie Pass, Washington", "USC00450872"))
+        with self.assertRaisesRegex(climate.ClimateError, "a place saved on the Map"):
+            climate.look_up(self.lib, "Atlantis", search=lambda text: [])
         # A point far outside the table's region is refused, not guessed.
         with self.assertRaisesRegex(ToolError, "2,1.. km from the nearest station"):
             all_tools()["climate"].run({"place": "41.14, -95.91"}, self.run)
