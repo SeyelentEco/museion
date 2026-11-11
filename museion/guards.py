@@ -48,6 +48,16 @@ NO_MORE_TOOLS = (
     "already found, citing each by its number."
 )
 
+
+
+def save_now(name: str) -> str:
+    """Said on the last round to an agent whose plan is not saved yet
+    (agent.toml's saves): only write_note is on offer."""
+    return (f"You are out of rounds for searching and calculating. If you were working out a plan, "
+            f"save it now as {name} with write_note, from what you have found and worked out; then "
+            "you will answer. If the question was not for a plan, answer now instead.")
+
+
 # Said once to a tool call that came back as text, while tools are still on
 # offer. Withholding them instead, as before, meant a calculation written out
 # as text was never made, and the next turn did the sum in prose unchecked.

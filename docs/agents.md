@@ -45,6 +45,7 @@ person or by a coding agent on the local model.
 | `guards` | Checks on its answers: `calculate_first`, `call_again`, `search_first` (an answer given without searching or reading any records is sent back to search), `cite_or_stand` (`museion/guards.py`). An agent with `ask_person` also gets `ask_by_card`, which sends a question written in the answer back to be asked with the tool |
 | `max_rounds` | Most tool rounds before it must answer |
 | `max_calls` | How many times one answer may call a tool, like `{ search_library = 4 }`; then the tool is taken away. `ask_person` allows 2 unless this says otherwise |
+| `saves` | The person's note its work ends in, like `garden-plan.md`: if the rounds run out before it is written, the last round offers only `write_note`, to save it (the person still allows it), and one more is for the answer |
 | `answer_tokens` | Most tokens in one model turn |
 | `max_history`, `history_chars` | How many earlier exchanges of the chat it sees, and how long each may be |
 | `compact`, `keep_rounds` | Fold old tool results into one-line stubs when the context fills, keeping the last rounds whole (`museion/compaction.py`) |

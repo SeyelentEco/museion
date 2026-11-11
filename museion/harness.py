@@ -120,6 +120,7 @@ class Harness:
         self.turns = 0  # the model's turns: what an answer reports as its rounds
         self.max_rounds = spec.max_rounds
         self.allowed: set[str] = set()  # calls the person allowed for the rest of the run
+        self.declined: set[str] = set()  # tools the person said no to in this run
         self.log = None
         self.started = time.monotonic()
 
@@ -165,6 +166,7 @@ class Harness:
 
         fired: set[str] = set()
         room = self.room()
+        crowded = was_saving = False
         while True:
             self.check_stop()
             # Another tool result must fit beside everything already here, or
@@ -180,12 +182,23 @@ class Harness:
                 if prompt_chars(messages) > room:
                     self.mark("context nearly full; answering from what was found")
                     self.round = spec.max_rounds
-            # On the last round the tools are withheld so the model must answer.
-            last = self.round >= spec.max_rounds or not self.tools
-            if self.round == spec.max_rounds and self.tools:
+                    crowded = True
+            # On the last round the tools are withheld so the model must answer,
+            # unless its plan is still to be saved: then that round is for
+            # write_note alone, and one more is for the answer.
+            saving = self.round == spec.max_rounds and not crowded and self.unsaved()
+            last = (self.round >= spec.max_rounds or not self.tools) and not saving
+            if saving:
+                messages.append(llama.user(guards.save_now(spec.saves)))
+                self.event("save_now", note=spec.saves)
+            elif (self.round == spec.max_rounds and self.tools) or (self.round == spec.max_rounds + 1 and was_saving):
                 messages.append(llama.user(guards.NO_MORE_TOOLS))
+            was_saving = saving
             self.round += 1
-            schemas = None if last else [t.schema() for t in self.tools.values()]
+            if saving:
+                schemas = [self.tools["write_note"].schema()]
+            else:
+                schemas = None if last else [t.schema() for t in self.tools.values()]
             turn = self.chat.turn(messages, schemas, spec.answer_tokens, on_token)
             self.turns += 1
             self.mark(f"turn {self.round}: {len(turn.tool_calls)} tool call(s), {len(turn.text)} chars")
@@ -229,6 +242,13 @@ class Harness:
             return Answer(renumber_citations(text, cited), used, self.reranked,
                           basis_of(bool(used), bool(self.calculations), self.used, notes_only),
                           self.calculations, self.used, self.turns, self.files)
+
+    def unsaved(self) -> bool:
+        """The agent's plan (agent.toml's saves) is not written yet, though it
+        has found or worked out something to put in it."""
+        name = self.spec.saves
+        return bool(name) and "write_note" in self.tools and "write_note" not in self.used \
+            and "write_note" not in self.declined and bool(self.sources or self.calculations)
 
     def guard_names(self) -> list[str]:
         """The agent's guards, plus those it gets for having a tool."""
@@ -326,6 +346,7 @@ class Harness:
                 if decision == "allow_run":
                     self.allowed.add(key)
                 elif decision != "allow":
+                    self.declined.add(name)
                     return (f"The person declined: {note or 'no reason given'}. Do not try this "
                             "again; carry on another way, or answer with what you have.")
         t0 = time.monotonic()

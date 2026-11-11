@@ -7,8 +7,10 @@ for the date once.
 
 1. Know the plot (size), the climate (the frost dates in the almanac, or how
    cold the winter is) and how many people it should feed. Check your notes
-   and the person's garden-plan.md (read_note) first; ask for what is
-   missing and note it.
+   and the person's garden-plan.md (read_note) first; ask once for what is
+   missing (all of it in one question) and note it. If they do not know,
+   go on from what they said, like "cold winters", and say what you
+   assumed.
 2. Search for the crops that suit it, their spacing, when to sow, and how to
    keep seed. Name several crops in one search rather than one search per
    crop.

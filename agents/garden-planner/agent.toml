@@ -16,6 +16,10 @@ max_rounds = 14
 # On the same model, with searching spent, it once called calculate nine
 # times (sqrt(2), sqrt(4) ... sqrt(81)) until the rounds ran out.
 max_calls = { search_library = 4, calculate = 6 }
+# On the 35B, a plan for a 10 by 20 metre plot used every round (notes, the
+# almanac, two questions, four searches, five sums) and was never saved: so
+# when the rounds run out, the last one is for saving it.
+saves = "garden-plan.md"
 examples = [
   "We have a 10 by 20 metre plot and cold winters. What should we plant to feed four?",
   "It's March. What should I be doing in the garden now?",
