@@ -250,7 +250,12 @@ class Harness:
         the plan, is saved instead, once the person allows it (write_note
         lists the sources it cites). On the 35B, offered only write_note for
         a last round, it wrote the plan as its answer instead."""
-        args = json.dumps({"name": self.spec.saves, "text": text.strip()}, ensure_ascii=False)
+        text = text.strip()
+        if not text.startswith("#"):
+            # On the 35B, asked for a title, it began "Based on your 200
+            # square metre plot..." all the same.
+            text = f"# {Path(self.spec.saves).stem.replace('-', ' ').replace('_', ' ').capitalize()}\n\n{text}"
+        args = json.dumps({"name": self.spec.saves, "text": text}, ensure_ascii=False)
         call = {"id": "save_answer", "type": "function", "function": {"name": "write_note", "arguments": args}}
         self.event("save_answer", note=self.spec.saves)
         self.call(call, f"The plan, saved as {self.spec.saves} so it can be found and changed later.")

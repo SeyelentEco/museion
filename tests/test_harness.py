@@ -243,7 +243,7 @@ class HarnessTest(unittest.TestCase):
         self.assertIsNone(chat.calls[2][1])
         self.assertEqual(answer.text, "Plant potatoes on 40 m2 [1].")
         self.assertEqual((notes_dir / "plan.md").read_text(encoding="utf-8"),
-                         "Plant potatoes on 40 m2 [2].\n\nSources:\n[2] Book 2, page 2\n")
+                         "# Plan\n\nPlant potatoes on 40 m2 [2].\n\nSources:\n[2] Book 2, page 2\n")
         self.assertEqual(answer.files, ["notes/plan.md"])
         self.assertEqual([r.tool for r in person.requests], ["write_note"], "the person still allows it")
 
