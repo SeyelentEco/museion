@@ -163,7 +163,8 @@ region's stations' records, plus GeoNames' towns of 1,000 people or more
 `climate/sources/`, keeping only the daily lows (gzipped), so `--offline`
 can make the table again with no internet, from the stations it has (it
 says how many it never downloaded). The table and town list are a few MB
-at most. A home area for Seattle (28 stations) took 50 s and kept 18.5 MB.
+at most. A home area for Seattle (28 stations) took 52 s, downloaded 115 MB
+and kept 18.5 MB.
 
 ## How they are searched and cited
 
