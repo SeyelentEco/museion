@@ -204,7 +204,8 @@ class UseTest(unittest.TestCase):
             all_tools()["climate"].run({"place": "Atlantis"}, self.run)
         # A place too small for the town list, found by the page's online search.
         pass_ = {"name": "Snoqualmie Pass", "label": "Snoqualmie Pass, Washington", "lat": 47.42, "lon": -121.41}
-        found, chosen, e = climate.look_up(self.lib, "Snoqualmie Pass", search=lambda text: [pass_])
+        found, chosen, e = climate.look_up(self.lib, "Snoqualmie Pass", search=lambda text: [pass_, pass_])
+        self.assertEqual(len(found), 1, "one place given twice is listed once")
         self.assertEqual((chosen.label, e.stations[0].row["id"]), ("Snoqualmie Pass, Washington", "USC00450872"))
         with self.assertRaisesRegex(climate.ClimateError, "a place saved on the Map"):
             climate.look_up(self.lib, "Atlantis", search=lambda text: [])
@@ -308,6 +309,8 @@ class BuildTest(unittest.TestCase):
         self.assertEqual((towns[0].label, towns[0].elev_m), ("SeaTac, Washington, US", 110.0))
         kept = gzip.decompress((lib / "climate" / "sources" / "stations" / "USW00024233.dly.gz").read_bytes())
         self.assertNotIn(b"TMAX", kept, "only the lows are kept")
+        kept_bytes = sum(f.stat().st_size for f in (lib / "climate" / "sources").rglob("*") if f.is_file())
+        self.assertGreater(info["downloaded_bytes"], kept_bytes, "what came over the internet, not what is kept")
         # Again with no internet: the same table from what was kept.
         (lib / "climate" / climate.STATIONS).unlink()
         climate.build(lib, "US-WA", None, offline=True)
@@ -346,9 +349,14 @@ class BuildTest(unittest.TestCase):
             climate.build(lib, "US-WA", get, stop=stop)
         self.assertFalse((lib / "climate" / climate.STATIONS).exists())
         self.assertTrue((lib / "climate" / "sources" / "ghcnd-stations.txt.gz").is_file(), "kept, gzipped")
+        # With no internet, a station never downloaded is left out, and said.
+        with self.assertRaisesRegex(climate.ClimateError, "None of the 1 weather stations in US-WA"):
+            climate.build(lib, "US-WA", None, offline=True)
         asked.clear()
         climate.build(lib, "US-WA", get)
         self.assertNotIn(f"{climate.NOAA}/ghcnd-stations.txt", asked, "carried on from what was kept")
+        info = climate.build(lib, "US-WA UK", None, offline=True)
+        self.assertEqual((info["stations"], info["never_downloaded"]), (1, 1))
 
 
 class AreaTest(unittest.TestCase):

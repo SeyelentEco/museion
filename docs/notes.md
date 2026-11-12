@@ -156,11 +156,14 @@ How it is worked out (`museion/climate.py`):
 states or provinces (`US-WA CA-BC`), `box:south,west,north,east`, or
 `near:lat,lon,km` (what a home area is), several at once. A whole state can
 mean a few hundred stations and a GB or more of downloads; a home area is
-capped at 40. Each build adds to the table already there. The build downloads NOAA's station list and each of the region's
-stations' records, plus GeoNames' towns of 1,000 people or more (CC BY 4.0)
-for finding a place by name. It keeps them in `climate/sources/`, keeping
-only the daily lows (gzipped), so `--offline` can make the table again with
-no internet. The table and town list are a few MB at most.
+capped at 40 (`--most 40` does the same). Each build adds to the table
+already there. The build downloads NOAA's station list and each of the
+region's stations' records, plus GeoNames' towns of 1,000 people or more
+(CC BY 4.0) for finding a place by name. It keeps them in
+`climate/sources/`, keeping only the daily lows (gzipped), so `--offline`
+can make the table again with no internet, from the stations it has (it
+says how many it never downloaded). The table and town list are a few MB
+at most. A home area for Seattle (28 stations) took 50 s and kept 18.5 MB.
 
 ## How they are searched and cited
 

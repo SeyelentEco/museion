@@ -15,10 +15,13 @@ def add_commands(commands) -> None:
     b = sub.add_parser("build", help="download a region's weather-station records and make the table "
                                      "(needs the internet once)")
     b.add_argument("--region", required=True,
-                   help="countries by GHCN code (US, UK, CA ...), states or provinces (US-WA CA-BC), or "
-                        "box:south,west,north,east; several separated by spaces")
+                   help="countries by GHCN code (US, UK, CA ...), states or provinces (US-WA CA-BC), "
+                        "box:south,west,north,east or near:lat,lon,km; several separated by spaces")
     b.add_argument("--library", type=Path, required=True, help="the library: the table goes in its climate folder")
-    b.add_argument("--offline", action="store_true", help="make it again from what was downloaded before")
+    b.add_argument("--offline", action="store_true", help="make it again from what was downloaded before "
+                   "(stations never downloaded are left out)")
+    b.add_argument("--most", type=int, help="for a near: area, at most this many stations, nearest first and "
+                   "then spread out (a home area takes 40)")
     b.add_argument("--years", default=f"{climate.YEARS[0]}-{climate.YEARS[1]}", help="the years to average")
     b.set_defaults(run=cmd_build)
     look = sub.add_parser("lookup", help="the frost dates and zone of a place")
@@ -39,9 +42,13 @@ def cmd_build(args) -> None:
         elif step == "towns" and done == 0:
             print("  towns", flush=True)
 
-    info = climate.build(args.library, args.region, offline=args.offline, years=years, report=report)
+    info = climate.build(args.library, args.region, offline=args.offline, years=years, report=report,
+                         most=args.most)
     print(f"\nMade {info['folder']}: {info['stations']} stations, {info['towns']} towns, "
           f"{info['downloaded_bytes'] / 1e6:.1f} MB downloaded")
+    if info["never_downloaded"]:
+        print(f"{info['never_downloaded']} of the region's stations were never downloaded, so they are left out. "
+              "Run it again with the internet to add them.")
 
 
 def cmd_lookup(args) -> None:

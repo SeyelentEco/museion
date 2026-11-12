@@ -348,11 +348,12 @@ class Fetcher:
         if self.offline or self.get is None:
             raise ClimateError(f"{name} was never downloaded, and this is building with no internet.")
         try:
-            data = keep(self.get(url))
+            raw = self.get(url)
         except (OSError, urllib.error.URLError) as e:
             from museion.osm import reason
             raise ClimateError(f"Could not download {url} (this needs the internet): {reason(e)}") from None
-        self.downloaded += len(data)
+        self.downloaded += len(raw)  # what came over the internet, not what is kept
+        data = keep(raw)
         path.parent.mkdir(parents=True, exist_ok=True)
         part = path.with_name(path.name + ".part")
         part.write_bytes(data)
@@ -412,10 +413,16 @@ def build(library_dir: Path, region_text: str, get: Callable[[str], bytes] | Non
         lat, lon, _ = region.circles[0]
         picked = thin(picked, lat, lon, most)
     rows = []
+    skipped = 0
     for i, s in enumerate(picked):
         if stop is not None and stop.is_set():
             raise ClimateError(STOPPED)
         report("station", i, len(picked))
+        if offline and not (fetch.folder / f"stations/{s.id}.dly.gz").is_file():
+            # Made again with no internet: the stations a home area left out
+            # (most) or a stopped build never reached are left out again.
+            skipped += 1
+            continue
         st = station_stats(s.lat, dly_lows(fetch.lows(s.id)), years, min_years)
         report("bytes", fetch.downloaded, 0)
         if st is not None:
@@ -439,7 +446,7 @@ def build(library_dir: Path, region_text: str, get: Callable[[str], bytes] | Non
             "towns": len(towns), "built": datetime.date.today().isoformat(), "source": SOURCE}
     write_table(where, rows, info)
     report("towns", 1, 1)
-    return {**info, "downloaded_bytes": fetch.downloaded, "folder": str(where)}
+    return {**info, "downloaded_bytes": fetch.downloaded, "folder": str(where), "never_downloaded": skipped}
 
 
 def near_towns(fetch: Fetcher, rows: list[dict[str, str]]) -> list[Place]:
@@ -709,7 +716,8 @@ def at_point(library_dir: Path, lat: float, lon: float) -> Estimate:
     e = estimate(read_table(where), lat, lon, height_near(where, lat, lon))
     if e.stations[0].km > FAR_KM:
         raise ClimateError(f"That point is {e.stations[0].km:,.0f} km from the nearest station in the climate "
-                           f"table, which covers {about(where).get('region', 'another region')}.")
+                           f"table, which covers {about(where).get('region', 'another region')}. Setting up a home "
+                           "area there (Settings) would add it.")
     return e
 
 
@@ -730,8 +738,13 @@ def look_up(library_dir: Path, text: str, saved: list[dict] = (), pick: int = 0,
     table = read_table(where)
     found = find_place(text, where, saved)
     if not found and search is not None:
-        found = [Place(r["name"], r.get("label") or r["name"], float(r["lat"]), float(r["lon"]))
-                 for r in search(text)][:8]
+        seen = set()
+        for r in search(text):
+            label = r.get("label") or r["name"]
+            if label not in seen:  # the place search can give one place twice
+                seen.add(label)
+                found.append(Place(r["name"], label, float(r["lat"]), float(r["lon"])))
+        found = found[:8]
     if not found:
         raise ClimateError(f"No town called {text.strip()!r} in the climate table's region "
                            f"({about(where).get('region', 'unknown')}). Try a bigger town nearby, a place "
@@ -741,6 +754,6 @@ def look_up(library_dir: Path, text: str, saved: list[dict] = (), pick: int = 0,
     e = estimate(table, chosen.lat, chosen.lon, elev)
     if e.stations[0].km > FAR_KM:
         raise ClimateError(f"{chosen.label} is {e.stations[0].km:,.0f} km from the nearest station in the climate "
-                           f"table, which covers {about(where).get('region', 'another region')}: a table for that "
-                           "region would be needed (museion climate build).")
+                           f"table, which covers {about(where).get('region', 'another region')}. Setting up a home "
+                           "area there (Settings) would add it.")
     return found, chosen, e
