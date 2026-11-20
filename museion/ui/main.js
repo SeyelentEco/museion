@@ -9,6 +9,7 @@
 //   radio.js     the Radio tab and its card in Settings
 //   evals.js     the Evals tab        dots.js     the header's service dots
 //   settings.js  the Settings tab     tabs.js     switching tabs
+//   home.js      your home area, in Settings and first-run set-up
 //   welcome.js   first-run set-up     dom.js      small helpers
 
 import { closeEvents, invoke, listen } from './api.js';
@@ -24,6 +25,7 @@ import './radio.js';
 import './library.js';
 import './evals.js';
 import './settings.js';
+import './home.js';
 import './welcome.js';
 import './prepare.js';
 

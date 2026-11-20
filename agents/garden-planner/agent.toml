@@ -6,14 +6,21 @@
 name = "Garden planner"
 goal = "Plan a food garden: what to plant, when, spacing and how much seed, for the plot and climate."
 min_tier = "Capable"
-tools = ["search_library", "read_page", "calculate", "notes", "read_note", "write_note", "ask_person"]
+tools = ["search_library", "read_page", "calculate", "almanac", "climate", "notes", "read_note", "write_note", "ask_person"]
 guards = ["calculate_first", "call_again", "search_first", "cite_or_stand"]
 # 14, not 10: on the 35B a first plan took nine searches and the rounds ran
 # out before it could calculate or save garden-plan.md.
 max_rounds = 14
 # On Qwen3.6-35B it searched twelve times for a 10 by 20 metre plot, told
 # to stop after three, and ran out of rounds before calculating or saving.
-max_calls = { search_library = 4 }
+# On the same model, with searching spent, it once called calculate nine
+# times (sqrt(2), sqrt(4) ... sqrt(81)) until the rounds ran out.
+max_calls = { search_library = 4, calculate = 6 }
+# On the 35B, a plan for a 10 by 20 metre plot used every round (notes, the
+# almanac, questions, four searches, five or six sums) and was never saved;
+# offered only write_note for the last round, it answered instead. So when
+# the rounds run out, its answer is saved as the plan (the person allows it).
+saves = "garden-plan.md"
 examples = [
   "We have a 10 by 20 metre plot and cold winters. What should we plant to feed four?",
   "It's March. What should I be doing in the garden now?",

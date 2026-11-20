@@ -5,10 +5,12 @@ import { invoke, listen } from './api.js';
 import { pickInto } from './chooser.js';
 import { $, el, gb, statusMsg } from './dom.js';
 import { refreshServiceDots } from './dots.js';
+import { homeForm } from './home.js';
 import { refreshSetup } from './settings.js';
 import { leaveWelcome, onTab } from './tabs.js';
 
 let plan = null;
+const home = homeForm($('#home-welcome'), { button: false });
 
 async function loadPlan() {
   const dl = $('#wiz-plan');
@@ -123,10 +125,26 @@ $('#wiz-go').addEventListener('click', async () => {
     showProgress('Building the index…', null);
     await invoke('build_index', { force: false });
 
-    showProgress('Ready. Ask something.', 1);
+    // Last, and not a reason to stop: everything else works without it,
+    // and Settings can do it again.
+    let homeTrouble = '';
+    if (home.wanted()) {
+      try {
+        await home.run((t) => showProgress(`Your home area: ${t}`, null));
+      } catch (e) {
+        homeTrouble = String(e);
+      }
+    }
+
     statusMsg('Set-up complete.');
     await refreshSetup();
     await refreshServiceDots();
+    if (homeTrouble) {
+      showProgress(`Ready, but your home area was not set up: ${homeTrouble} You can set it up in Settings.`, 1);
+      $('#wiz-done').hidden = false;
+      return;
+    }
+    showProgress('Ready. Ask something.', 1);
     // Done: the set-up screen has served its purpose.
     setTimeout(() => leaveWelcome('ask'), 1200);
   } catch (e) {
@@ -137,9 +155,12 @@ $('#wiz-go').addEventListener('click', async () => {
   }
 });
 
+$('#wiz-done').addEventListener('click', () => leaveWelcome('ask'));
+
 $('#welcome-skip').addEventListener('click', (e) => {
   e.preventDefault();
   leaveWelcome('setup');
 });
 
 onTab('welcome', loadPlan);
+onTab('welcome', home.refresh);

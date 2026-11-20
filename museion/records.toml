@@ -53,3 +53,12 @@ file = "household.csv"
 title = "Household"
 about = "Who lives here: ages, health needs, medicines taken every day."
 columns = ["name", "age", "needs", "daily_medicines", "notes"]
+
+[[records]]
+file = "almanac.csv"
+title = "Almanac"
+about = "What to do in the garden, kitchen, with animals and around the house, timed from your frost dates (6-8 weeks before last frost), a month (mid March) or a date (04-15)."
+columns = ["task", "kind", "when", "notes"]
+# A new almanac starts with common rules of thumb (almanac-start.csv), for the
+# person to keep, change or delete. museion/almanac.py reads it.
+start_with = "almanac-start.csv"

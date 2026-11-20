@@ -120,6 +120,8 @@ class Harness:
         self.turns = 0  # the model's turns: what an answer reports as its rounds
         self.max_rounds = spec.max_rounds
         self.allowed: set[str] = set()  # calls the person allowed for the rest of the run
+        self.declined: set[str] = set()  # tools the person said no to in this run
+        self.saving = False  # the rounds ran out with the plan unsaved: the answer is saved
         self.log = None
         self.started = time.monotonic()
 
@@ -181,9 +183,12 @@ class Harness:
                     self.mark("context nearly full; answering from what was found")
                     self.round = spec.max_rounds
             # On the last round the tools are withheld so the model must answer.
+            # If its plan is not saved yet, it is told that its answer will be.
             last = self.round >= spec.max_rounds or not self.tools
             if self.round == spec.max_rounds and self.tools:
-                messages.append(llama.user(guards.NO_MORE_TOOLS))
+                self.saving = self.unsaved()
+                messages.append(llama.user(guards.answer_is_saved(spec.saves) if self.saving
+                                           else guards.NO_MORE_TOOLS))
             self.round += 1
             schemas = None if last else [t.schema() for t in self.tools.values()]
             turn = self.chat.turn(messages, schemas, spec.answer_tokens, on_token)
@@ -225,10 +230,35 @@ class Harness:
                               self.calculations, self.used, self.turns, self.files)
             cited = [n for n in cited_numbers(text) if n <= len(self.sources)]
             used = [self.sources[n - 1] for n in cited]
+            if self.saving and self.unsaved():
+                self.save_answer(text)
             notes_only = bool(used) and all(h.book == NOTES_BOOK for h in used)
             return Answer(renumber_citations(text, cited), used, self.reranked,
                           basis_of(bool(used), bool(self.calculations), self.used, notes_only),
                           self.calculations, self.used, self.turns, self.files)
+
+    def unsaved(self) -> bool:
+        """The agent's plan (agent.toml's saves) is not written yet, though it
+        has worked something out to put in it. A question with nothing
+        calculated ("what should I do now?") is not a plan to save."""
+        name = self.spec.saves
+        return bool(name) and "write_note" in self.tools and "write_note" not in self.used \
+            and "write_note" not in self.declined and bool(self.calculations)
+
+    def save_answer(self, text: str) -> None:
+        """The rounds ran out before the agent saved its plan: its answer,
+        the plan, is saved instead, once the person allows it (write_note
+        lists the sources it cites). On the 35B, offered only write_note for
+        a last round, it wrote the plan as its answer instead."""
+        text = text.strip()
+        if not text.startswith("#"):
+            # On the 35B, asked for a title, it began "Based on your 200
+            # square metre plot..." all the same.
+            text = f"# {Path(self.spec.saves).stem.replace('-', ' ').replace('_', ' ').capitalize()}\n\n{text}"
+        args = json.dumps({"name": self.spec.saves, "text": text}, ensure_ascii=False)
+        call = {"id": "save_answer", "type": "function", "function": {"name": "write_note", "arguments": args}}
+        self.event("save_answer", note=self.spec.saves)
+        self.call(call, f"The plan, saved as {self.spec.saves} so it can be found and changed later.")
 
     def guard_names(self) -> list[str]:
         """The agent's guards, plus those it gets for having a tool."""
@@ -326,6 +356,7 @@ class Harness:
                 if decision == "allow_run":
                     self.allowed.add(key)
                 elif decision != "allow":
+                    self.declined.add(name)
                     return (f"The person declined: {note or 'no reason given'}. Do not try this "
                             "again; carry on another way, or answer with what you have.")
         t0 = time.monotonic()

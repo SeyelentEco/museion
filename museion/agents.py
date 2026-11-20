@@ -47,6 +47,10 @@ class AgentSpec:
     # How many times one answer may call a tool, by tool name, over the
     # tool's own limit (ask_person: 2). Past it the tool is taken away.
     max_calls: dict = field(default_factory=dict)
+    # The person's note its work ends in (garden-plan.md). If the rounds run
+    # out before it is written, its answer is saved as that note instead
+    # (harness.save_answer), once the person allows it.
+    saves: str = ""
     answer_tokens: int = 1500
     max_continuations: int = 2
     # Earlier messages of the chat carried into a new one, and how much of
@@ -269,6 +273,10 @@ def problems_of(spec: AgentSpec) -> list[str]:
                 out.append(f"max_calls names {tool}, which is not one of its tools")
             elif not isinstance(n, int) or isinstance(n, bool) or n < 1:
                 out.append(f"max_calls for {tool} must be a whole number, 1 or more")
+    if not isinstance(spec.saves, str):
+        out.append("saves must be a note's name, like garden-plan.md")
+    elif spec.saves and "write_note" not in spec.tools:
+        out.append("saves names a note, but write_note is not one of its tools")
     if spec.prompt_from == "file" and not spec.prompt.strip():
         out.append("prompt.md is missing or empty")
     if not spec.goal:

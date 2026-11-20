@@ -11,3 +11,20 @@ id = "seed-saving"
 prompt = "How do I save bean seed for next year?"
 expect_any = ["dry", "seed", "pod"]
 expect_basis = "library"
+
+[[cases]]
+id = "what-now"
+prompt = "It's March. What should I be doing in the garden now?"
+given_files = { "notes/almanac.csv" = "task,kind,when,notes\nlast frost,frost,04-20,\nfirst frost,frost,10-15,\nStart tomatoes and peppers indoors,garden,6-8 weeks before last frost,\nSow peas outdoors,garden,3-6 weeks before last frost,\nPlant garlic,garden,1-3 weeks after first frost,\n" }
+expect_tool = ["almanac", "search_library"]
+expect_any = ["tomato", "pea"]
+# Garlic is planted after the first frost: not due in March.
+must_not_contain = ["garlic"]
+
+[[cases]]
+id = "what-now-town"
+prompt = "It's March. We live in Bellevue, Washington. What should I be doing in the garden now?"
+given_files = { "notes/almanac.csv" = "task,kind,when,notes\nlast frost,frost,,\nfirst frost,frost,,\nSow peas outdoors,garden,3-6 weeks before last frost,\nStart tomatoes and peppers indoors,garden,6-8 weeks before last frost,\nPlant garlic,garden,1-3 weeks after first frost,\n", "climate/stations.csv" = "id,name,country,state,lat,lon,elev_m,years,last_frost,last_frost_late,first_frost,first_frost_early,frost_free_days,frost_years,coldest_c,zone\nUSW00024233,SEATTLE TACOMA INTL AP,US,WA,47.4444,-122.3139,113,30,03-10,04-02,11-18,11-01,252,1.00,-6.4,8b\nUSC00450872,BELLEVUE,US,WA,47.6000,-122.1500,60,25,03-28,04-20,11-02,10-20,218,1.00,-7.9,8b\n", "climate/towns.csv" = "name,label,lat,lon,elev_m,population\nBellevue,\"Bellevue, Washington, US\",47.61,-122.20,40,151854\n" }
+expect_tool = ["almanac", "search_library"]
+expect_any = ["pea"]
+must_not_contain = ["garlic"]

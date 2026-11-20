@@ -28,7 +28,7 @@ person or by a coding agent on the local model.
 | `stores-keeper` | Keeps `stores.csv` in the notes; how long things last, what expires soon | Capable |
 | `clinic` | The sick and injured, from the library's medical books (danger signs first, doses only from a cited passage); keeps the health log and medicine list | Capable |
 | `power-keeper` | What the power you have can run, how long fuel lasts, what servicing is due (`power.csv`, `maintenance.csv`) | Capable |
-| `garden-planner` | A food garden: what, when, spacing and seed; keeps `garden-plan.md` | Capable |
+| `garden-planner` | A food garden: what, when, spacing and seed; "what now?" from the almanac, with frost dates from your home area (or looked up for your town) when the almanac has none; keeps `garden-plan.md` | Capable |
 | `repair-helper` | Fixing a tool or machine step by step from the repair guides | Capable |
 | `ration-scaler` | Scales a recipe or ration to a number of people | Modest |
 | `study-guide` | Turns a topic into a numbered lesson with sources | Capable |
@@ -45,6 +45,7 @@ person or by a coding agent on the local model.
 | `guards` | Checks on its answers: `calculate_first`, `call_again`, `search_first` (an answer given without searching or reading any records is sent back to search), `cite_or_stand` (`museion/guards.py`). An agent with `ask_person` also gets `ask_by_card`, which sends a question written in the answer back to be asked with the tool |
 | `max_rounds` | Most tool rounds before it must answer |
 | `max_calls` | How many times one answer may call a tool, like `{ search_library = 4 }`; then the tool is taken away. `ask_person` allows 2 unless this says otherwise |
+| `saves` | The person's note its work ends in, like `garden-plan.md`. If the rounds run out with something calculated and that note not written, the last answer is told it is the plan, and is saved as that note with its sources listed (the person still allows it) |
 | `answer_tokens` | Most tokens in one model turn |
 | `max_history`, `history_chars` | How many earlier exchanges of the chat it sees, and how long each may be |
 | `compact`, `keep_rounds` | Fold old tool results into one-line stubs when the context fills, keeping the last rounds whole (`museion/compaction.py`) |

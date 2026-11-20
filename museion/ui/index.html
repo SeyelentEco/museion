@@ -125,10 +125,42 @@
               <button id="note-folder" type="button" class="small">Open the notes folder</button>
             </aside>
             <div class="note-detail" id="note-detail">
-              <div class="empty" id="note-empty">
-                <h1>Your notes</h1>
-                <p>Write down what you learn, what you have and what worked: a repair, a remedy, which seeds grew. Records such as stores, medicines and maintenance are tables that agents keep up to date for you, after you press Allow.</p>
-                <p class="muted">They are plain files in the library's notes folder, so any text editor opens them too. Every change keeps the version before in the folder's .history.</p>
+              <div id="note-empty">
+                <section class="coming-up" id="coming-up">
+                  <h1>Coming up</h1>
+                  <p class="muted small-print" id="coming-about">What to do now and in the next weeks, from your almanac, maintenance and medicines.</p>
+                  <ul id="coming-items" class="coming-items"></ul>
+                  <div id="coming-start" class="coming-note" hidden>
+                    <p>Start an almanac: common garden, preserving, animal and house tasks, timed from your frost dates so they fit where you live. You keep, change or delete them; it is a record like the others.</p>
+                    <button id="coming-start-go" type="button" class="primary small">Start the almanac</button>
+                  </div>
+                  <form id="frost-form" class="coming-note">
+                    <p id="frost-about" class="small-print">Your average frost dates, as month-day. Local growers, old seed packets or the library's climate maps say.</p>
+                    <div class="row">
+                      <label class="small-print">Last spring frost <input id="frost-last" type="text" placeholder="MM-DD" size="8" /></label>
+                      <label class="small-print">First autumn frost <input id="frost-first" type="text" placeholder="MM-DD" size="8" /></label>
+                      <button type="submit" class="small">Save</button>
+                    </div>
+                    <p id="frost-state" class="small-print"></p>
+                    <div id="climate-look" hidden>
+                      <div class="row">
+                        <label class="small-print">Or look them up for <input id="climate-place" type="text" placeholder="your town, or lat, lon" size="24" /></label>
+                        <button id="climate-go" type="button" class="small">Look up</button>
+                        <select id="climate-pick" class="small-print" hidden></select>
+                      </div>
+                      <p id="climate-result" class="small-print" hidden></p>
+                      <button id="climate-use" type="button" class="primary small" hidden>Use these dates</button>
+                    </div>
+                    <p id="climate-setup" class="small-print muted" hidden>Or <a href="#" id="climate-setup-link">set up
+                      your home area</a> in Settings, and Museion fills them in.</p>
+                  </form>
+                  <ul id="coming-problems" class="muted small-print"></ul>
+                </section>
+                <div class="empty">
+                  <h2>Your notes</h2>
+                  <p>Write down what you learn, what you have and what worked: a repair, a remedy, which seeds grew. Records such as stores, medicines and maintenance are tables that agents keep up to date for you, after you press Allow.</p>
+                  <p class="muted">They are plain files in the library's notes folder, so any text editor opens them too. Every change keeps the version before in the folder's .history.</p>
+                </div>
               </div>
               <div id="note-edit" hidden>
                 <div class="note-head">
@@ -356,6 +388,11 @@
               </p>
             </div>
 
+            <div class="card" id="card-home">
+              <h2>Your home area</h2>
+              <div id="home-settings" class="home-area"></div>
+            </div>
+
             <div class="card folders">
               <h2>Other content folders</h2>
               <p class="muted">
@@ -575,6 +612,12 @@
                 <button id="wiz-pick-tools" type="button">Choose…</button>
               </div>
               <dl id="wiz-plan"><dd class="muted">Working out what this machine needs…</dd></dl>
+              <div class="field">
+                <label>Your home area <span class="opt">optional</span></label>
+                <span class="what">Where you live, so the almanac knows your frost dates and hardiness zone with no
+                  internet. You can set it up later in Settings.</span>
+                <div id="home-welcome" class="home-area"></div>
+              </div>
               <div class="row">
                 <select id="wiz-bundle" aria-label="Content bundle"></select>
                 <button id="wiz-go" type="button" class="primary">Set up this machine</button>
@@ -583,6 +626,7 @@
                 <div class="bar"><div class="fill" id="wiz-fill"></div></div>
                 <div class="label" id="wiz-label"></div>
               </div>
+              <button id="wiz-done" type="button" class="primary" hidden>Go to Ask</button>
             </div>
 
             <p class="hint">

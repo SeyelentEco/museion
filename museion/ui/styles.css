@@ -766,3 +766,37 @@ td.fail { color: var(--bad); font-weight: 600; }
 .map-area { position: absolute; border: 2px dashed #c24e6b; background: rgba(194, 78, 107, 0.06); pointer-events: none; }
 .map-area[hidden], #map-canvas[hidden] { display: none; }
 #map-canvas { left: 0; top: 0; }
+
+/* The Notes tab's first page: what to do now and soon (museion/almanac.py). */
+#note-empty[hidden] { display: none; }
+.coming-up { max-width: 44rem; margin: 0.5rem auto 0; }
+.coming-up h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
+.coming-items { list-style: none; padding: 0; margin: 0.75rem 0; display: grid; gap: 0.4rem; }
+.coming-items li { display: flex; gap: 0.75rem; align-items: baseline; padding: 0.45rem 0.6rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.coming-items .when { flex: 0 0 6.5rem; font-size: 0.8rem; font-weight: 600; color: var(--ink-mid); }
+.coming-items .overdue .when { color: var(--bad); }
+.coming-items .now .when { color: var(--good); }
+.coming-items .what { flex: 1 1 auto; min-width: 0; }
+.coming-items .meta { font-size: 0.8rem; color: var(--ink-mute); }
+.coming-items .meta button { font-size: inherit; padding: 0; border: 0; background: none; color: var(--accent); cursor: pointer; text-decoration: underline; }
+.coming-items .none { border-style: dashed; color: var(--ink-mid); }
+.coming-note { margin: 0.75rem 0; padding: 0.6rem 0.75rem; border: 1px solid var(--accent-dim); border-radius: var(--radius); }
+.coming-note[hidden] { display: none; }
+.coming-note p { margin: 0 0 0.5rem; }
+.coming-note .row { flex-wrap: wrap; align-items: end; margin: 0; }
+.coming-note label { display: flex; flex-direction: column; gap: 0.15rem; }
+#coming-problems { padding-left: 1.1rem; }
+#note-items li.coming .t { font-weight: 600; }
+#note-empty .empty { margin-top: 2rem; max-width: 44rem; }
+#note-empty .empty h2 { font-size: 1.15rem; margin: 0 0 0.5rem; }
+
+/* Your home area (home.js), in Settings and first-run set-up. */
+.home-area > * + * { margin-top: 0.5rem; }
+.home-area .home-find input { flex: 1 1 auto; min-width: 0; }
+.field .home-area label.home-map { display: inline; font-weight: 400; }
+.home-area .home-found { flex: 0 0 auto; overflow: visible; }
+.home-area .home-found:empty { display: none; }
+.home-area .home-found li.chosen { outline: 2px solid var(--accent); }
+.home-area .good { color: var(--good, #2f9a4b); }
+.home-area .err { color: var(--bad, #c0392b); }
+#climate-setup[hidden] { display: none; }

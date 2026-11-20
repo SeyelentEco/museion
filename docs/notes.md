@@ -26,6 +26,7 @@ text editor opens them too and they survive Museion itself:
 | `people.csv` | name, skills, where, how_to_reach, notes | you |
 | `household.csv` | name, age, needs, daily_medicines, notes | First steps reads it |
 | `radio-messages.csv` | time, direction, from, to, channel, text | the radio ([radio.md](radio.md)) |
+| `almanac.csv` | task, kind, when, notes | you; the Garden planner reads it (see below) |
 
 The kinds are defined in `museion/records.toml`; add a line there for a new one.
 Dates are written `YYYY-MM-DD`.
@@ -41,10 +42,129 @@ Both you and the agents:
 - **You**, in the Notes tab (Save, or Ctrl+S) or in any editor.
 - **An agent**, with `write_note`, but only after you press **Allow** on a
   card that shows exactly what it will add or change (new lines, or a diff of
-  the changed ones). Deny, and nothing is written.
+  the changed ones). Deny, and nothing is written. A note (not a record)
+  that cites what the agent found, like `[2]`, gets a **Sources** list at its
+  end naming those books and pages, so the numbers still mean something
+  later.
 
-Reading is free: `list_notes`, `read_note` and `check_dates` (what expires or
-falls due soon, from a date column) need no permission.
+Reading is free: `list_notes`, `read_note`, `check_dates` (what expires or
+falls due soon, from a date column) and `almanac` (what is coming up, below)
+need no permission.
+
+## Coming up, and the almanac
+
+The Notes tab opens on **Coming up**: what to do now and in the next six
+weeks. It lists the almanac's tasks, maintenance that is due
+(`maintenance.csv`: last done plus every so many days) and medicines that
+run out (`medicines.csv`), with whatever is overdue first. Museion works the
+dates out itself (`museion/almanac.py`), not the model.
+
+The **almanac** (`almanac.csv`) is the year's work: planting, preserving,
+animals, the house. Each task says *when* the way growers say it:
+
+| When | Means |
+| --- | --- |
+| `6-8 weeks before last frost` | from 8 to 6 weeks before your average last spring frost |
+| `2 weeks after last frost`, `at first frost` | the week from that day |
+| `March`, `early March`, `mid March`, `late March`, `March to May` | that part of the year (early is the 1st to 10th, mid the 11th to 20th) |
+| `04-15`, `15 April`, `04-15 to 05-10` | a date (the week from it) or dates |
+
+Two rows of kind `frost` hold your average frost dates as month-day
+(`last frost,frost,04-20,`). Timing from them is what makes one list fit any
+climate, in either hemisphere; Coming up has a form to set them.
+
+Starting the almanac (Coming up's button, or New record… Almanac) gives you
+common rules of thumb for the garden, preserving, animals and the house
+(`museion/almanac-start.csv`), each marked as such. They are general
+practice, not from your library: keep them, change them to fit, or delete
+them, and check timings against your seed packets and the library. Add your
+own rows the same way.
+
+### Your home area
+
+**Settings → Your home area** (also offered at the end of first-run set-up)
+is where you say where you live, once, while there is internet. Type your
+town, press **Find**, pick the right one and press **Set up my home area**.
+Museion then:
+
+1. keeps it in `places.csv` as the one place of kind `home` (doing it again
+   moves that row rather than adding another);
+2. downloads the weather records of the stations around it (up to 40 within
+   150 km: the nearest 20, then ones spread further out) and builds the
+   climate table below from them, added to any table the library already
+   has;
+3. puts its frost dates and hardiness zone in `almanac.csv` (starting it if
+   there is none), unless the file has frost dates you typed yourself;
+4. if you tick it, makes a map of the area (as the Map tab's **Make a map**).
+
+It downloads about 100-200 MB (NOAA's station list and inventory, 1-4 MB
+per station, GeoNames' towns) and keeps about 20 MB of it in
+`<library>/climate/sources/`, so it can be done again with no internet.
+**Stop** stops it between stations; starting again carries on. With a home
+area set, the `almanac` tool uses its frost dates when `almanac.csv` has
+none, and the `climate` tool answers "what zone am I in?" without being
+told the town. The code is `museion/home_commands.py` and `ui/home.js`.
+
+### Frost dates and hardiness zones by place
+
+If you don't know your frost dates, Museion can look them up from weather
+stations near you, with no internet, once the library has a **climate
+table** (`<library>/climate/`): setting up your home area makes one, or
+`museion climate build` makes one for a whole region. Type your town (or
+`lat, lon`, or a saved place) under the frost form and press **Look up**. A
+place too small for the town list (a hamlet, a mountain pass) is searched for
+online when there is internet:
+
+> Station averages for Bellevue, Washington, US: last spring frost about
+> 03-28 (1 year in 10 as late as 04-20); first autumn frost about 11-02 (1
+> year in 10 as early as 10-20); about 218 frost-free days; hardiness zone
+> 8b (average coldest night -7.9 °C). From 3 weather stations (...)
+
+**Use these dates** writes them into `almanac.csv`, with the zone in a row
+of kind `zone` and where they came from in the rows' notes. Dates typed by
+hand afterwards replace them. The garden planner and the `almanac` tool look
+your town up the same way when `almanac.csv` has no frost dates, and the
+`climate` tool answers "what zone am I in?".
+
+How it is worked out (`museion/climate.py`):
+
+- The records are NOAA's daily weather-station records, **GHCN-Daily**,
+  which are public domain, for 1991-2020. Each station needs 20 of those
+  years with readings.
+- A *frost* is a daily low at or below 0 °C. The frost dates are the median
+  of the station's years. The "1 year in 10" dates are passed only one year
+  in ten: later in spring, earlier in autumn.
+- The **zone** is the USDA's: the average of each year's coldest night (zone
+  1 starts at -60 °F, each zone is 10 °F wide, with halves *a* and *b*). A
+  year counts when 80% of its three coldest months have readings.
+  It's worked out from station data the USDA's way. It is not the official
+  USDA map.
+- A place's estimate weighs the nearest stations (up to 3 within 60 km) by
+  1/distance². When the town's height is known, 100 m of height difference
+  counts like 10 km. If no station is within 60 km, the nearest one is
+  used and the answer says it's only a rough guide. A place 250 km or more
+  from every station is outside the table's region, and is refused.
+- These are averages: a frost pocket or a sheltered garden can be a week or
+  two off. Correct them once you know your own.
+
+**Making the table** needs the internet once, on any computer:
+
+    python -m museion climate build --region US-WA --library <library>
+    python -m museion climate lookup "Bellevue, Washington" --library <library>
+
+`--region` takes countries by their GHCN code (`US`, `UK`, `CA`, ...),
+states or provinces (`US-WA CA-BC`), `box:south,west,north,east`, or
+`near:lat,lon,km` (what a home area is), several at once. A whole state can
+mean a few hundred stations and a GB or more of downloads; a home area is
+capped at 40 (`--most 40` does the same). Each build adds to the table
+already there. The build downloads NOAA's station list and each of the
+region's stations' records, plus GeoNames' towns of 1,000 people or more
+(CC BY 4.0) for finding a place by name. It keeps them in
+`climate/sources/`, keeping only the daily lows (gzipped), so `--offline`
+can make the table again with no internet, from the stations it has (it
+says how many it never downloaded). The table and town list are a few MB
+at most. A home area for Seattle (28 stations) took 52 s, downloaded 115 MB
+and kept 18.5 MB.
 
 ## How they are searched and cited
 
@@ -71,7 +191,9 @@ wrote. Open the citation and it opens the note.
   `medicines.csv`.
 - **Power keeper** keeps `power.csv` and `maintenance.csv`: what the power you
   have can run, how long the fuel lasts, what servicing is due.
-- **Garden planner** keeps `garden-plan.md`.
+- **Garden planner** keeps `garden-plan.md`, and answers "what should I be
+  doing in the garden now?" from the almanac (its `almanac` tool), adding
+  the how-to from the library.
 
 An agent's test cases put their files in a scratch notes folder
 (`given_files = { "notes/stores.csv" = "..." }`), so a test never touches yours.
