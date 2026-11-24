@@ -217,7 +217,12 @@ def stage(source: Source, target: Path, *, force: bool = False, consume: bool = 
     mine = appmerge.read_tree(target / "app")
     new = _shipped(source)
     merged = appmerge.merge(base, mine, new)
-    _write_app(new_dir / "app", merged, label, source.version, aside_name)
+    # A note from an earlier upgrade stays until the person deletes it.
+    try:
+        earlier = (target / "app" / appmerge.NOTES).read_text(encoding="utf-8")
+    except OSError:
+        earlier = ""
+    _write_app(new_dir / "app", merged, label, source.version, aside_name, earlier)
     dropped = False
     if tests is not None:
         report("Testing the new version before it is used (a minute or two)")
@@ -229,7 +234,7 @@ def stage(source: Source, target: Path, *, force: bool = False, consume: bool = 
             if not keep_changes:
                 report("The tests fail with your changes in; trying the new version as shipped")
                 merged = appmerge.without_changes(base, mine, new)
-                _write_app(new_dir / "app", merged, label, source.version, aside_name)
+                _write_app(new_dir / "app", merged, label, source.version, aside_name, earlier)
                 if not tests(new_dir / "app", work / "tests.log"):
                     raise failed
                 dropped = True
@@ -321,7 +326,12 @@ def go_back(target: Path, report: Report = lambda line: None) -> tuple[str, str]
                            f"{prepare.python_exe(kept)} -m museion upgrade --back")
     report(f"Going back from {current} to {old}")
     (target / WORK / STAGED).unlink(missing_ok=True)
-    moves = switch.swap_moves(target, parts, f"{PREVIOUS}/{old}", f"{PREVIOUS}/{current}")
+    # The same version twice (one reinstalled with --force) needs two names.
+    leaving = current if current != old else f"{current}-again"
+    # What an earlier going-back left there (the Python it ran on) would
+    # stand in the way of the parts moving out.
+    shutil.rmtree(target / PREVIOUS / leaving, ignore_errors=True)
+    moves = switch.swap_moves(target, parts, f"{PREVIOUS}/{old}", f"{PREVIOUS}/{leaving}")
     try:
         switch.switch(target, {"from": current, "to": old, "moves": moves, "parts": parts, "back": True}, report)
     except switch.Refused as e:
@@ -342,15 +352,15 @@ def _shipped(source: Source) -> dict[str, bytes]:
     return {f.relative_to(source.app).as_posix(): f.read_bytes() for f in prepare.app_files(source.app)}
 
 
-def _write_app(folder: Path, merged: appmerge.Result, old: str, new: str, aside_name: str) -> None:
+def _write_app(folder: Path, merged: appmerge.Result, old: str, new: str, aside_name: str, earlier: str = "") -> None:
     shutil.rmtree(folder, ignore_errors=True)
     for path, data in merged.files.items():
         target = folder / path
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(data)
-    notes = appmerge.notes(merged, old, new, aside_name)
+    notes = "\n\n".join(text.strip() for text in (appmerge.notes(merged, old, new, aside_name), earlier) if text.strip())
     if notes:
-        (folder / appmerge.NOTES).write_text(notes, encoding="utf-8")
+        (folder / appmerge.NOTES).write_text(notes + "\n", encoding="utf-8")
 
 
 def _write_zip(path: Path, files: dict[str, bytes]) -> None:

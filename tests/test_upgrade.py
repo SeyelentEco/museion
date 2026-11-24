@@ -222,6 +222,14 @@ class MyChanges(UpgradeCase):
         self.assertEqual(upgrade.local_changes(self.old), {})
         self.assertEqual(switch.history(self.old)[-1]["aside"], ["museion/ask.py"])
 
+    def test_a_note_from_an_earlier_upgrade_is_kept(self):
+        write(self.old / "app" / "museion" / "ask.py", code("0.1.0")["museion/ask.py"].replace("'old'", "'mine'"))
+        self.install()
+        newer = make_copy(self.new.parent / "newer", "0.3.0", code("0.3.0", {"museion/ask.py": NEW_ASK}))
+        upgrade.install(upgrade.source_of(newer), self.old, tests=passes)
+        self.assertIn("could not carry over", self.app(appmerge.NOTES))
+        self.assertTrue((self.old / "my-changes" / "from-0.1.0-to-0.2.0" / "museion" / "ask.py").is_file())
+
     def test_changes_that_break_the_new_version_are_set_aside(self):
         write(self.old / "app" / "museion" / "mine.py", "breaks the tests\n")
         outcome = self.install(tests=lambda app, log: not (app / "museion" / "mine.py").exists())
@@ -249,11 +257,21 @@ class GoingBack(UpgradeCase):
         skip = ("previous/", "support/installed.json", *launchers.launchers())
         self.assertEqual(tree(self.old, *skip), before)
         self.assertEqual(upgrade.previous_version(self.old), "0.3.0")
-        # Going back can itself be undone.
+        # Going back can itself be undone, whatever the first time left behind.
+        write(self.old / "previous" / "0.1.0" / "python" / "bin" / "python3", "the Python that ran the going back")
         self.assertEqual(upgrade.go_back(self.old), ("0.1.0", "0.3.0"))
         self.assertEqual((self.old / "python" / "bin" / "python3").read_text(), "the interpreter py-2")
         self.assertEqual(self.app("museion/mine.py"), "my own module\n")
         self.assertEqual([p.name for p in (self.old / "previous").iterdir()], ["0.1.0"])
+
+    def test_back_from_a_version_installed_over_itself(self):
+        self.install()
+        again = make_copy(self.new.parent / "again", "0.2.0", code("0.2.0", {"museion/ask.py": "reinstalled\n"}))
+        upgrade.install(upgrade.source_of(again), self.old, tests=passes, force=True)
+        self.assertEqual(upgrade.go_back(self.old), ("0.2.0", "0.2.0"))
+        self.assertEqual(self.app("museion/ask.py"), NEW_ASK)
+        self.assertEqual(upgrade.go_back(self.old), ("0.2.0", "0.2.0-again"))
+        self.assertEqual(self.app("museion/ask.py"), "reinstalled\n")
 
     def test_nothing_to_go_back_to(self):
         with self.assertRaisesRegex(UpgradeError, "no previous version"):
