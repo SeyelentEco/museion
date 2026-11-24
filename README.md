@@ -17,7 +17,7 @@ questions.
 
 ---
 
-## Three things to be honest about up front
+## Two things to be honest about up front
 
 **1. Setting this up requires internet. Using it does not.**
 
@@ -35,23 +35,6 @@ otherwise. It contains the best freely-licensed reference corpus that exists, ma
 searchable offline, with citations so you can judge the source yourself. Where the library
 is silent, Hypatia is built to say so rather than invent something — see
 [docs/safety.md](docs/safety.md).
-
-**3. It is early, and most of its code was written by an AI coding assistant.**
-
-Museion is a hobby project at version 0.2. What it should do, how it should behave when
-it does not know, and the testing on a real computer are a person's work; the code and
-most of these documents were written with Claude Code, and the commits are marked as
-such. What stands behind it instead of years of use: several hundred unit tests
-that run offline in under a minute, on Windows, macOS and Linux for every change; a fixed
-benchmark of questions scored by machine ([docs/evals.md](docs/evals.md)); and comments
-throughout the code that say why it is the way it is.
-
-What has been run for real, by a person: Windows with an NVIDIA RTX 3060 (12 GB), which is
-where nearly all of the testing happened, and Linux with no graphics card. A Mac, and
-Linux with a graphics card, have only been checked by the automated builds and by tests
-that stand in for the hardware. The radio has only met simulated radios. If you run it on
-something else, [an issue](https://github.com/SeyelentEco/museion/issues) saying what
-happened is the most useful thing you can send.
 
 ---
 
