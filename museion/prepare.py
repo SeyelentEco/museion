@@ -44,7 +44,7 @@ HEADROOM = 1 << 30
 # for the coding agent. A new folder at the top of the repository belongs here
 # too, or drives and releases go out without it (the tests check).
 APP_PARTS = ["museion", "agents", "catalog", "models", "tools", "drive", "evals", "tests", "docs",
-             "AGENTS.md", "README.md", "CHANGELOG.md", "LICENSE"]
+             "AGENTS.md", "README.md", "CHANGELOG.md", "CONTRIBUTING.md", "SECURITY.md", "LICENSE"]
 
 # A pristine copy of app/, for undoing every change at once.
 ORIGINAL_ZIP = "museion-app-original.zip"

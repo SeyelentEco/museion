@@ -2,8 +2,7 @@
 
 The calculator computes doses, so it must give the same answers as the Rust
 version it replaces. The tables at the bottom are Rust's own output: each
-expression was run through the Rust calc.rs (now on the archive/rust-app
-branch), unchanged, and
+expression was run through the Rust calc.rs, unchanged, and
 the exact value (to the last bit), formatted text, or error message it gave is
 what the Python version is held to here."""
 

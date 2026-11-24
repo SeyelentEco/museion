@@ -177,10 +177,6 @@ catalogue, added a rule to the assistant's instructions, and found and fixed a b
 its symptom alone; the small 4B model cannot be relied on for this. See
 [docs/python.md](docs/python.md).
 
-Museion was first written in Rust and TypeScript, as a Tauri desktop app. That version is
-kept on the [`archive/rust-app`](https://github.com/SeyelentEco/museion/tree/archive/rust-app)
-branch; the Python version reads the indexes and settings it wrote.
-
 ---
 
 ## Design

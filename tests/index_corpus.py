@@ -11,9 +11,8 @@ Python index must open that file and return the same hits in the same order,
 and the Python indexer must build the same rows from the same library.
 
 The fixtures are a record, not something to rebuild: the Rust code that made
-them is on the archive/rust-app branch (with the probe that wrote
-rust-search.json, tests/fixtures/rust_probe.rs), and they are what proves an
-index a person built with the Rust version still works. If the index is
+them is no longer in this repository, and they are what proves an index a
+person built with the Rust version still works. If the index is
 changed on purpose so that they no longer match, say so in the change, and
 keep a test that opens the old file.
 """

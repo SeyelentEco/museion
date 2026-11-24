@@ -2,10 +2,8 @@
 
 Museion was rewritten from Rust and TypeScript into plain Python, so that
 someone who has been offline for a long time can change it themselves with a
-local coding agent (opencode on the same local model Museion runs). The Rust
-and TypeScript version is kept on the
-[`archive/rust-app`](https://github.com/SeyelentEco/museion/tree/archive/rust-app)
-branch; this page says how the Python version works, and what the rewrite found.
+local coding agent (opencode on the same local model Museion runs). This page
+says how the Python version works, and what the rewrite found.
 
 The rules the Python code keeps:
 
@@ -26,7 +24,7 @@ The rules the Python code keeps:
 | 2 | Browser UI in plain HTML and JavaScript | Done: `python -m museion` opens it (see below); every screen of the Rust app |
 | 3 | The drive: portable mode, prepare, `AGENTS.md`, opencode | Done: tested on a real PC with real models (see [The drive](#the-drive-and-changing-museion)) |
 | 4 | Rehearse offline edits with a local coding agent | Done: three tasks on a drive with the 35B, each re-run after `AGENTS.md` was fixed (see [What phase 4 found](#what-phase-4-found)) |
-| 5 | Retire the Rust code | Done: the Rust and TypeScript app moved to the `archive/rust-app` branch, the Node scripts became commands, the `.toml` files became the only data, and a release is a zip per platform (see [What phase 5 changed](#what-phase-5-changed)) |
+| 5 | Retire the Rust code | Done: the Rust and TypeScript app was removed, the Node scripts became commands, the `.toml` files became the only data, and a release is a zip per platform (see [What phase 5 changed](#what-phase-5-changed)) |
 
 ## Running it
 
@@ -309,9 +307,8 @@ Still rough:
 
 ## What phase 5 changed
 
-- The Rust and TypeScript app (`crates/`, `apps/`, Cargo and npm) moved to the
-  `archive/rust-app` branch, at the last commit where both versions lived side
-  by side, and its release job went with it.
+- The Rust and TypeScript app (`crates/`, `apps/`, Cargo and npm) was removed,
+  and its release job went with it.
 - The Node scripts became commands: `fetch.js` is `fetch`, `verify.js` is
   `verify --library`, `catalog-sync.js` is `sync-source` and `check-sources`,
   and `retrieval-eval.mjs` is `retrieval-eval`, its questions now in
