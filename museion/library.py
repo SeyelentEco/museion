@@ -42,14 +42,17 @@ def plan_item(id: str, title: str, size_bytes: int) -> dict:
 
 
 def bundle_items() -> list[dict]:
-    """Every bundle with the total size of its archives."""
-    return [plan_item(b.id, b.title, sum(s.size_bytes for s in catalog.bundle(b.id)[1]))
-            for b in catalog.bundles()]
+    """Every bundle with the total size of its archives, smallest first."""
+    items = [{**plan_item(b.id, b.title, sum(s.size_bytes for s in catalog.bundle(b.id)[1])),
+              "description": b.description} for b in catalog.bundles()]
+    return sorted(items, key=lambda b: b["size_bytes"])
 
 
 def setup_plan(state: AppState) -> dict:
     """What a first run on this machine would fetch, and how big it is, so
-    the person can decide before anything downloads."""
+    the person can decide before anything downloads. The chat model is the
+    recommended one; the wizard's model step offers the others
+    (model_choice.py)."""
     hw = state.hardware()
     chat = catalog.chat_model_for(hw.tier, hw.system_ram_mb)
     reranker = catalog.reranker_model()
@@ -59,7 +62,29 @@ def setup_plan(state: AppState) -> dict:
         "reranker": plan_item(reranker.id, reranker.title, reranker.size_bytes) if reranker else None,
         "tools": [plan_item(key, name, size) for name, key, size in tools.plan(hw.accelerator)],
         "bundles": bundle_items(),
+        # One folder to offer someone who has not chosen any yet; from a
+        # drive or an unzipped release the config already names them.
+        "suggested_base": str(Path.home() / "Museion"),
+        "portable": bool(state.drive),
     }
+
+
+def setup_room(state: AppState, folders: list[str]) -> list[dict]:
+    """Free space for each folder the set-up screen is about to fill, and
+    which drive it is on, so the wizard can refuse before the first byte
+    rather than fail at 98%. A folder that does not exist yet is judged by
+    the nearest one above it that does."""
+    out = []
+    for text in folders:
+        entry = {"path": text, "free_bytes": None, "volume": ""}
+        if text.strip():
+            try:
+                entry["free_bytes"] = disk.free_space(Path(text))
+                entry["volume"] = disk.volume_name(Path(text))
+            except OSError:
+                pass
+        out.append(entry)
+    return out
 
 
 def progress(state: AppState, item: str, received: int, total: int, note: str = "") -> None:

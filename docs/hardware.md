@@ -22,6 +22,32 @@ names the tier and this fetches its model like any other content:
 python -m museion fetch qwen3.6-35b-a3b-q4 --dest /path/to/models
 ```
 
+## Choosing a model
+
+The set-up wizard's **Model** step, and **Settings › Models › Help me choose a model**,
+show this for the computer you are sitting at. In short:
+
+| Model | Download | Needs | Can | Cannot |
+|---|---|---|---|---|
+| Qwen3 4B | 2.3 GB | Any computer, no graphics card needed | Answer from the library with citations; the librarian and ration scaler agents | Run the other agents; change Museion's code with Edit Museion; reason as well as the big ones |
+| Qwen3.6 35B-A3B Q4 (recommended from 8 GB cards up) | 21 GB | Graphics card with 8 GB + 24 GB system memory, or a Mac with 32 GB | Everything: every agent, 28 of 29 on the benchmark, edits Museion's code offline | — |
+| Gemma 4 26B-A4B Q4 | 16 GB | The same | Every agent; tied Qwen on the benchmark | Match Qwen's speed on a 12 GB card; not yet tried with Edit Museion |
+| Qwen3.6 35B-A3B Q8 | 34 GB | Graphics card with 32 GB, or a Mac with 64 GB | Everything, slightly better | Run well on less |
+
+Two pieces of advice the chooser gives:
+
+- **Take the recommended one.** It is the largest model that runs well on the computer
+  as measured, not the largest that loads.
+- **Keep the small model as a spare.** If the graphics card fails, or the library moves to
+  an older computer, the 4B still answers on the processor alone. It is 2.3 GB, and it
+  cannot be fetched once the internet is gone.
+
+The words about each model are in its file under `models/` (`summary`, `good_for`,
+`limits`, `speed`), so a new measurement is a one-line edit. Whether a model fits, which
+agents it runs and whether there is room for it are worked out in
+`museion/model_choice.py`. Agents are offered by the model chosen, not only by the
+computer: the 4B on a 12 GB card gets the 4B's agents.
+
 ## The counterintuitive part
 
 The instinct on a mid-range GPU is to pick the largest dense model that fits in VRAM. That

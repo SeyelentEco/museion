@@ -20,7 +20,7 @@ import sys
 from contextlib import closing
 from pathlib import Path
 
-from museion import agents, appstate, hardware
+from museion import agents, appstate, hardware, model_choice
 from museion.agent_run import Agents, count_cases, prepared, tests_dir
 from museion.runs import WORK
 from museion.agent_run import test as run_tests
@@ -70,7 +70,7 @@ def add_parser(commands, where, servers) -> None:
 def environment(args, library: Path | None = None) -> Agents:
     state = appstate.open_state()
     cfg = state.config()
-    tier = getattr(args, "tier", None) or state.hardware().tier
+    tier = getattr(args, "tier", None) or model_choice.agent_tier(state.hardware().tier, cfg.chat_model)
     model = getattr(args, "model", None) or ""
     if not model and getattr(args, "llama", None):
         try:

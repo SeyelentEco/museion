@@ -22,3 +22,17 @@ server_args = [
   "16384",
 ]
 license = { name = "Apache-2.0", attribution = "Alibaba Qwen team; GGUF quantisation by Unsloth" }
+
+# What the model chooser in set-up and Settings says about it.
+summary = "The small model. It runs on any computer, even one with no graphics card, so it is also the spare to keep in case a bigger computer fails."
+good_for = [
+  "Answers questions from the library, with citations, like the others",
+  "Runs the librarian and the ration scaler",
+  "Works on the processor alone, with no graphics card",
+]
+limits = [
+  "Weaker at reasoning and long instructions: answers are shorter and miss more",
+  "Cannot run the other agents (first steps, clinic, stores keeper, water planner and the rest)",
+  "Cannot change Museion's own code with Edit Museion",
+]
+speed = "Quick on any graphics card. On the processor alone an answer takes noticeably longer."

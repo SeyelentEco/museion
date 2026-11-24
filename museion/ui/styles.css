@@ -800,3 +800,63 @@ td.fail { color: var(--bad); font-weight: 600; }
 .home-area .good { color: var(--good, #2f9a4b); }
 .home-area .err { color: var(--bad, #c0392b); }
 #climate-setup[hidden] { display: none; }
+
+/* ── the set-up wizard and the model chooser ─────────────────────────────── */
+.wiz-steps { list-style: none; display: flex; flex-wrap: wrap; gap: 0.3rem 0.4rem; margin: 0 0 0.9rem; padding: 0; font-size: 0.82rem; counter-reset: wiz; }
+.wiz-steps li { counter-increment: wiz; padding: 0.2rem 0.6rem; border: 1px solid var(--line); border-radius: 999px; color: var(--ink-mute); }
+.wiz-steps li::before { content: counter(wiz) ". "; }
+.wiz-steps li.done { color: var(--ink-mid); border-color: var(--accent-dim); }
+.wiz-steps li.done::before { content: "✓ "; color: var(--good); }
+.wiz-steps li[aria-current="step"] { color: var(--ink); border-color: var(--accent); font-weight: 600; }
+.wizard h2 { font-size: 1.1rem; }
+.wizard h2 .opt { font-weight: 400; color: var(--ink-mute); font-size: 0.75em; margin-left: 0.35rem; }
+.wizard details { margin: 0.4rem 0 0.8rem; }
+.wizard summary { cursor: pointer; color: var(--ink-mid); font-size: 0.9rem; margin-bottom: 0.7rem; }
+.wiz-list { margin: 0.5rem 0 0.9rem; padding-left: 1.2rem; color: var(--ink-mid); }
+.wiz-list li { margin: 0.3rem 0; }
+.wiz-list b { color: var(--ink); }
+.wiz-nav { display: flex; align-items: center; gap: 0.6rem; margin-top: 1.2rem; padding-top: 0.9rem; border-top: 1px solid var(--line); }
+.wiz-nav .wiz-nav-note { flex: 1 1 auto; }
+.wiz-nav .wiz-nav-note.err, .small-print.err, .model-machine li.err { color: var(--bad); }
+.wiz-review { width: 100%; border-collapse: collapse; margin: 0.6rem 0; }
+.wiz-review td { padding: 0.45rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.wiz-review .meta { font-size: 0.82rem; color: var(--ink-mute); }
+.wiz-review .size { text-align: right; white-space: nowrap; font-family: var(--mono); font-size: 0.88rem; padding-left: 1rem; }
+.wiz-review tr.total td { font-weight: 600; border-bottom: 0; }
+.wiz-stages { list-style: none; margin: 0.9rem 0 0; padding: 0; font-size: 0.9rem; color: var(--ink-mute); }
+.wiz-stages li { padding: 0.12rem 0; }
+.wiz-stages .tick { display: inline-block; width: 1.4rem; font-family: var(--mono); }
+.wiz-stages li.doing { color: var(--ink); font-weight: 600; }
+.wiz-stages li.done { color: var(--ink-mid); }
+.wiz-stages li.done .tick { color: var(--good); }
+.wiz-stages li.failed, .wiz-stages li.failed .tick { color: var(--bad); }
+
+.model-machine { background: var(--surface-2); border-radius: 8px; padding: 0.65rem 0.85rem; margin: 0.8rem 0; }
+.model-machine-title { font-weight: 600; font-size: 0.85rem; margin-bottom: 0.2rem; }
+.model-machine ul { margin: 0; padding-left: 1.1rem; color: var(--ink-mid); font-size: 0.9rem; }
+.model-choice { display: block; border: 1px solid var(--line); border-radius: 8px; padding: 0.7rem 0.85rem; margin: 0.6rem 0; cursor: pointer; }
+div.model-choice { cursor: default; }
+.model-choice.chosen { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.model-choice.too-big { opacity: 0.8; }
+.model-head { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+.model-title { font-weight: 600; }
+.model-size { margin-left: auto; color: var(--ink-mute); font-size: 0.85rem; font-family: var(--mono); }
+.model-choice .badges { margin: 0.3rem 0 0; }
+.model-choice .badge { margin: 0 0.4rem 0 0; padding: 0.05rem 0.45rem; font-size: 0.76rem; }
+.badge.good { background: transparent; border: 1px solid var(--good); color: var(--good); }
+.badge.ok { background: transparent; border: 1px solid var(--line); color: var(--ink-mid); }
+.badge.bad { background: transparent; border: 1px solid var(--bad); color: var(--bad); }
+.model-summary { margin: 0.45rem 0 0.3rem; color: var(--ink-mid); font-size: 0.92rem; }
+.model-warn { margin: 0.3rem 0; color: var(--bad); font-size: 0.88rem; }
+.model-facts { margin: 0.35rem 0 0; color: var(--ink-mute); font-size: 0.82rem; }
+.model-choice button { margin-top: 0.6rem; }
+.points { list-style: none; margin: 0.2rem 0; padding: 0; font-size: 0.88rem; color: var(--ink-mid); }
+.points li { display: flex; gap: 0.45rem; padding: 0.08rem 0; }
+.points.good .tick { color: var(--good); }
+.points.limits .tick { color: var(--bad); }
+.model-status { margin-top: 0.5rem; min-height: 1.2rem; }
+.model-status.good { color: var(--good); }
+.model-status.muted { color: var(--ink-mute); }
+.model-guide { margin-top: 0.6rem; }
+.field .actions { margin-top: 0.5rem; }
+.wizard [hidden], .wiz-steps[hidden] { display: none; }

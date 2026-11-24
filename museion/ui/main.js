@@ -11,6 +11,7 @@
 //   settings.js  the Settings tab     tabs.js     switching tabs
 //   home.js      your home area, in Settings and first-run set-up
 //   welcome.js   first-run set-up     dom.js      small helpers
+//   models.js    the model chooser, in set-up and Settings
 
 import { closeEvents, invoke, listen } from './api.js';
 import { $, el } from './dom.js';
@@ -26,6 +27,7 @@ import './library.js';
 import './evals.js';
 import './settings.js';
 import './home.js';
+import './models.js';
 import './welcome.js';
 import './prepare.js';
 

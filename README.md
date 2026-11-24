@@ -50,16 +50,18 @@ python -m museion
 ```
 
 That opens Museion in your web browser. On a machine that isn't set up, the page shows a
-welcome screen and nothing else: it detects your hardware, shows exactly what it would
-fetch and how large each piece is — helper programs, the reranker, the chat model for
-your tier, the content bundle you pick — then downloads it all (resumable, verified),
-fits the model to your GPU, starts the services and builds the index. Then it gets out of
-the way, leaving Ask, Agents, Notes, Map, Library, Evals and Settings.
+set-up wizard and nothing else. It looks at your hardware and walks through where things
+go, which model to use (each one with whether it fits this computer and what it can and
+cannot do, and one recommended), which library to start with and, optionally, your home
+area. The last step lists exactly what it will fetch and how large each piece is; then it
+downloads it all (resumable, verified), fits the model to your GPU, starts the services
+and builds the index. Then it gets out of the way, leaving Ask, Agents, Notes, Map,
+Library, Evals and Settings.
 
 Or skip the clone: each [release](https://github.com/SeyelentEco/museion/releases) is a
 zip for Windows or macOS holding Museion, the portable Python that runs it and every
 helper program. Unzip it onto a drive, double-click `Museion.cmd` (`Museion.command` on a
-Mac), and the same welcome screen fetches the library into the drive. Nothing is
+Mac), and the same wizard fetches the model and library into the drive. Nothing is
 installed on the computer.
 
 Everything the page does, the command line does too:

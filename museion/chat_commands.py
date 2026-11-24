@@ -23,7 +23,7 @@ import queue
 import threading
 from contextlib import closing
 
-from museion import agents, calc, tuning
+from museion import agents, calc, model_choice, tuning
 from museion.agent_run import Agents
 from museion.answer import DISCARD, Exchange
 from museion.appstate import AppState, UiError, local
@@ -63,7 +63,8 @@ def environment(state: AppState) -> Agents:
         model = Llama(local(cfg.chat_port), timeout=3).model_id()
     except Exception:  # noqa: BLE001 -- no model running: resolve without its table
         model = ""
-    return Agents(cfg.library_dir, agents.override_dir(state.tuning_path), state.hardware().tier,
+    return Agents(cfg.library_dir, agents.override_dir(state.tuning_path),
+                  model_choice.agent_tier(state.hardware().tier, cfg.chat_model),
                   model, work_dir=work)
 
 

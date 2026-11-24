@@ -89,6 +89,7 @@ and the unit tests. A change shows in a new chat; no restart is needed.
 | The search index | `museion/index.py` (search), `indexer.py` (building it), `pdf.py`, `kiwix.py` |
 | The page in the browser | `museion/ui/` (`index.html`, `styles.css`, one `.js` file per tab); reload the page to see a change |
 | What the page can ask of the program | `museion/app.py` (the list `COMMANDS`), `commands.py`, `services.py`, `library.py`, `drives.py` |
+| First-run set-up (the wizard) and the model chooser | `museion/ui/welcome.js` (the steps), `ui/models.js` (the chooser, also in Settings), `museion/model_choice.py` (what fits, what each model runs); the words about each model are in `models/*.toml` |
 | Settings and where they are saved | `museion/config.py`, `appstate.py` |
 | Starting and stopping the helper programs | `museion/sidecar.py`, `services.py` |
 | What can be downloaded, with checksums | `catalog/`, `models/`, `tools/`, `drive/` (`.toml` files), read by `museion/catalog.py`; `catalog_add.py` adds an archive (`catalog_sync.py` does it from a Kiwix link, with internet) |
