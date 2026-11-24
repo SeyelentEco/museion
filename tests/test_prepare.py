@@ -10,6 +10,7 @@ import dataclasses
 import hashlib
 import io
 import json
+import subprocess
 import sys
 import tarfile
 import tempfile
@@ -115,7 +116,7 @@ class PrepareTest(unittest.TestCase):
         # Museion's code, what someone changing it needs, and no caches.
         app = root / "app"
         for part in ("museion/app.py", "museion/ui/index.html", "catalog", "drive/opencode.toml",
-                     "tests/test_prepare.py", "AGENTS.md"):
+                     "agents/librarian/agent.toml", "tests/test_prepare.py", "AGENTS.md"):
             self.assertTrue((app / part).exists(), part)
         self.assertEqual(list(app.rglob("__pycache__")), [])
         with zipfile.ZipFile(root / "support" / prepare.ORIGINAL_ZIP) as z:
@@ -130,6 +131,9 @@ class PrepareTest(unittest.TestCase):
                 self.assertEqual(data.count(b"\r\n"), text.count("\n"))
         readme = (root / "README.txt").read_text(encoding="utf-8")
         self.assertTrue(all(name in readme for name in launchers.launchers()))
+        # A skeleton says it has no library yet, not that it carries one.
+        self.assertIn("does not hold a library", readme)
+        self.assertNotIn("This drive carries", readme)
         self.assertIn("Museion itself", (root / "support" / "LICENSES" / "README.txt").read_text(encoding="utf-8"))
         self.assertEqual(manifest.read(root), [])
 
@@ -149,6 +153,19 @@ class PrepareTest(unittest.TestCase):
         self.assertEqual(cfg.kiwix_exe, root / "bin" / exe("kiwix-serve"))
         self.assertEqual(cfg.llama_exe, root / "bin" / "llama" / "cpu" / exe("llama-server"))
         self.assertEqual(cfg.chat_model, root / "models" / SMALL)
+
+    def test_every_part_of_the_repository_is_carried(self):
+        # The agents folder was added to the repository and not to APP_PARTS,
+        # and drives went out with an empty Agents tab. In a git checkout,
+        # everything tracked at the top is carried unless it is only for
+        # GitHub or git.
+        try:
+            out = subprocess.run(["git", "ls-files"], cwd=prepare.APP_DIR, capture_output=True, text=True, check=True)
+        except (OSError, subprocess.CalledProcessError):
+            self.skipTest("not a git checkout")
+        tracked = {line.split("/")[0] for line in out.stdout.splitlines()}
+        missing = {t for t in tracked if not t.startswith(".")} - set(prepare.APP_PARTS)
+        self.assertEqual(missing, set(), "add these to prepare.APP_PARTS")
 
     def test_preparing_again_keeps_what_is_there(self):
         self.run_prepare()

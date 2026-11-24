@@ -40,8 +40,9 @@ HEADROOM = 1 << 30
 
 # What of this program goes on the drive, under app/: the code, the data it
 # reads, and what someone changing it needs -- the tests, the docs, the notes
-# for the coding agent.
-APP_PARTS = ["museion", "catalog", "models", "tools", "drive", "evals", "tests", "docs",
+# for the coding agent. A new folder at the top of the repository belongs here
+# too, or drives and releases go out without it (the tests check).
+APP_PARTS = ["museion", "agents", "catalog", "models", "tools", "drive", "evals", "tests", "docs",
              "AGENTS.md", "README.md", "LICENSE"]
 
 # A pristine copy of app/, for undoing every change at once.
@@ -273,7 +274,7 @@ def run(plan: Plan, report: Callable[[Progress], None] = lambda p: None) -> Path
     if not (root / "config.json").exists():
         write_config(root, plan, chosen)
     write_licenses(support / "LICENSES", sources, chosen)
-    launchers.write_readme(root, bundle.title)
+    launchers.write_readme(root, bundle.title, plan.skeleton)
 
     if plan.build_index and not plan.skeleton:
         report(Progress(PHASE, "Building the index"))
