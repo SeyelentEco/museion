@@ -63,14 +63,6 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: '3.12' }
 
-      - name: Temporary, the size and checksum of the Linux kiwix-tools
-        if: matrix.platform == 'linux'
-        run: |
-          curl -sSL -o /tmp/kiwix.tar.gz https://download.kiwix.org/release/kiwix-tools/kiwix-tools_linux-x86_64-3.8.2.tar.gz
-          wc -c /tmp/kiwix.tar.gz
-          sha256sum /tmp/kiwix.tar.gz
-          tar tzf /tmp/kiwix.tar.gz
-
       # The file is named for the version in the code, and a tag has to agree
       # with it: v0.2.0 on code that says 0.1.0 would publish a package that
       # every copy of Museion takes for an older one.
