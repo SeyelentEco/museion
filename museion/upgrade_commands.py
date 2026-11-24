@@ -11,12 +11,14 @@ from __future__ import annotations
 
 import json
 import subprocess
+import time
 from pathlib import Path
 
-from museion import appmerge, switch, upgrade, upgrade_cli
+from museion import appmerge, disk, newer, switch, upgrade, upgrade_cli
 from museion.appstate import AppState, UiError
 from museion.upgrade import UpgradeError
-from museion.version import VERSION, newer
+from museion.version import VERSION
+from museion.version import newer as is_newer
 
 EVENT = "upgrade-progress"
 
@@ -59,7 +61,7 @@ def upgrade_from(state: AppState, path: str, port: int) -> dict:
         if source.root is None or not (source.app / "museion" / "upgrade_cli.py").is_file():
             raise UpgradeError(f"{path} does not hold a whole copy of Museion that can install itself "
                                "(a download, or a drive of version 0.2.0 or later)")
-        if not newer(source.version, VERSION):
+        if not is_newer(source.version, VERSION):
             raise UpgradeError(f"that is version {source.version}; this copy is already {VERSION}")
         consume = ["--consume"] if unpacked else []
         command, cwd = upgrade_cli.child(source, root, "--stage-only", *consume)
@@ -84,9 +86,50 @@ def upgrade_back(state: AppState, port: int) -> dict:
     return {"to": old}
 
 
-def upgrade_other(state: AppState, path: str) -> str:
+def newer_version(state: AppState) -> dict:
+    """Ask GitHub for the latest release. The one thing here that uses the
+    internet, and only when the person presses the button."""
+    try:
+        release = newer.latest()
+    except newer.Unknown as e:
+        raise UiError(str(e)) from e
+    return {"version": release.version, "newer": release.is_newer(), "page": release.page, "notes": release.notes,
+            "file": release.file, "size": release.size,
+            # Fetching it here needs a copy to put it in and a checksum to hold it to.
+            "can_fetch": bool(state.drive and release.url and release.sha256)}
+
+
+def fetch_upgrade(state: AppState, port: int) -> dict:
+    """Download the latest release for this system into this copy, check
+    it, and prepare the upgrade from it as upgrade_from does."""
+    root = _own_root(state)
+    last = [0.0]
+
+    def progress(done: int, total: int) -> None:
+        # A line a second is plenty for a download of minutes.
+        if time.monotonic() - last[0] >= 1 or done == total:
+            last[0] = time.monotonic()
+            state.emit(EVENT, {"line": f"Downloading {release.file}: {disk.gb(done)} of {disk.gb(total)}"})
+
+    try:
+        release = newer.latest()
+        if not release.is_newer():
+            raise UiError(f"Version {release.version} is the latest, and this copy is {VERSION}.")
+        need = release.size * 4
+        if disk.free_space(root) < need:
+            raise UiError(f"{root} needs about {disk.gb(need)} free to download and unpack version "
+                          f"{release.version}, and has {disk.gb(disk.free_space(root))}.")
+        state.emit(EVENT, {"line": f"Downloading {release.file}"})
+        file = newer.fetch(release, root / switch.WORK / "downloads", progress)
+    except (newer.Unknown, RuntimeError) as e:
+        raise UiError(str(e)) from e
+    return upgrade_from(state, str(file), port)
+
+
+def upgrade_other(state: AppState, path: str, with_changes: bool = False) -> str:
     """Put this version into another copy of Museion: an older folder, or a
-    drive. Returns what was done, for the person."""
+    drive, with the changes made to this copy's code if asked. Returns what
+    was done, for the person."""
     def report(line: str) -> None:
         state.emit(EVENT, {"line": line})
 
@@ -95,7 +138,8 @@ def upgrade_other(state: AppState, path: str) -> str:
         if not path.strip() or not target.is_dir():
             raise UpgradeError("choose the folder or drive that holds the other copy")
         upgrade_cli.closed(target)
-        outcome = upgrade.install(upgrade.this_museion(), target.resolve(), report=report, tests=upgrade.run_tests)
+        outcome = upgrade.install(upgrade.this_museion(), target.resolve(), report=report, tests=upgrade.run_tests,
+                                  with_changes=with_changes)
     except UpgradeError as e:
         raise UiError(str(e)) from e
     return "\n".join(upgrade_cli.summary(outcome, target)).strip()

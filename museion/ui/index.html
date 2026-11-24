@@ -536,8 +536,18 @@
                   </div>
                 </div>
                 <div class="actions">
+                  <button id="upgrade-check" type="button">Check for a newer version</button>
+                  <button id="upgrade-fetch" type="button" hidden></button>
                   <button id="upgrade-back" type="button" hidden></button>
                 </div>
+                <p class="hint">
+                  Checking asks GitHub, and is the only thing on this card that uses the internet.
+                  Nothing is checked unless you press it.
+                </p>
+                <details id="upgrade-notes" class="upgrade-changes" hidden>
+                  <summary></summary>
+                  <pre></pre>
+                </details>
               </div>
               <div class="field">
                 <label for="upgrade-target">Bring another copy up to this version</label>
@@ -550,6 +560,10 @@
                   <button id="upgrade-target-pick" type="button">Choose…</button>
                   <button id="upgrade-other" type="button">Upgrade that copy</button>
                 </div>
+                <label id="upgrade-with-changes-row" class="check" hidden>
+                  <input id="upgrade-with-changes" type="checkbox" />
+                  <span>Take along the changes I made to this copy's code</span>
+                </label>
               </div>
               <p id="upgrade-status" class="status" role="status"></p>
             </div>

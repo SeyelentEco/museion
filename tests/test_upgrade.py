@@ -25,7 +25,7 @@ class UpgradeCase(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        base = Path(self.tmp.name)
+        base = Path(self.tmp.name).resolve()
         self.old = make_copy(base / "old", "0.1.0")
         self.new = make_copy(base / "new", "0.2.0", code("0.2.0", {"museion/ask.py": NEW_ASK,
                                                                   "museion/maps.py": "new in 0.2\n"}))
@@ -244,6 +244,50 @@ class MyChanges(UpgradeCase):
         outcome = self.install(tests=lambda app, log: not (app / "museion" / "mine.py").exists(), keep_changes=True)
         self.assertFalse(outcome.dropped_changes)
         self.assertTrue((self.old / "app" / "museion" / "mine.py").exists())
+
+
+class WithTheSourcesChanges(UpgradeCase):
+    """One person's computer copy bringing their drive up to date, with the
+    changes they made to the computer copy's code."""
+
+    def test_the_sources_changes_are_taken_along_and_count_as_changes_there(self):
+        write(self.new / "app" / "museion" / "tuning.toml", "passages = 30\nlength = 400\n")
+        write(self.new / "app" / "museion" / "theirs.py", "made on the computer\n")
+        write(self.old / "app" / "museion" / "mine.py", "made on the drive\n")
+        outcome = self.install(with_changes=True)
+        self.assertEqual(outcome.brought, ["museion/theirs.py", "museion/tuning.toml"])
+        self.assertEqual(outcome.carried, ["museion/mine.py"])
+        self.assertEqual(self.app("museion/tuning.toml"), "passages = 30\nlength = 400\n")
+        self.assertEqual(self.app("museion/ask.py"), NEW_ASK)
+        # What is recorded as shipped is the version as shipped, so both
+        # sets of changes show, and the next upgrade carries both.
+        self.assertEqual(upgrade.local_changes(self.old), {"museion/mine.py": "added", "museion/theirs.py": "added",
+                                                           "museion/tuning.toml": "changed"})
+        self.assertEqual(switch.history(self.old)[-1]["brought"], outcome.brought)
+
+    def test_without_asking_they_are_left_behind(self):
+        write(self.new / "app" / "museion" / "theirs.py", "made on the computer\n")
+        outcome = self.install()
+        self.assertEqual(outcome.brought, [])
+        self.assertFalse((self.old / "app" / "museion" / "theirs.py").exists())
+
+    def test_the_same_version_can_still_take_changes(self):
+        self.install()
+        write(self.new / "app" / "museion" / "theirs.py", "made on the computer\n")
+        with self.assertRaisesRegex(UpgradeError, "already version 0.2.0"):
+            self.install()
+        outcome = self.install(with_changes=True)
+        self.assertEqual((outcome.old, outcome.new, outcome.brought), ("0.2.0", "0.2.0", ["museion/theirs.py"]))
+        self.assertEqual(self.app("museion/theirs.py"), "made on the computer\n")
+
+    def test_a_change_on_both_sides_to_the_same_lines_is_set_aside(self):
+        write(self.new / "app" / "museion" / "tuning.toml", "passages = 30\nlength = 400\n")
+        write(self.old / "app" / "museion" / "tuning.toml", "passages = 12\nlength = 400\n")
+        outcome = self.install(with_changes=True)
+        self.assertEqual(outcome.aside, ["museion/tuning.toml"])
+        self.assertEqual(self.app("museion/tuning.toml"), "passages = 30\nlength = 400\n")
+        self.assertEqual((self.old / outcome.aside_folder / "museion" / "tuning.toml").read_text(),
+                         "passages = 12\nlength = 400\n")
 
 
 class GoingBack(UpgradeCase):

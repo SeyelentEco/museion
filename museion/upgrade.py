@@ -73,6 +73,7 @@ class Outcome:
     new: str
     parts: list[str]                                  # of "app", "python", "bin"
     carried: list[str] = field(default_factory=list)  # the person's changes now in the new code
+    brought: list[str] = field(default_factory=list)  # changes made in the source copy, taken along
     aside: list[str] = field(default_factory=list)    # those that could not be carried
     aside_folder: str = ""
     # True when the merged code failed its tests and the new version went in
@@ -179,7 +180,7 @@ def run_tests(app: Path, log: Path) -> bool:
 
 def stage(source: Source, target: Path, *, force: bool = False, consume: bool = False,
           tests: Callable[[Path, Path], bool] | None = run_tests, keep_changes: bool = False,
-          report: Report = lambda line: None) -> Outcome:
+          with_changes: bool = False, report: Report = lambda line: None) -> Outcome:
     """Build the Museion at `source` inside the copy at `target`, ready to
     be switched to. Nothing the copy is using is touched.
 
@@ -187,14 +188,17 @@ def stage(source: Source, target: Path, *, force: bool = False, consume: bool = 
     helper programs instead of copying them (for a source unpacked only to be
     installed). `tests` runs the new code's tests (None skips them);
     `keep_changes` keeps the person's changes even if the tests fail with
-    them."""
+    them. `with_changes` takes along the changes made to the source copy's
+    own code (one person's computer copy, bringing their drive up to date),
+    and may then be the same version: only the changes are new."""
     target = Path(target).resolve()
     switch.recover(target, report)
     old = check_target(target)
     if source.root is not None and source.root.resolve() == target:
         raise UpgradeError("that is this copy of Museion itself")
-    if not force and not version.newer(source.version, old):
-        if version.parse(source.version) == version.parse(old):
+    same = version.parse(source.version) == version.parse(old)
+    if not force and not version.newer(source.version, old) and not (same and with_changes):
+        if same:
             raise UpgradeError(f"{target} is already version {old}. Nothing to upgrade.")
         raise UpgradeError(f"{target} is version {old}, which is newer than this one ({source.version}). "
                            "Nothing was changed.")
@@ -216,7 +220,12 @@ def stage(source: Source, target: Path, *, force: bool = False, consume: bool = 
     base = appmerge.read_original(target / ORIGINAL)
     mine = appmerge.read_tree(target / "app")
     new = _shipped(source)
-    merged = appmerge.merge(base, mine, new)
+    # With the source's own changes, the code coming in is its app/ as it
+    # stands; what is recorded as shipped is still the version as shipped,
+    # so those changes count as changes in the target too.
+    coming = appmerge.read_tree(source.app) if with_changes else new
+    brought = sorted(appmerge.local_changes(new, coming)) if with_changes else []
+    merged = appmerge.merge(base, mine, coming)
     # A note from an earlier upgrade stays until the person deletes it.
     try:
         earlier = (target / "app" / appmerge.NOTES).read_text(encoding="utf-8")
@@ -237,7 +246,7 @@ def stage(source: Source, target: Path, *, force: bool = False, consume: bool = 
                 _write_app(new_dir / "app", merged, label, source.version, aside_name, earlier)
                 if not tests(new_dir / "app", work / "tests.log"):
                     raise failed
-                dropped = True
+                dropped, brought = True, []
     if merged.aside:
         appmerge.write_aside(merged, new_dir / "aside")
 
@@ -258,7 +267,7 @@ def stage(source: Source, target: Path, *, force: bool = False, consume: bool = 
             held.helpers[name] = sha
     package.write(new_dir, held)
 
-    outcome = Outcome(old, source.version, parts, merged.carried(), merged.set_aside(),
+    outcome = Outcome(old, source.version, parts, merged.carried(), brought, merged.set_aside(),
                       aside_name if merged.aside else "", dropped)
     disk.write_text(work / STAGED, json.dumps({**asdict(outcome), "fingerprint": seen}, indent=2))
     return outcome
@@ -290,7 +299,7 @@ def switch_staged(target: Path, report: Report = lambda line: None) -> Outcome:
     (target / WORK / STAGED).unlink()
     try:
         switch.switch(target, {"from": outcome.old, "to": outcome.new, "moves": moves, "parts": outcome.parts,
-                               "carried": outcome.carried, "aside": outcome.aside,
+                               "carried": outcome.carried, "brought": outcome.brought, "aside": outcome.aside,
                                "aside_folder": outcome.aside_folder, "dropped_changes": outcome.dropped_changes}, report)
     except switch.Refused as e:
         disk.write_text(target / WORK / STAGED, json.dumps({**asdict(outcome), "fingerprint": seen}, indent=2))

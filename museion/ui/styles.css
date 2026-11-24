@@ -809,3 +809,6 @@ td.fail { color: var(--bad); font-weight: 600; }
 .upgrade-changes ul { margin: 0.3rem 0 0; padding-left: 1.2rem; font-size: 0.9rem; }
 .upgrade-changes li span { color: var(--ink-mute); }
 #upgrade-status { white-space: pre-line; }
+.upgrade-changes pre { white-space: pre-wrap; font: inherit; font-size: 0.9rem; margin: 0.4rem 0 0; }
+#upgrade-own .actions { margin-bottom: 0.2rem; }
+.check[hidden] { display: none; }

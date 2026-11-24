@@ -6,7 +6,7 @@
 
 import { closeEvents, invoke, listen } from './api.js';
 import { chooseFile, pickInto } from './chooser.js';
-import { $, el } from './dom.js';
+import { $, el, gb } from './dom.js';
 import { onTab, showTab } from './tabs.js';
 
 const UPGRADED = 'museion-upgraded';
@@ -15,7 +15,7 @@ const status = (text, err = false) => {
   out.textContent = text;
   out.classList.toggle('err', err);
 };
-const buttons = () => ['#upgrade-start', '#upgrade-back', '#upgrade-other'].map((id) => $(id));
+const buttons = () => ['#upgrade-start', '#upgrade-back', '#upgrade-other', '#upgrade-check', '#upgrade-fetch'].map((id) => $(id));
 const busy = (on) => buttons().forEach((b) => (on ? b.setAttribute('disabled', 'true') : b.removeAttribute('disabled')));
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
@@ -24,6 +24,9 @@ function describe(last) {
   if (!last) return '';
   if (last.back) return `Went back from version ${last.from} to ${last.to}.`;
   const lines = [`Upgraded ${last.from ? `from version ${last.from} ` : ''}to ${last.to}.`];
+  if (last.brought?.length) {
+    lines.push(`${plural(last.brought.length, 'change', 'changes')} made in the copy it came from ${last.brought.length === 1 ? 'was' : 'were'} taken along.`);
+  }
   if (last.carried?.length) {
     lines.push(`${plural(last.carried.length, 'change', 'changes')} you had made to the code ${last.carried.length === 1 ? 'was' : 'were'} carried over.`);
   }
@@ -69,6 +72,10 @@ export async function refreshUpgrade() {
     li.append(el('span', undefined, ` (${kind})`));
     list.append(li);
   }
+  // Taking this copy's changes along only means something if it has some.
+  $('#upgrade-with-changes-row').hidden = changes.length === 0;
+  $('#upgrade-with-changes-row span').textContent =
+    `Take along the ${plural(changes.length, 'change', 'changes')} I made to this copy's code`;
   if (st.failed) status(`Museion was not changed: ${st.failed}`, true);
 }
 
@@ -132,11 +139,57 @@ $('#upgrade-other').addEventListener('click', async () => {
   status('Looking at that copy…');
   const off = listen('upgrade-progress', (e) => status(e.payload.line));
   try {
-    status(await invoke('upgrade_other', { path }));
+    const withChanges = !$('#upgrade-with-changes-row').hidden && $('#upgrade-with-changes').checked;
+    status(await invoke('upgrade_other', { path, with_changes: withChanges }));
   } catch (e) {
     status(String(e), true);
   } finally {
     off();
+    busy(false);
+  }
+});
+
+$('#upgrade-check').addEventListener('click', async () => {
+  busy(true);
+  status('Asking GitHub…');
+  const fetchBtn = $('#upgrade-fetch');
+  const notes = $('#upgrade-notes');
+  fetchBtn.hidden = true;
+  notes.hidden = true;
+  try {
+    const r = await invoke('newer_version');
+    if (!r.newer) {
+      status(`This is the newest version. (The latest release is ${r.version}.)`);
+    } else {
+      notes.hidden = !r.notes;
+      notes.querySelector('summary').textContent = `What version ${r.version} changes`;
+      notes.querySelector('pre').textContent = r.notes;
+      if (r.can_fetch) {
+        fetchBtn.textContent = `Download version ${r.version} and upgrade (${gb(r.size)})`;
+        fetchBtn.hidden = false;
+        status(`Version ${r.version} is available.`);
+      } else {
+        status(`Version ${r.version} is available at ${r.page}${r.file ? '' : ', but it has no download for this kind of computer'}.`);
+      }
+    }
+  } catch (e) {
+    status(String(e), true);
+  } finally {
+    busy(false);
+  }
+});
+
+$('#upgrade-fetch').addEventListener('click', async () => {
+  busy(true);
+  status('Starting the download…');
+  const off = listen('upgrade-progress', (e) => status(e.payload.line));
+  try {
+    const r = await invoke('fetch_upgrade', { port: Number(location.port) });
+    off();
+    await restartInto(`Version ${r.to} is ready.`);
+  } catch (e) {
+    off();
+    status(String(e), true);
     busy(false);
   }
 });

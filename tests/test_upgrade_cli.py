@@ -24,7 +24,7 @@ class Case(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        self.base = Path(self.tmp.name)
+        self.base = Path(self.tmp.name).resolve()
         self.old = make_copy(self.base / "old", "0.1.0")
         self.new = make_copy(self.base / "new", "0.2.0", code("0.2.0", {"museion/ask.py": "new\n"}))
         # This program is the new copy; no Museion is running; the stand-in
@@ -107,7 +107,7 @@ class Commands(Case):
         upgrade.install(upgrade.source_of(newer), self.old, tests=None)
         command, folder = upgrade_cli.back_command(self.old)
         kept = self.old / "previous" / "0.1.0" / "python"
-        self.assertTrue(Path(command[0]).is_relative_to(kept), command)
+        self.assertTrue(Path(command[0]).resolve().is_relative_to(kept.resolve()), command)
         self.assertEqual((command[1:], folder), (["-m", "museion", "upgrade", "--back"], self.old / "app"))
 
     def test_nothing_named(self):
@@ -197,7 +197,8 @@ class ThePage(Case):
             result = upgrade_commands.upgrade_from(self.state(self.old, events), str(newer), 8123)
         self.assertEqual(result, {"to": "9.0.0"})
         self.assertEqual(ran[0][1:], ["-m", "museion", "upgrade", "--into", str(self.old), "--stage-only"])
-        self.assertTrue(Path(ran[0][0]).is_relative_to(newer / "python"))
+        # (resolved: a temporary folder is reached through a link on macOS)
+        self.assertTrue(Path(ran[0][0]).is_relative_to(newer.resolve() / "python"))
         switched = spawn.call_args.args[0]
         self.assertEqual(switched[5:], [str(self.old), "--switch-only", "--wait-port", "8123", "--relaunch", "8123"])
         self.assertEqual(events, ["Testing the new version"])

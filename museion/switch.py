@@ -149,6 +149,9 @@ def finish(target: Path, journal: dict) -> None:
         past.append(entry)
         disk.write_text(target / "support" / HISTORY, json.dumps(past, indent=2) + "\n")
     (target / WORK / JOURNAL).unlink(missing_ok=True)
+    # A download fetched for this upgrade has done its work. (Not in tidy:
+    # that runs at every start, and a half-fetched one is resumed.)
+    shutil.rmtree(target / WORK / "downloads", ignore_errors=True)
     tidy(target)
 
 

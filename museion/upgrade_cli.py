@@ -42,6 +42,8 @@ def add_commands(commands) -> None:
     c.add_argument("--no-test", action="store_true", help="do not run the new version's tests first")
     c.add_argument("--keep-changes", action="store_true",
                    help="keep your changes to the code even if the tests fail with them")
+    c.add_argument("--with-changes", action="store_true",
+                   help="with --into: take along the changes made to this copy's code as well")
     # How the steps are started by this program itself.
     for flag in ("--consume", "--stage-only", "--switch-only", "--pause"):
         c.add_argument(flag, action="store_true", help=argparse.SUPPRESS)
@@ -118,7 +120,8 @@ def into(args) -> None:
     target = args.into.resolve()
     source = upgrade.this_museion()
     tests = None if args.no_test else upgrade.run_tests
-    options = dict(force=args.force, consume=args.consume, tests=tests, keep_changes=args.keep_changes)
+    options = dict(force=args.force, consume=args.consume, tests=tests, keep_changes=args.keep_changes,
+                   with_changes=args.with_changes)
     if args.stage_only:
         upgrade.stage(source, target, report=say, **options)
         say(READY)
@@ -271,8 +274,14 @@ def closed(target: Path, port: int = DEFAULT_PORT) -> None:
         return
     # Version 0.1.0 does not say which folder it runs from.
     where = hello.get("root")
-    if where is None or (where and os.path.normcase(os.path.abspath(where)) == os.path.normcase(os.path.abspath(target))):
+    if where is None or (where and _same_folder(where, target)):
         raise UpgradeError("Museion is running. Close it (close its browser tab and its window), then run this again.")
+
+
+def _same_folder(a: str | Path, b: str | Path) -> bool:
+    # realpath: one folder can be reached by two spellings (a link, a short
+    # Windows name), and a copy must not be changed for want of noticing.
+    return os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b))
 
 
 def wait_closed(port: int, seconds: int = 120) -> None:
@@ -296,13 +305,18 @@ def show(outcome: upgrade.Outcome, target: Path) -> None:
 def summary(outcome: upgrade.Outcome, target: Path) -> list[str]:
     """What an upgrade did, for the person."""
     names = {"app": "the code", "python": "the Python that runs it", "bin": "the helper programs"}
-    lines = ["", f"Museion in {target} is now version {outcome.new}" + (f" (was {outcome.old})." if outcome.old else "."),
+    was = f" (was {outcome.old})." if outcome.old and outcome.old != outcome.new else "."
+    lines = ["", f"Museion in {target} is now version {outcome.new}{was}",
              f"Replaced: {', '.join(names[p] for p in outcome.parts)}. "
              "Your library, models, notes and settings were not touched."]
     if outcome.carried:
         n = len(outcome.carried)
         lines.append(f"{n} change{'s' if n != 1 else ''} you had made to the code "
                      f"{'were' if n != 1 else 'was'} carried over: {', '.join(outcome.carried)}.")
+    if outcome.brought:
+        n = len(outcome.brought)
+        lines.append(f"{n} change{'s' if n != 1 else ''} made to this copy's code {'were' if n != 1 else 'was'} "
+                     f"taken along: {', '.join(outcome.brought)}.")
     if outcome.aside:
         n = len(outcome.aside)
         why = ("The new version did not pass its tests with your changes in it, so they were all set aside"

@@ -91,7 +91,7 @@ COMMANDS = {f.__name__: f for f in [
     radio_commands.radio_state, radio_commands.find_radios, radio_commands.connect_radio,
     radio_commands.disconnect_radio, radio_commands.radio_messages, radio_commands.send_radio_message,
     upgrade_commands.upgrade_state, upgrade_commands.upgrade_from, upgrade_commands.upgrade_other,
-    upgrade_commands.upgrade_back,
+    upgrade_commands.upgrade_back, upgrade_commands.newer_version, upgrade_commands.fetch_upgrade,
 ]}
 
 # The page's kinds of file. Spelled out rather than asked of the mimetypes
