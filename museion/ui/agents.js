@@ -29,7 +29,11 @@ async function refresh(flash = '') {
     $('#agent-items').append(el('li', 'empty-note', String(e)));
     return;
   }
-  $('#agents-tier').textContent = `This computer: ${data.tier}${data.model ? ` · ${data.model}` : ''}`;
+  // A small chat model on a bigger computer: agents follow the model.
+  const smaller = data.machine_tier && data.machine_tier !== data.tier;
+  $('#agents-tier').textContent = smaller
+    ? `This computer: ${data.machine_tier} · chat model in use: ${data.tier}${data.model ? ` (${data.model})` : ''}`
+    : `This computer: ${data.tier}${data.model ? ` · ${data.model}` : ''}`;
   const list = $('#agent-items');
   list.textContent = '';
   for (const a of data.agents) {

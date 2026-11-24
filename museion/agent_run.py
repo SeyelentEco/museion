@@ -29,6 +29,12 @@ class Agents:
     model_id: str = ""
     work_dir: Path | None = None  # where agent-work is, if not in the library
     shipped: Path = agents.SHIPPED_DIR
+    # The computer's own tier, when `tier` was lowered for a small chat
+    # model (model_choice.agent_tier); it only changes what a refusal says.
+    machine_tier: str = ""
+
+    def tier_problem(self, spec: AgentSpec) -> str | None:
+        return agents.tier_problem(spec, self.tier, self.machine_tier)
 
     @property
     def work(self) -> Path:
@@ -68,7 +74,7 @@ class Agents:
             spec = prepared(self.get(agent_id), tuning)
             if not spec.enabled:
                 spec.problems.append("it is turned off")
-            why = agents.tier_problem(spec, self.tier)
+            why = self.tier_problem(spec)
             if why:
                 spec.problems.append(why)
             return spec
@@ -89,7 +95,7 @@ class Agents:
     def run(self, spec: AgentSpec, goal: str, setting: Setting, history: Sequence[Exchange] = (),
             on_token: Callable[[str | None], None] = lambda t: None, chat_id: str | None = None,
             tuning=None) -> Answer:
-        problem = (spec.problems[0] if spec.problems else None) or agents.tier_problem(spec, self.tier)
+        problem = (spec.problems[0] if spec.problems else None) or self.tier_problem(spec)
         if problem:
             raise RuntimeError(f"{spec.name} cannot run: {problem}")
         spec = prepared(spec, tuning)

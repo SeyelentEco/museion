@@ -28,3 +28,16 @@ server_args = [
   "32768",
 ]
 license = { name = "Apache-2.0", attribution = "Google DeepMind; GGUF quantisation by Unsloth" }
+
+# What the model chooser in set-up and Settings says about it.
+summary = "An alternative to Qwen of the same size and shape, from Google. Worth having if you want a second opinion from a different model."
+good_for = [
+  "Tied with Qwen on Museion's benchmark when tested in September 2026",
+  "Runs every agent; cites a little more and writes a little less than Qwen",
+]
+limits = [
+  "Slower than Qwen on a 12 GB card: the benchmark took two and a half times as long",
+  "Not yet tried with Edit Museion for changing Museion's own code",
+  "Needs 24 GB of system memory as well as the graphics card",
+]
+speed = "Measured on an RTX 3060 (12 GB): writes about 32 tokens a second."

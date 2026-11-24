@@ -96,6 +96,13 @@ class Model:
     # first file in name order wins, which is alphabetical -- adding a Gemma
     # beside the Qwen would have made Gemma the default.
     preferred: bool = False
+    # What the model chooser says about it, in plain words for someone who
+    # has never heard of a GGUF: one sentence on what it is, what it is good
+    # for, what it cannot do, and how fast it ran where it was measured.
+    summary: str = ""
+    good_for: list[str] = field(default_factory=list)
+    limits: list[str] = field(default_factory=list)
+    speed: str = ""
 
 
 @dataclass

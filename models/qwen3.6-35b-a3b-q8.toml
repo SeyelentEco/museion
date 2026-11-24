@@ -23,3 +23,15 @@ server_args = [
   "65536",
 ]
 license = { name = "Apache-2.0", attribution = "Alibaba Qwen team; GGUF quantisation by Unsloth" }
+
+# What the model chooser in set-up and Settings says about it.
+summary = "The same Qwen model kept at higher precision: a little better, nearly twice the size. Only for computers with memory to spare."
+good_for = [
+  "Slightly better answers than the 4-bit Qwen",
+  "Runs every agent and can change Museion's own code",
+]
+limits = [
+  "Nearly twice the download of the 4-bit Qwen",
+  "Wants a graphics card with 32 GB, or a Mac with 64 GB; on less it is slow or will not load",
+]
+speed = "Not measured yet."

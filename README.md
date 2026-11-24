@@ -91,11 +91,13 @@ python -m museion
 ```
 
 That opens Museion in your web browser. On a machine that isn't set up, the page shows a
-welcome screen and nothing else: it detects your hardware, shows exactly what it would
-fetch and how large each piece is — helper programs, the reranker, the chat model for
-your tier, the content bundle you pick — then downloads it all (resumable, verified),
-fits the model to your GPU, starts the services and builds the index. Then it gets out of
-the way, leaving Ask, Agents, Notes, Map, Library, Evals and Settings.
+set-up wizard and nothing else. It looks at your hardware and walks through where things
+go, which model to use (each one with whether it fits this computer and what it can and
+cannot do, and one recommended), which library to start with and, optionally, your home
+area. The last step lists exactly what it will fetch and how large each piece is; then it
+downloads it all (resumable, verified), fits the model to your GPU, starts the services
+and builds the index. Then it gets out of the way, leaving Ask, Agents, Notes, Map,
+Library, Evals and Settings.
 
 Everything the page does, the command line does too:
 
