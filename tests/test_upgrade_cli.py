@@ -193,7 +193,10 @@ class ThePage(Case):
             report("Testing the new version")
 
         events: list[str] = []
-        with mock.patch.object(upgrade_commands, "_watch", watch), mock.patch.object(upgrade_cli, "spawn") as spawn:
+        # (The running code's version is this copy's; these tests also run
+        # inside a copy standing in for a far later version.)
+        with (mock.patch.object(upgrade_commands, "_watch", watch), mock.patch.object(upgrade_cli, "spawn") as spawn,
+              mock.patch.object(upgrade_commands, "VERSION", "0.1.0")):
             result = upgrade_commands.upgrade_from(self.state(self.old, events), str(newer), 8123)
         self.assertEqual(result, {"to": "9.0.0"})
         self.assertEqual(ran[0][1:], ["-m", "museion", "upgrade", "--into", str(self.old), "--stage-only"])
