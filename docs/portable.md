@@ -129,8 +129,9 @@ drive, it runs, sees an empty library, and offers the same first-run fetch as an
 else -- into its own folder. Content and models are never mirrored on GitHub; they are
 fetched from where they already live, with the hashes the catalogue records.
 
-**Making one.** Set `VERSION` in `museion/version.py`, give `CHANGELOG.md` a section for
-it, merge, and push the tag `v<VERSION>`. The workflow builds all three, runs the tests in
+**Making one.** Set `VERSION` in `museion/version.py` and give `CHANGELOG.md` a section
+for it. Then push the tag `v<VERSION>`, or run the release workflow by hand with *publish*
+ticked, which makes the tag. The workflow builds all three, runs the tests in
 each with the package's own Python from its own `app/`, and only if all three pass makes
 the release, with the change list's section as its text. A tag that disagrees with
 `version.py` is refused. A pull request that changes how a package is laid out builds and

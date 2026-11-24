@@ -12,15 +12,17 @@
 #   museion-<version>-linux.tar.gz    Linux, x86-64
 #   SHA256SUMS.txt                    a checksum for each
 #
-# To release: set VERSION in museion/version.py, give CHANGELOG.md a section
-# for it, merge, and push the tag v<VERSION>. Every package is built and runs
-# Museion's tests with its own Python from its own app/; only if all of them
-# pass is the release made, with the change list's section as its text.
+# To release: set VERSION in museion/version.py and give CHANGELOG.md a
+# section for it. Then either push the tag v<VERSION>, or run this workflow by
+# hand (Actions > release > Run workflow) with "publish" ticked, which makes
+# the tag itself. Every package is built and runs Museion's tests with its own
+# Python from its own app/; only if all of them pass is the release made, with
+# the change list's section as its text.
 #
 # A pull request that changes how a package is laid out builds and tests them
-# too, so a broken release is found before the tag. Run by hand
-# (workflow_dispatch), the packages are kept as the run's artifacts for a
-# week, to try one before releasing it.
+# too, so a broken release is found before it is made. Run by hand without
+# "publish", the packages are kept as the run's artifacts for a week, to try
+# one before releasing it.
 name: release
 on:
   push:
@@ -29,6 +31,11 @@ on:
     paths: ['.github/workflows/release.yml', 'museion/prepare.py', 'museion/launchers.py',
             'museion/portable.py', 'museion/tools.py', 'museion/version.py', 'tools/**', 'drive/**']
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish these packages as the release v<VERSION>
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -111,7 +118,7 @@ jobs:
   # Only when every package passed: a release with one system missing would
   # look complete to whoever downloads it.
   publish:
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/') || inputs.publish
     needs: package
     runs-on: ubuntu-latest
     permissions:
@@ -135,10 +142,15 @@ jobs:
           cd ..
           python -m museion version --notes > notes.md
           cat notes.md
+          echo "VERSION=$(python -m museion version --number)" >> "$GITHUB_ENV"
 
       - uses: softprops/action-gh-release@v2
         with:
-          name: Museion ${{ github.ref_name }}
+          # The tag is made here when the run was started by hand; started
+          # by a tag, this names the same one (the package job checked).
+          tag_name: v${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
+          name: Museion ${{ env.VERSION }}
           body_path: notes.md
           files: |
             packages/museion-*
