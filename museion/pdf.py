@@ -111,8 +111,7 @@ class PdfExtractor:
 
 def _page_text(lib: ctypes.CDLL, doc: int, index: int) -> str:
     """All the text on one page, in pdfium's reading order. A page pdfium
-    cannot open is treated as empty rather than failing the whole document,
-    as the Rust version did."""
+    cannot open is treated as empty rather than failing the whole document."""
     page = lib.FPDF_LoadPage(doc, index)
     if not page:
         return ""

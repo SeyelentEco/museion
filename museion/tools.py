@@ -4,12 +4,11 @@ The archives and their checksums come from tools/*.toml (see catalog.py);
 every download goes through download.py, so nothing unverified is ever
 unpacked.
 
-One choice differs from the Rust app. It unpacked with whatever the system
-already had (bsdtar, which ships with Windows 10+ and macOS; GNU tar reads a
-Windows drive letter as a remote host and needed --force-local). Python's own
-zipfile and tarfile read both formats on every platform, so nothing outside
-Python is needed. What stays the same: every publisher lays its archive out
-differently, so the result is flattened into one directory afterwards.
+Archives are unpacked with Python's own zipfile and tarfile, which read both
+formats on every platform, so nothing outside Python is needed. (The system's
+tar is not the same everywhere: GNU tar reads a Windows drive letter as a
+remote host.) Every publisher lays its archive out differently, so the result
+is flattened into one directory afterwards.
 """
 
 from __future__ import annotations

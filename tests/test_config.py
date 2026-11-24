@@ -1,4 +1,4 @@
-"""config.json: read as the Rust app wrote it, and forgiving of hand edits."""
+"""config.json: read as the first version wrote it, and forgiving of hand edits."""
 
 import json
 import tempfile
@@ -17,8 +17,8 @@ class ConfigTest(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def test_reads_what_the_rust_app_wrote(self):
-        # serde_json's output for a configured machine, abridged.
+    def test_reads_what_the_first_version_wrote(self):
+        # Its file for a configured machine, abridged.
         self.path.write_text(json.dumps({
             "library_dir": "E:\\museion-library",
             "extra_dirs": ["D:\\found"],

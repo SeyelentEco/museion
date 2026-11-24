@@ -1,18 +1,18 @@
-"""A small library for the index tests, and the record of what the Rust
-version made of it.
+"""A small library for the index tests, and the record of what the first
+version of Museion made of it.
 
 The library has a PDF-collection archive served by kiwix-serve (here, by
 tests/fake_kiwix.py), an archive with its own full-text index, and a folder of
 loose PDFs, with a duplicate, an image-only scan and two documents that cannot
-be read among them. tests/fixtures/rust-index.db is the index the Rust
-`museion index` built over it, and tests/fixtures/rust-search.json is what the
-Rust Index::search_ungated returned for each of QUERIES on that database. The
-Python index must open that file and return the same hits in the same order,
-and the Python indexer must build the same rows from the same library.
+be read among them. tests/fixtures/old-index.db is the index the first
+version built over it, and tests/fixtures/old-search.json is what its search
+returned for each of QUERIES on that database. The index must open that file
+and return the same hits in the same order, and the indexer must build the
+same rows from the same library.
 
-The fixtures are a record, not something to rebuild: the Rust code that made
-them is no longer in this repository, and they are what proves an index a
-person built with the Rust version still works. If the index is
+The fixtures are a record, not something to rebuild: the code that made them
+is gone, and they are what proves an index a person built with the first
+version still works. If the index is
 changed on purpose so that they no longer match, say so in the change, and
 keep a test that opens the old file.
 """
@@ -24,8 +24,8 @@ from museion.pdf import sample_pdf
 
 HERE = Path(__file__).resolve().parent
 FIXTURES = HERE / "fixtures"
-RUST_DB = FIXTURES / "rust-index.db"
-RUST_SEARCH = FIXTURES / "rust-search.json"
+OLD_DB = FIXTURES / "old-index.db"
+OLD_SEARCH = FIXTURES / "old-search.json"
 
 ARCHIVE = "zimgit-water_en_2024-01"
 NATIVE = "wikipedia_en_chemistry_nopic_2026-07"

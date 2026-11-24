@@ -3,7 +3,7 @@ spoken to over HTTP the way the page speaks to it.
 
 The helpers are the fakes the other tests use, already running on their
 ports, so start_services adopts them as it adopts servers left running. The
-index is the one the Rust indexer built, tests/fixtures/rust-index.db.
+index is the one the first version built, tests/fixtures/old-index.db.
 """
 
 import http.client
@@ -23,7 +23,7 @@ from museion import app, sidecar, tiny_gguf
 from museion.appstate import AppState
 from museion.pdf import sample_pdf
 
-FIXTURE_DB = Path(__file__).resolve().parent / "fixtures" / "rust-index.db"
+FIXTURE_DB = Path(__file__).resolve().parent / "fixtures" / "old-index.db"
 LLAMA_SERVER = os.environ.get("MUSEION_LLAMA_SERVER")
 QUESTION = "how much water should I store per person"
 

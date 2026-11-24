@@ -5,8 +5,8 @@ assigned to the job is terminated when the last handle to the job closes. One
 job serves the whole of Museion and its handle is deliberately never closed,
 so it closes only when Museion's process ends -- however it ends.
 
-Measured on the Rust version: force-killing the app left three helpers alive
-holding 11.7 GB. The job has no such gap.
+Measured without it: force-killing Museion left three helpers alive holding
+11.7 GB. The job has no such gap.
 
 Declared directly against kernel32 through ctypes, so nothing is compiled.
 On other systems assign() does nothing.

@@ -13,7 +13,7 @@ Grammar (recursive descent):
   unary  := '-' unary | atom
   atom   := number | ident '(' args ')' | ident | '(' expr ')'
 
-The arithmetic follows IEEE floating point the way the Rust version did: an
+The arithmetic follows IEEE floating point: an
 operation that overflows or has no real answer (the square root of a negative
 number, say) gives infinity or NaN rather than an error, and only a final
 result that is not a finite number is refused. The helpers at the bottom
@@ -29,9 +29,9 @@ import re
 # Ways a person opens a question that is otherwise only arithmetic.
 _PREFIXES = ("what is ", "what's ", "calculate ")
 
-# What counts as whitespace: Unicode's White_Space, as in Rust. Python's own
+# What counts as whitespace: Unicode's White_Space. Python's own
 # str.isspace() and str.strip() also take the control characters 0x1C-0x1F,
-# which would let "1\x1c+1" through where the Rust version refused it.
+# which would let "1\x1c+1" through; it is refused.
 _WHITESPACE = (
     "\t\n\x0b\x0c\r \x85\xa0\u1680\u2000\u2001\u2002\u2003\u2004\u2005"
     "\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000"
@@ -171,8 +171,7 @@ class _Parser:
         return base
 
     def unary(self) -> float:
-        # Note that the minus binds tighter than '^' here, so -2^2 is 4, as it
-        # was in the Rust version.
+        # Note that the minus binds tighter than '^' here, so -2^2 is 4.
         if self.eat("-"):
             return -self.unary()
         self.eat("+")
@@ -370,7 +369,7 @@ def _powf(a: float, b: float) -> float:
 
 
 def _fmod(a: float, b: float) -> float:
-    """The remainder with the sign of the dividend, as C and Rust compute it
+    """The remainder with the sign of the dividend, as C computes it
     (Python's own % follows the divisor's sign instead)."""
     try:
         return math.fmod(a, b)
@@ -392,13 +391,13 @@ def _log(a: float, fn) -> float:
 
 def _whole(a: float, fn) -> float:
     """floor or ceil as a float. Python's give an int, which loses the sign
-    of a zero result (ceil(-0.5) is -0.0 in Rust and C) and cannot hold
+    of a zero result (ceil(-0.5) is -0.0 in C) and cannot hold
     infinity."""
     return a if not math.isfinite(a) else math.copysign(float(fn(a)), a)
 
 
 def _round_half_away(a: float) -> float:
-    """Round half away from zero, as Rust's f64::round does. Python's round()
+    """Round half away from zero, as C's round() does. Python's round()
     rounds half to even, which would turn 2.5 into 2."""
     if not math.isfinite(a):
         return a
@@ -422,7 +421,7 @@ def _round_to(a: float, places: float) -> float:
 
 
 def _fmin(a: float, b: float) -> float:
-    """The smaller of two numbers, ignoring NaN, as Rust's f64::min does."""
+    """The smaller of two numbers, ignoring NaN, as C's fmin() does."""
     if math.isnan(a):
         return b
     if math.isnan(b):

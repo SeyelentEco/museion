@@ -1,7 +1,7 @@
 """Building the index over a library, with tests/fake_kiwix.py standing in for
 kiwix-serve. Most tests stand in for pdfium too; the last one uses the real
 pdfium, when it is found (see helper_programs.py), and checks the rows
-it builds are the ones the Rust version built from the same library."""
+it builds are the ones the first version built from the same library."""
 
 import io
 import os
@@ -98,7 +98,7 @@ class IndexLibraryTest(LibraryTestCase):
     def test_indexes_archives_and_loose_pdfs(self):
         stats, events = self.index()
         self.assertEqual(events, FIRST_RUN)
-        # The counts the Rust version reported for the same library.
+        # The counts the first version reported for the same library.
         self.assertEqual(stats, IndexStats(documents=6, pages=14, words=347, image_only=1))
         ix = Index(self.db)
         try:
@@ -259,13 +259,13 @@ class NamesTest(unittest.TestCase):
 
 
 @unittest.skipUnless(PDFIUM, "pdfium not found: set MUSEION_PDFIUM to the folder holding it")
-class SameRowsAsRustTest(LibraryTestCase):
-    def test_builds_the_rows_the_rust_version_built(self):
+class SameRowsAsOldIndexTest(LibraryTestCase):
+    def test_builds_the_rows_the_first_version_built(self):
         self.index(pdfium=PDFIUM)
         # A copy, because opening a database in WAL mode writes beside it.
-        rust_db = Path(self.tmp.name) / "rust-index.db"
-        shutil.copyfile(index_corpus.RUST_DB, rust_db)
-        self.assertEqual(rows(self.db), rows(rust_db))
+        old_db = Path(self.tmp.name) / "old-index.db"
+        shutil.copyfile(index_corpus.OLD_DB, old_db)
+        self.assertEqual(rows(self.db), rows(old_db))
 
 
 def rows(db_path: Path) -> dict:

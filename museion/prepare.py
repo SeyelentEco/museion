@@ -9,7 +9,7 @@ and hash-checked, so a drive can be prepared over several sittings and a
 half-written file is never mistaken for a whole one. A run over a finished
 drive touches nothing it does not have to.
 
-Beyond what the Rust version carried, a drive now holds Museion's own code in
+Beside the library and the models, a drive holds Museion's own code in
 app/, the portable Python that runs it, and opencode, so whoever has the
 drive can change the program as well as use it.
 """

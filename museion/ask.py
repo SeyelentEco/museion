@@ -307,9 +307,9 @@ def render_search(hits: list[Hit], sources: list[Hit]) -> str:
     out = ""
     for h in hits:
         # The file is part of what makes a passage the same one: articles
-        # from a native archive all have page 0. (The Rust version compared
-        # book and page only, so a second article from the same archive was
-        # shown under the first one's number and could never be cited.)
+        # from a native archive all have page 0. (Compared by book and page
+        # only, a second article from the same archive would be shown under
+        # the first one's number and could never be cited.)
         number = next((i + 1 for i, s in enumerate(sources)
                        if (s.book, s.page, s.file) == (h.book, h.page, h.file)), 0)
         who = f", {h.author}" if h.author else ""

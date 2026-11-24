@@ -108,11 +108,11 @@ and the unit tests. A change shows in a new chat; no restart is needed.
 | The optional Meshtastic radio (the Radio tab) | `museion/radio.py`, `radio_commands.py`, `ui/radio.js`; see `docs/radio.md` |
 
 `docs/` explains the design: `retrieval.md` (how search works and why),
-`python.md` (how this Python version works), `portable.md` (drives),
+`python.md` (how the code works), `portable.md` (drives),
 `upgrading.md` (putting a newer version into this copy),
-`evals.md`, `adding-content.md`, `agents.md`. Comments that say what "the Rust version" did
-describe the program Museion was before it was Python, kept on purpose: the
-indexes and settings it wrote still work.
+`evals.md`, `adding-content.md`, `agents.md`. Comments that say what "the first version" did
+describe an earlier Museion, kept in mind on purpose: the indexes and settings
+it wrote still work.
 
 ## How it fits together
 

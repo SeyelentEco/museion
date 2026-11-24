@@ -22,7 +22,7 @@ A drive's layout (prepare.py makes it):
     bin/               kiwix-serve, pdfium, opencode
     bin/llama/<kind>/  a llama.cpp build per kind of graphics card
 
-The marker and the profile are the ones the Rust version used, in the same
+The marker and the profile are the ones the first version used, in the same
 places, so a computer that ran a drive under it keeps that drive's profile.
 """
 
@@ -102,8 +102,7 @@ def detect(app_dir: Path = APP_DIR, local_data: Path | None = None) -> Portable 
 
 
 def local_data_dir() -> Path:
-    """The computer's own folder for Museion's per-machine state: the one the
-    Rust app used (Tauri's app_local_data_dir)."""
+    """The computer's own folder for Museion's per-machine state."""
     if sys.platform == "win32":
         base = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
     elif sys.platform == "darwin":
@@ -125,8 +124,7 @@ def is_writable(folder: Path) -> bool:
 
 @dataclass
 class MachineProfile:
-    """What this computer runs from the drive, and how. The same JSON the
-    Rust app wrote."""
+    """What this computer runs from the drive, and how."""
 
     # For a person reading the file: which computer this was measured on.
     machine: str = ""
@@ -179,7 +177,7 @@ class MachineProfile:
 
     def apply(self, cfg: Config, root: Path | None = None) -> bool:
         """Lay the machine-specific fields over a config. The profile's paths
-        are absolute, as the Rust app wrote them, so a drive that comes up
+        are absolute, so a drive that comes up
         under another letter finds them missing: each is looked for again
         under `root` (the drive as it is now). Without that, the CUDA build
         chosen last time was dropped and the drive ran on the CPU, saying

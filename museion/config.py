@@ -5,7 +5,7 @@ gigabyte to well over 250 GB, and a tool that silently fills someone's system
 drive with Wikipedia has done something rude. The path is asked for once and
 then remembered.
 
-The file is the config.json the Rust version of Museion wrote, in the same
+The file is the config.json the first version of Museion wrote, in the same
 folder, so a machine it set up stays set up.
 """
 
@@ -20,7 +20,7 @@ from pathlib import Path
 
 from museion import disk
 
-# The Rust version's identifier, which names its folder. Kept, so a computer
+# The first version's identifier, which names its folder. Kept, so a computer
 # it set up keeps its settings.
 APP_ID = "org.museion.desktop"
 
@@ -97,8 +97,8 @@ class Config:
     @classmethod
     def from_json(cls, data: dict) -> Config:
         """Build a config from what the page sent or the file held. Unknown
-        fields are ignored and missing ones keep their defaults, as the Rust
-        version did, so a file from an older or newer build still loads."""
+        fields are ignored and missing ones keep their defaults, so a file
+        from an older or newer build still loads."""
         c = cls()
         for f in dataclasses.fields(cls):
             if f.name == "base" or f.name not in data or data[f.name] is None:
@@ -167,8 +167,7 @@ def load(path: Path) -> Config:
 
 
 def config_dir() -> Path:
-    """The folder config.json and the tuning override live in: the one the
-    Rust app uses on each system."""
+    """The folder config.json and the tuning override live in."""
     if sys.platform == "win32":
         base = Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming")
     elif sys.platform == "darwin":

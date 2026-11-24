@@ -250,7 +250,7 @@ def is_step(line: str) -> bool:
 
 
 def save_run(directory: Path, run: Run) -> Path:
-    """Write the run as run-<id>.json, the same file the Rust version wrote."""
+    """Write the run as run-<id>.json."""
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / f"run-{run.id}.json"
     path.write_text(json.dumps(dataclasses.asdict(run), indent=2, ensure_ascii=False), encoding="utf-8")

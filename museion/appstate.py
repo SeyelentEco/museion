@@ -137,8 +137,8 @@ class AppState:
 
     def hardware(self) -> hardware.Hardware:
         """Detected once. Detection shells out to nvidia-smi, and doing that
-        every time the Settings tab opened is what made the Rust app's page
-        scroll like it was wading."""
+        every time the Settings tab opened made the page scroll like it was
+        wading."""
         if self._hardware is None:
             self._hardware = hardware.detect()
         return self._hardware
