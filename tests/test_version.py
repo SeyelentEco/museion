@@ -50,4 +50,6 @@ class VersionTest(unittest.TestCase):
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
             cli.main(["version", "--notes"])
-        self.assertIn("first version", out.getvalue())
+        # Every version has a section: it is the text of its release.
+        self.assertTrue(out.getvalue().strip())
+        self.assertNotIn("\n## ", out.getvalue())

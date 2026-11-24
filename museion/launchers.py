@@ -16,16 +16,16 @@ WINDOWS = {
     "Museion.cmd": """@echo off
 rem Starts Museion from this drive and opens it in the browser.
 rem Close this window, or the last Museion tab, to stop it.
+rem The last line is one line on purpose: cmd reads this file a line at a
+rem time as it runs, and an upgrade may rewrite the file while Museion runs.
 cd /d "%~dp0app"
-"%~dp0python\\python.exe" -m museion %*
-if errorlevel 1 pause
+"%~dp0python\\python.exe" -m museion %* & if errorlevel 1 (pause & exit /b 1) else (exit /b 0)
 """,
     "Edit Museion.cmd": """@echo off
 rem Opens opencode on Museion's own code, answering with the chat model on
 rem this drive. See app\\AGENTS.md for how the code is laid out.
 cd /d "%~dp0app"
-"%~dp0python\\python.exe" -m museion edit %*
-if errorlevel 1 pause
+"%~dp0python\\python.exe" -m museion edit %* & if errorlevel 1 (pause & exit /b 1) else (exit /b 0)
 """,
 }
 
@@ -112,6 +112,10 @@ small model answers questions, but it cannot be relied on to change code.
 Running from a flash drive means the model is read from it on every start; a
 copy of this whole folder on the computer's own disk starts much faster, and
 works the same.
+
+To upgrade it:  a newer Museion download is put in from Museion's page,
+Settings > Version and upgrades, with no internet. Your library, models,
+notes and settings are not touched. app/docs/upgrading.md explains it.
 
 support/LICENSES/README.txt says what is on the drive and under what terms.
 MANIFEST.yaml lists every downloaded file with its checksum. To check them

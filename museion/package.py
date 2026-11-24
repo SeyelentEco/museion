@@ -16,6 +16,7 @@ nothing known: every part of it differs.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from dataclasses import dataclass, field
@@ -84,12 +85,40 @@ def variant_sha(tool: catalog.Tool, variant: catalog.ToolVariant) -> str:
     return "+".join(parts)
 
 
-def app_version(root: Path) -> str:
-    """The version of the code in a drive's app/, read from its version.py
-    without running it. Empty if it has none: a copy from before versions."""
+def llama_build(root: Path) -> str:
+    """A short name for the llama.cpp builds a drive holds, which changes
+    when an upgrade replaces them. Empty for a drive with no record."""
+    builds = sorted(f"{name}={sha}" for name, sha in read(root).helpers.items() if name.startswith("llama.cpp"))
+    return hashlib.sha256("\n".join(builds).encode()).hexdigest()[:16] if builds else ""
+
+
+def made_for(root: Path) -> tuple[str, str]:
+    """The system a copy's Python and helpers are built for: (platform,
+    arch). From its record, or for a copy from before the record, from the
+    launcher it was given. ("", "") if neither says."""
+    held = read(root)
+    if held.platform:
+        return held.platform, held.arch
+    for launcher, platform in (("Museion.cmd", "windows"), ("Museion.command", "macos"), ("museion.sh", "linux")):
+        if (Path(root) / launcher).is_file():
+            # Before the record there was one build per system.
+            return platform, "arm64" if platform == "macos" else "x64"
+    return "", ""
+
+
+def code_version(app: Path) -> str:
+    """The version of the Museion code in a folder (a drive's app/, or a
+    checkout), read from its version.py without running it. Empty if it has
+    none: a copy from before versions, or not Museion at all."""
     try:
-        text = (Path(root) / "app" / "museion" / "version.py").read_text(encoding="utf-8")
+        text = (Path(app) / "museion" / "version.py").read_text(encoding="utf-8")
     except OSError:
+        # Before versions there was still a museion package to recognise.
         return ""
     found = re.search(r'^VERSION\s*=\s*"([^"]+)"', text, re.MULTILINE)
     return found.group(1) if found else ""
+
+
+def app_version(root: Path) -> str:
+    """The version of the code in a drive's app/."""
+    return code_version(Path(root) / "app")

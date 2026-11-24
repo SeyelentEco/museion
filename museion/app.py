@@ -50,7 +50,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
 from museion import (agent_commands, chat_commands, commands, drives, home_commands, library, map_commands,
-                     maps, notes_commands, radio_commands, services, sidecar)
+                     maps, notes_commands, radio_commands, services, sidecar, switch, upgrade_commands)
 from museion.appstate import AppState, UiError, open_state
 from museion.version import VERSION
 
@@ -90,6 +90,8 @@ COMMANDS = {f.__name__: f for f in [
     home_commands.home_area, home_commands.set_up_home, home_commands.stop_home,
     radio_commands.radio_state, radio_commands.find_radios, radio_commands.connect_radio,
     radio_commands.disconnect_radio, radio_commands.radio_messages, radio_commands.send_radio_message,
+    upgrade_commands.upgrade_state, upgrade_commands.upgrade_from, upgrade_commands.upgrade_other,
+    upgrade_commands.upgrade_back, upgrade_commands.newer_version, upgrade_commands.fetch_upgrade,
 ]}
 
 # The page's kinds of file. Spelled out rather than asked of the mimetypes
@@ -202,7 +204,10 @@ class Handler(BaseHTTPRequestHandler):
         if url.path == "/api/events":
             return self.stream_events()
         if url.path == "/api/hello":
-            return self.send_json(200, {"app": "museion", "version": VERSION})
+            # The folder says which copy this is, to an upgrade that must
+            # not change a copy Museion is running from.
+            drive = self.server.state.drive
+            return self.send_json(200, {"app": "museion", "version": VERSION, "root": str(drive.root) if drive else ""})
         if url.path == "/file":
             return self.send_content_file(urllib.parse.parse_qs(url.query).get("path", [""])[0])
         if url.path.startswith("/tiles/"):
@@ -444,6 +449,13 @@ def serve(port: int = DEFAULT_PORT, open_browser: bool = True, stay: bool = Fals
         port = sidecar.free_port()
     events = Events()
     state = open_state(config_dir, events.emit)
+    if state.drive:
+        try:
+            # An upgrade's switch that was cut short, and what one left behind.
+            switch.recover(state.drive.root, print)
+            switch.tidy(state.drive.root)
+        except OSError as e:
+            print(f"  (an unfinished upgrade could not be finished: {e})")
     server = Server(state, events, port)
     radio_commands.start_saved(state)
     url = f"http://127.0.0.1:{server.port}/"
