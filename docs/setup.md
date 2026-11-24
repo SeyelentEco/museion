@@ -24,8 +24,8 @@ a set-up wizard, one question per step:
    steps 2–6 below for you, ticking off each stage, and carries on where it stopped if it
    is interrupted and you press **Try again**.
 
-When it finishes it gets out of the way — Ask, Library, Evals and Settings are what you
-see from then on. (*Run first-time set-up again* under Settings brings it back for a new
+When it finishes it gets out of the way — Ask, Agents, Notes, Map, Library, Evals and
+Settings are what you see from then on. (*Run first-time set-up again* under Settings brings it back for a new
 computer, and **Settings › Models › Help me choose a model** is the model step on its
 own, for changing model later.) The rest of this page is the same thing by hand.
 
@@ -52,7 +52,8 @@ downloading for the Go Bag plus a 4B model, or a few hours if you take the 35B M
 
 - **Python** 3.11 or newer. Nothing else: Museion uses only Python's standard library,
   so there is nothing to `pip install`. (A release zip carries its own Python.)
-- Disk: 1 GB for the Go Bag, 3–37 GB for a model, 250+ GB if you want all of Wikipedia.
+- Disk: 1 GB for the Go Bag, 3–37 GB for a model, 270 GB if you want the whole Library
+  bundle (all of Wikipedia without images is 49 GB of it).
 
 Every command below is run from the top of the repository. On Windows, `python` may be
 called `py`.
