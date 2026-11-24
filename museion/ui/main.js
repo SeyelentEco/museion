@@ -59,6 +59,11 @@ async function autostartServices() {
   }
 }
 
+// Which Museion this is, beside the name.
+fetch('/api/hello').then((r) => r.json()).then((hello) => {
+  if (hello.version) $('#version').textContent = hello.version;
+}).catch(() => {});
+
 // The browser cannot end Museion by closing a window, so there is a button
 // for it. Closing the last Museion tab also ends it, a minute later.
 $('#quit').addEventListener('click', async () => {

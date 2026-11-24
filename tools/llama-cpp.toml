@@ -7,6 +7,11 @@
 # Windows builds ship *without* the CUDA runtime DLLs, which come from a
 # separate cudart archive and rarely change. The CUDA variant therefore needs
 # both, unpacked over each other.
+#
+# Upstream publishes no CUDA build for Linux. A Linux machine with a graphics
+# card (NVIDIA or AMD) runs the Vulkan build, which needs the system's Vulkan
+# loader (libvulkan.so.1) and the card's own driver; without them it gets the
+# CPU build (hardware.py decides).
 
 id = "llama-cpp"
 name = "llama.cpp"
@@ -57,3 +62,21 @@ file = "llama-b10712-bin-macos-arm64.tar.gz"
 url = "https://github.com/ggml-org/llama.cpp/releases/download/b10712/llama-b10712-bin-macos-arm64.tar.gz"
 size_bytes = 11041360
 sha256 = "8b20c140a04c932596d91bc6b6c23c0f3e67f939b5d621000d4194bfb6ad48fc"
+
+[variants.linux-vulkan]
+accelerator = "vulkan"
+platform = "linux"
+arch = "x64"
+file = "llama-b10712-bin-ubuntu-vulkan-x64.tar.gz"
+url = "https://github.com/ggml-org/llama.cpp/releases/download/b10712/llama-b10712-bin-ubuntu-vulkan-x64.tar.gz"
+size_bytes = 33504523
+sha256 = "de47a5207b0dc7932ac996cf12c77f27d50aeb4381bc16a4ec1a0cab57c392bf"
+
+[variants.linux-cpu]
+accelerator = "cpu"
+platform = "linux"
+arch = "x64"
+file = "llama-b10712-bin-ubuntu-x64.tar.gz"
+url = "https://github.com/ggml-org/llama.cpp/releases/download/b10712/llama-b10712-bin-ubuntu-x64.tar.gz"
+size_bytes = 16436021
+sha256 = "2ab07b8e85b4f00109ad00f4eb713b7265b2efc2e34664c10fb0e876d06c0d8e"

@@ -32,3 +32,11 @@ file = "pdfium-mac-x64.tgz"
 url = "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium/8021/pdfium-mac-x64.tgz"
 size_bytes = 3622080
 sha256 = "0e770fda56c6726a08fab84c6306ad91eceb10589020ce3a407fad3ebcbe7bb2"
+
+[variants.linux-x64]
+platform = "linux"
+arch = "x64"
+file = "pdfium-linux-x64.tgz"
+url = "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium/8021/pdfium-linux-x64.tgz"
+size_bytes = 3682846
+sha256 = "685f7930cd184ea22cd77afe707c1cf53b173d18118b6e16cb213c9277d7cdc3"

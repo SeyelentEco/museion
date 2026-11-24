@@ -53,9 +53,10 @@ python -m museion tools --dest bin
 ```
 
 Detects your GPU and fetches the matching llama.cpp build (CUDA, Vulkan, Metal or CPU),
-plus kiwix-serve and pdfium. Everything is checked against pinned checksums. The
-catalogue has no Linux builds of llama.cpp or kiwix-serve yet, so on Linux this installs
-only what it has; point Settings at your own builds.
+plus kiwix-serve and pdfium. Everything is checked against pinned checksums. On Linux a
+graphics card runs the Vulkan build (llama.cpp publishes no CUDA build for Linux), which
+needs the system's Vulkan driver; if you have built llama.cpp with CUDA yourself, point
+Settings at your own `llama-server`.
 
 ## 3. Find out what your machine is
 

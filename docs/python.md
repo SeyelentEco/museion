@@ -243,10 +243,10 @@ Where the Python version deliberately differs:
 - **Set-up** keeps helper programs already configured when the catalogue has
   none for this system, rather than clearing their paths.
 
-Not done yet:
-
-- **Linux helpers.** The catalogue has no Linux builds of llama.cpp or
-  kiwix-tools, so `tools` installs nothing on Linux, as with the Rust version.
+Linux came later than the other two: the catalogue has Linux builds of llama.cpp
+(Vulkan and CPU; upstream publishes no CUDA build), kiwix-tools and pdfium, and
+the release has a Linux package. The graphics-card paths on Linux are tested
+with stand-ins only; nobody has yet run them on a real Linux machine with a card.
 
 ## What phase 4 found
 

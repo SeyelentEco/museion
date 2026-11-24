@@ -113,21 +113,40 @@ same.
 
 ## C. The release
 
-A GitHub release asset, `museion-drive-<version>-windows.zip` (and `-macos`), holding
-everything that is not content: Museion's code, the portable Python, every helper build,
-opencode and ripgrep, licences, README, the marker, and empty `library/` and `models/`.
-It is `python -m museion prepare --skeleton`, zipped. Unzipped onto a drive it runs, sees
-an empty library, and offers the same first-run fetch as anywhere else -- into the drive.
-Content and models are never mirrored on GitHub; they are fetched from where they already
-live, with the hashes the catalogue records.
+Three files on a GitHub release, one per system, holding everything that is not content:
+Museion's code, the portable Python, every helper build, opencode and ripgrep, licences,
+README, the marker, and empty `library/` and `models/`.
 
-The workflow builds the zips on a version tag, for Windows and for macOS on Apple
-silicon, and before attaching them runs the tests with the drive's own Python from its
-own `app/`. A pull request that changes how a drive is laid out builds and tests them
-too. There is no Linux zip until the catalogue has Linux builds of llama.cpp and
-kiwix-serve. Nothing in the macOS zip is notarized; if macOS refuses to run a program
-from it, `xattr -dr com.apple.quarantine` on the unzipped folder lifts the quarantine a
-download carries.
+| file | system |
+|---|---|
+| `museion-<version>-windows.zip` | Windows, x86-64 |
+| `museion-<version>-macos.zip` | macOS on Apple silicon |
+| `museion-<version>-linux.tar.gz` | Linux, x86-64 |
+| `SHA256SUMS.txt` | a checksum for each of them |
+
+Each is `python -m museion prepare --skeleton`, packed. Unpacked anywhere, on a disk or a
+drive, it runs, sees an empty library, and offers the same first-run fetch as anywhere
+else -- into its own folder. Content and models are never mirrored on GitHub; they are
+fetched from where they already live, with the hashes the catalogue records.
+
+**Making one.** Set `VERSION` in `museion/version.py` and give `CHANGELOG.md` a section
+for it. Then push the tag `v<VERSION>`, or run the release workflow by hand with *publish*
+ticked, which makes the tag. The workflow builds all three, runs the tests in
+each with the package's own Python from its own `app/`, and only if all three pass makes
+the release, with the change list's section as its text. A tag that disagrees with
+`version.py` is refused. A pull request that changes how a package is laid out builds and
+tests them too, and a run started by hand keeps the packages as artifacts for a week, to
+try one before it is released.
+
+**What a download meets.** Nothing in the packages is signed. Windows shows "Windows
+protected your PC" the first time `Museion.cmd` is run from a downloaded zip (*More info*,
+*Run anyway*). macOS refuses programs from an unsigned download until
+`xattr -dr com.apple.quarantine` on the unpacked folder lifts the quarantine. On Linux the
+Vulkan build of llama.cpp needs the system's Vulkan loader (`libvulkan.so.1`) and the
+card's driver; without them Museion uses the CPU build.
+
+**Not covered.** Intel Macs and ARM Linux have no package: the release job has no runner
+that would test one.
 
 ## Not doing
 

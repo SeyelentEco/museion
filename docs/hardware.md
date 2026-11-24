@@ -54,9 +54,12 @@ than the biggest dense model that fits.
 | 2 | 16–24 GB VRAM | Same MoE, more layers resident, larger context |
 | 3 | Apple Silicon: 32 GB+ unified for the 35B at Q4, 64 GB+ for Q8; less gets tier 0 | Larger MoE |
 
-Detection: `nvidia-smi` on Windows, falling back to WMI/DXGI for AMD and Intel (Vulkan
-build), else CPU. On macOS, architecture plus `sysctl hw.memsize` selects the Metal build
-and the tier.
+Detection: `nvidia-smi` on Windows, falling back to the registry's display adapters for
+AMD and Intel (Vulkan build), else CPU. On macOS, architecture plus `sysctl hw.memsize`
+selects the Metal build and the tier. On Linux, `nvidia-smi` for an NVIDIA card and
+`/sys/class/drm` for an AMD one; either runs the Vulkan build, since llama.cpp publishes
+no CUDA build for Linux, and counts only when the system can load Vulkan
+(`libvulkan.so.1`). Without it, and for Intel graphics, Linux gets the CPU build.
 
 ## Offload splits are computed, not guessed
 

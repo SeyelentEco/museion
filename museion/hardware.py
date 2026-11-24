@@ -103,8 +103,10 @@ def run(args: list[str]) -> str | None:
 
 
 def detect(platform: str = sys.platform, run: Run = run,
-           meminfo: Path = Path("/proc/meminfo")) -> Hardware:
-    accelerator = detect_accelerator(platform, run)
+           meminfo: Path = Path("/proc/meminfo"),
+           adapters: Callable[[], list[tuple[str, int]]] | None = None,
+           vulkan: Callable[[], bool] | None = None) -> Hardware:
+    accelerator = detect_accelerator(platform, run, adapters, vulkan)
     system_ram_mb = detect_system_ram_mb(platform, run, meminfo)
     return Hardware(accelerator, system_ram_mb, pick_tier(accelerator, system_ram_mb))
 
@@ -141,9 +143,11 @@ def pick_tier(accel: Accelerator, system_ram_mb: int) -> str:
 
 
 def detect_accelerator(platform: str = sys.platform, run: Run = run,
-                       adapters: Callable[[], list[tuple[str, int]]] | None = None) -> Accelerator:
-    """`adapters` lists Windows display adapters as (name, bytes of memory);
-    by default they are read from the registry."""
+                       adapters: Callable[[], list[tuple[str, int]]] | None = None,
+                       vulkan: Callable[[], bool] | None = None) -> Accelerator:
+    """`adapters` lists display adapters as (name, bytes of memory); by
+    default they are read from the registry on Windows and from /sys on
+    Linux. `vulkan` says whether a Linux system can load Vulkan."""
     if platform == "darwin":
         mb = macos_unified_memory_mb(run)
         if mb is not None:
@@ -155,12 +159,20 @@ def detect_accelerator(platform: str = sys.platform, run: Run = run,
         return Accelerator(CPU)
 
     found = nvidia_smi(run)
-    if found is not None:
-        return Accelerator(CUDA, *found)
     if platform == "win32":
+        if found is not None:
+            return Accelerator(CUDA, *found)
         found = other_gpu((adapters or windows_adapters)())
         if found is not None:
             return Accelerator(VULKAN, *found)
+        return Accelerator(CPU)
+    # Linux. llama.cpp publishes no CUDA build for it, so an NVIDIA card runs
+    # the Vulkan build like any other, and a card is only worth counting when
+    # the system can load Vulkan at all: without it that build does not start.
+    if found is None:
+        found = other_gpu((adapters or linux_adapters)())
+    if found is not None and (vulkan or vulkan_loader)():
+        return Accelerator(VULKAN, *found)
     return Accelerator(CPU)
 
 
@@ -192,6 +204,43 @@ def other_gpu(adapters: list[tuple[str, int]]) -> tuple[str, int] | None:
         return None
     size, name = max(usable, key=lambda a: a[0])
     return name, size // 1024 // 1024
+
+
+# Below this a Linux adapter is a processor's own graphics borrowing system
+# memory, and the CPU build serves better.
+LINUX_MIN_VRAM = 2 << 30
+
+
+def linux_adapters(drm: Path = Path("/sys/class/drm")) -> list[tuple[str, int]]:
+    """Graphics cards that say how much memory they have, as (name, bytes).
+    The amdgpu driver does, in mem_info_vram_total; NVIDIA cards are asked
+    through nvidia-smi before this is reached, and Intel's say nothing, so
+    they count as no card."""
+    vendors = {"0x1002": "AMD Radeon", "0x10de": "NVIDIA", "0x8086": "Intel"}
+    out: list[tuple[str, int]] = []
+    try:
+        cards = sorted(p for p in drm.iterdir() if p.name.startswith("card") and "-" not in p.name)
+    except OSError:
+        return out
+    for card in cards:
+        try:
+            size = int((card / "device" / "mem_info_vram_total").read_text().strip())
+            vendor = (card / "device" / "vendor").read_text().strip().lower()
+        except (OSError, ValueError):
+            continue
+        if size >= LINUX_MIN_VRAM:
+            out.append((f"{vendors.get(vendor, 'Graphics card')} ({card.name})", size))
+    return out
+
+
+def vulkan_loader() -> bool:
+    """Can this Linux system load Vulkan? The Vulkan build of llama.cpp needs
+    libvulkan.so.1, which comes with a desktop's graphics drivers."""
+    try:
+        ctypes.CDLL("libvulkan.so.1")
+        return True
+    except OSError:
+        return False
 
 
 def windows_adapters() -> list[tuple[str, int]]:
