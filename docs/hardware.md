@@ -86,11 +86,12 @@ Detection, with nothing to install on any of the three systems:
 |---|---|---|
 | Windows | `nvidia-smi` for NVIDIA (CUDA); otherwise the display adapters in the registry, largest first, for AMD and Intel (Vulkan) | `GlobalMemoryStatusEx` |
 | macOS | Apple Silicon is Metal on its unified memory (`sysctl hw.memsize`); an Intel Mac runs on the processor | `sysctl hw.memsize` |
-| Linux | `nvidia-smi` for NVIDIA (CUDA); otherwise the AMD driver's own figure in `/sys/class/drm/card*/device/mem_info_vram_total` (Vulkan); other cards run on the processor | `/proc/meminfo` |
+| Linux | `nvidia-smi` for NVIDIA, otherwise the AMD driver's own figure in `/sys/class/drm/card*/device/mem_info_vram_total`. Either runs the Vulkan build, since llama.cpp publishes no CUDA build for Linux, and counts only when the system can load Vulkan (`libvulkan.so.1`). Without it, and for Intel graphics, Linux gets the CPU build | `/proc/meminfo` |
 
-`python -m museion hardware` prints what was found. Windows on an RTX 3060 and Linux
-with no graphics card have been run for real; the macOS and Linux-AMD paths are covered
-by tests that stand in for the system's answers, not yet by a real machine.
+`python -m museion hardware` prints what was found, and which models fit. Windows on an
+RTX 3060 and Linux with no graphics card have been run for real; the macOS and Linux
+graphics-card paths are covered by tests that stand in for the system's answers, not yet
+by a real machine.
 
 ## Offload splits are computed, not guessed
 

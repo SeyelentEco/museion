@@ -94,6 +94,7 @@ and the unit tests. A change shows in a new chat; no restart is needed.
 | Starting and stopping the helper programs | `museion/sidecar.py`, `services.py` |
 | What can be downloaded, with checksums | `catalog/`, `models/`, `tools/`, `drive/` (`.toml` files), read by `museion/catalog.py`; `catalog_add.py` adds an archive (`catalog_sync.py` does it from a Kiwix link, with internet) |
 | Running from a drive, preparing one | `museion/portable.py`, `prepare.py`, `manifest.py`, `launchers.py` |
+| Upgrading a copy from a newer one, and carrying the person's code changes across | `museion/upgrade.py`, `switch.py`, `appmerge.py`, `merge3.py`, `upgrade_cli.py`, `upgrade_commands.py`, `newer.py` (asking for the latest release), `ui/upgrade.js`; see `docs/upgrading.md` |
 | This editing set-up | `museion/edit.py` |
 | The benchmark of questions and expected answers | `evals/benchmark.toml`, `museion/evals.py`; retrieval alone: `evals/retrieval.toml`, `retrieval_eval.py` |
 | Agents: the harness, its tools, chats | `agents/` (one folder each), `museion/harness.py`, `agent_tools/` (one tool per file), `agents.py` (settings), `chat_commands.py`, `agent_commands.py`; see `docs/agents.md` |
@@ -108,6 +109,7 @@ and the unit tests. A change shows in a new chat; no restart is needed.
 
 `docs/` explains the design: `retrieval.md` (how search works and why),
 `python.md` (how this Python version works), `portable.md` (drives),
+`upgrading.md` (putting a newer version into this copy),
 `evals.md`, `adding-content.md`, `agents.md`. Comments that say what "the Rust version" did
 describe the program Museion was before it was Python, kept on purpose: the
 indexes and settings it wrote still work.
@@ -125,6 +127,17 @@ model and another the reranker. A question goes through `ask.py`: search the
 index, rerank the passages, give the best to the chat model with tools for
 searching more and calculating, then check the answer's citations. The model
 and its tools are driven by `harness.py`, the same loop every agent runs on.
+
+## After an upgrade
+
+If `UPGRADE-NOTES.md` is in this folder, an upgrade could not carry some of
+the person's changes into the new version. It lists each file, why, and where
+their version and a diff of their change were kept (`../my-changes/`). To put
+a change back: read the diff, make the same change to the new file (do not
+copy their old file over the new one: that would undo the upgrade there), run
+the tests, and remove that entry from the notes. Delete the notes file when no
+entries are left. `python -m museion changes` lists everything that differs
+from the code as shipped.
 
 ## Undoing changes
 

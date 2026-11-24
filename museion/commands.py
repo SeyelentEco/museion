@@ -301,6 +301,8 @@ def wanted(entry: os.DirEntry, want: str) -> bool:
         return name.endswith(".gguf")
     if want == "zip":
         return name.endswith(".zip")
+    if want == "package":  # a Museion download
+        return name.endswith((".zip", ".tar.gz", ".tgz"))
     if want == "program":
         return name.endswith(".exe") if sys.platform == "win32" else os.access(entry.path, os.X_OK)
     return True

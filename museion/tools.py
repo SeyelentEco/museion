@@ -129,13 +129,42 @@ def extract(archive: Path, into: Path) -> None:
             _extract_zip(archive, into)
         else:
             with tarfile.open(archive) as tf:
-                if hasattr(tarfile, "data_filter"):
-                    tf.extractall(into, filter="data")
-                else:  # Pythons before 3.11.4 have no filter
-                    _check_tar(tf, into)
-                    tf.extractall(into)
+                _extract_tar(tf, into)
     except Exception as e:
         raise RuntimeError(f"could not unpack {archive}: {e}") from e
+
+
+def _extract_tar(tf: tarfile.TarFile, into: Path) -> None:
+    """Unpack a tar, writing each link in it as a copy of what it points at.
+    Linux and macOS builds name one library three ways with symbolic links
+    (libllama.so, libllama.so.0, libllama.so.0.3.0), and a drive formatted
+    exFAT, which is what moves between systems, cannot hold a link at all."""
+    members = tf.getmembers()
+    _check_tar(tf, into)
+    files = [m for m in members if not (m.issym() or m.islnk())]
+    if hasattr(tarfile, "data_filter"):
+        tf.extractall(into, members=files, filter="data")
+    else:  # Pythons before 3.11.4 have no filter
+        tf.extractall(into, members=files)
+    root = into.resolve()
+    pending = [m for m in members if m.issym() or m.islnk()]
+    while pending:
+        # A link may point at another link; each pass copies those whose
+        # target is there by now. One that points at nothing is left out.
+        waiting = []
+        for m in pending:
+            target = root / m.name
+            source = (target.parent / m.linkname if m.issym() else root / m.linkname).resolve()
+            if source.is_dir():
+                shutil.copytree(source, target, dirs_exist_ok=True)
+            elif source.is_file():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target)
+            else:
+                waiting.append(m)
+        if len(waiting) == len(pending):
+            break
+        pending = waiting
 
 
 def _check_tar(tf: tarfile.TarFile, into: Path) -> None:

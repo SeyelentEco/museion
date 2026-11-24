@@ -166,6 +166,31 @@ class FlattenAndExtractTest(unittest.TestCase):
         self.assertTrue((self.dir / "found").exists())
         self.assertFalse((self.dir / "too-deep").exists())
 
+    def test_links_in_a_tar_are_unpacked_as_copies(self):
+        # exFAT, which a drive is formatted with, cannot hold a symbolic link.
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w:gz") as tf:
+            def link(name, to, kind=tarfile.SYMTYPE):
+                info = tarfile.TarInfo(name)
+                info.type, info.linkname = kind, to
+                tf.addfile(info)
+            # Links before what they point at, and a link to a link.
+            link("b/libx.so", "libx.so.0")
+            link("b/libx.so.0", "libx.so.0.3.0")
+            link("b/hard", "b/libx.so.0.3.0", tarfile.LNKTYPE)
+            link("b/dangling", "nowhere")
+            info = tarfile.TarInfo("b/libx.so.0.3.0")
+            info.size, info.mode = 3, 0o755
+            tf.addfile(info, io.BytesIO(b"lib"))
+        archive = self.dir / "linked.tar.gz"
+        archive.write_bytes(buf.getvalue())
+        out = self.dir / "out"
+        tools.extract(archive, out)
+        for name in ("libx.so", "libx.so.0", "libx.so.0.3.0", "hard"):
+            self.assertEqual((out / "b" / name).read_bytes(), b"lib", name)
+            self.assertFalse((out / "b" / name).is_symlink(), name)
+        self.assertFalse((out / "b" / "dangling").exists())
+
     def test_a_tar_member_that_escapes_is_refused(self):
         archive = self.dir / "evil.tar.gz"
         archive.write_bytes(tar_gz({"../escaped": b"x"}))

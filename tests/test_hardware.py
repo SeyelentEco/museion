@@ -28,7 +28,6 @@ def fake_run(answers: dict[str, str]):
 
 NVIDIA_SMI = "nvidia-smi --query-gpu=name,memory.total --format=csv,noheader,nounits"
 NO_MEMINFO = Path("no-such-meminfo")
-NO_DRM = Path("no-such-drm")
 
 
 class TierTest(unittest.TestCase):
@@ -96,13 +95,37 @@ class DetectTest(unittest.TestCase):
             meminfo = Path(tmp, "meminfo")
             meminfo.write_text("MemTotal:       65536000 kB\nMemFree:  1 kB\n")
             run = fake_run({NVIDIA_SMI: "NVIDIA GeForce RTX 3060, 12288\nNVIDIA T400, 2048\n"})
-            hw = hardware.detect("linux", run, meminfo, NO_DRM)
-        self.assertEqual(hw.accelerator, Accelerator(hardware.CUDA, "NVIDIA GeForce RTX 3060", 12_288))
+            hw = hardware.detect("linux", run, meminfo, lambda: [], lambda: True)
+        # llama.cpp has no CUDA build for Linux: the card runs the Vulkan one.
+        self.assertEqual(hw.accelerator, Accelerator(hardware.VULKAN, "NVIDIA GeForce RTX 3060", 12_288))
         self.assertEqual(hw.system_ram_mb, 64_000)
         self.assertEqual(hw.tier, CAPABLE)
 
+    def test_a_linux_card_without_vulkan_is_cpu(self):
+        # The Vulkan build does not start without the system's Vulkan loader.
+        run = fake_run({NVIDIA_SMI: "NVIDIA GeForce RTX 3060, 12288\n"})
+        accel = hardware.detect_accelerator("linux", run, lambda: [], lambda: False)
+        self.assertEqual(accel, Accelerator(hardware.CPU))
+
+    def test_an_amd_card_on_linux_is_read_from_sys(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            drm = Path(tmp)
+            for name, vendor, vram in (("card0", "0x8086", None), ("card1", "0x1002", 16 * 1024**3),
+                                       ("card1-DP-1", "0x1002", 16 * 1024**3), ("card2", "0x1002", 512 * 1024**2)):
+                device = drm / name / "device"
+                device.mkdir(parents=True)
+                (device / "vendor").write_text(vendor + "\n")
+                if vram is not None:
+                    (device / "mem_info_vram_total").write_text(f"{vram}\n")
+            # Intel's says nothing, a connector is not a card, and 512 MB is a
+            # processor's own graphics.
+            self.assertEqual(hardware.linux_adapters(drm), [("AMD Radeon (card1)", 16 * 1024**3)])
+            accel = hardware.detect_accelerator("linux", fake_run({}), lambda: hardware.linux_adapters(drm), lambda: True)
+        self.assertEqual(accel, Accelerator(hardware.VULKAN, "AMD Radeon (card1)", 16_384))
+        self.assertEqual(hardware.linux_adapters(Path(tmp, "gone")), [])
+
     def test_no_gpu_on_linux_is_cpu(self):
-        hw = hardware.detect("linux", fake_run({}), NO_MEMINFO, NO_DRM)
+        hw = hardware.detect("linux", fake_run({}), NO_MEMINFO, lambda: [], lambda: True)
         self.assertEqual(hw.accelerator, Accelerator(hardware.CPU))
         self.assertEqual(hw.system_ram_mb, 0)
         self.assertEqual(hw.tier, MODEST)
@@ -159,38 +182,11 @@ class DetectTest(unittest.TestCase):
         accel = hardware.detect_accelerator("win32", fake_run({}), lambda: [("Microsoft Basic Display Adapter", 0)])
         self.assertEqual(accel, Accelerator(hardware.CPU))
 
-    def test_the_registry_is_read_only_on_windows(self):
+    def test_a_mac_does_not_look_for_other_gpus(self):
         called = []
-        accel = hardware.detect_accelerator("linux", fake_run({}), lambda: called.append(1) or [("AMD", 1)],
-                                            drm=NO_DRM)
+        accel = hardware.detect_accelerator("darwin", fake_run({}), lambda: called.append(1) or [("AMD", 1)])
         self.assertEqual(accel, Accelerator(hardware.CPU))
         self.assertEqual(called, [])
-
-    def test_an_amd_card_on_linux_is_found_in_sysfs(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            drm = Path(tmp)
-            for name, vendor, vram in [("card0", "0x8086", None), ("card1", "0x1002", 16 * 1024**3)]:
-                device = drm / name / "device"
-                device.mkdir(parents=True)
-                (device / "vendor").write_text(vendor + "\n")
-                if vram is not None:
-                    (device / "mem_info_vram_total").write_text(f"{vram}\n")
-            (drm / "card1-DP-1").mkdir()  # a connector, not a card
-            (drm / "version").write_text("drm 1.1.0\n")
-            accel = hardware.detect_accelerator("linux", fake_run({}), drm=drm)
-            self.assertEqual(accel, Accelerator(hardware.VULKAN, "AMD Radeon graphics", 16_384))
-            # NVIDIA is still asked first, and wins.
-            run = fake_run({NVIDIA_SMI: "NVIDIA GeForce RTX 3060, 12288\n"})
-            self.assertEqual(hardware.detect_accelerator("linux", run, drm=drm).kind, hardware.CUDA)
-            hw = hardware.detect("linux", fake_run({}), NO_MEMINFO, drm)
-            self.assertEqual(hw.tier, MODEST)  # 16 GB card, but no system memory read
-
-    def test_linux_with_no_drm_folder_or_unreadable_cards_is_cpu(self):
-        self.assertEqual(hardware.linux_adapters(NO_DRM), [])
-        with tempfile.TemporaryDirectory() as tmp:
-            (Path(tmp) / "card0" / "device").mkdir(parents=True)
-            (Path(tmp) / "card0" / "device" / "mem_info_vram_total").write_text("lots\n")
-            self.assertEqual(hardware.linux_adapters(Path(tmp)), [])
 
     def test_windows_adapters_are_read_from_the_registry(self):
         # A stand-in for winreg holding the display adapter class key: a 64-bit

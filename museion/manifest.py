@@ -31,6 +31,14 @@ def write(root: Path, bundle: str, accelerators: list[str], carried: list[Source
     (root / NAME).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def bundle(root: Path) -> str:
+    """The id of the bundle a drive was prepared with."""
+    for raw in (root / NAME).read_text(encoding="utf-8").splitlines():
+        if raw.startswith("bundle:"):
+            return raw[len("bundle:"):].strip()
+    raise ValueError(f"{root / NAME} names no bundle")
+
+
 def read(root: Path) -> list[dict]:
     """The manifest's files, as {"path", "bytes", "sha256"}."""
     entries: list[dict] = []

@@ -9,10 +9,10 @@ a set-up wizard, one question per step:
 1. **Start** — what set-up does, and what Museion found when it looked at this computer.
 2. **Folders** — one folder for everything, on a drive with room (or the library, models
    and helper programs in separate places). It shows the free space as you type.
-   On a system Museion has no helper programs to download for (Linux, and a Mac with an
-   Intel processor for llama.cpp), one extra step, **Programs**, asks where your own
-   `llama-server`, `kiwix-serve` and pdfium are, fills in any it finds, and checks them
-   before anything large is fetched.
+   On a system Museion has no helper program to download for (llama.cpp on a Mac with an
+   Intel processor; all three on Linux with an ARM processor), one extra step,
+   **Programs**, asks where your own `llama-server`, `kiwix-serve` and pdfium are, fills
+   in any it finds, and checks them before anything large is fetched.
 3. **Model** — each model with whether it fits this computer, its size, what it is good
    at and what it cannot do, and one marked *Recommended for this computer*. It also offers
    the small model as a spare that runs on any computer. See
@@ -71,9 +71,10 @@ python -m museion tools --dest bin
 ```
 
 Detects your GPU and fetches the matching llama.cpp build (CUDA, Vulkan, Metal or CPU),
-plus kiwix-serve and pdfium. Everything is checked against pinned checksums. The
-catalogue has no Linux builds of llama.cpp or kiwix-serve yet, so on Linux this installs
-only what it has; the wizard's Programs step, or Settings, takes the paths of your own.
+plus kiwix-serve and pdfium. Everything is checked against pinned checksums. On Linux a
+graphics card runs the Vulkan build (llama.cpp publishes no CUDA build for Linux), which
+needs the system's Vulkan driver; if you have built llama.cpp with CUDA yourself, point
+Settings at your own `llama-server`.
 
 ## 3. Find out what your machine is
 

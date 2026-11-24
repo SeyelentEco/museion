@@ -10,7 +10,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from museion import commands, hardware, portable
+from museion import commands, hardware, package, portable
 from museion.appstate import AppState
 from museion.config import Config, load
 from museion.portable import MachineProfile
@@ -203,6 +203,31 @@ class AppStateOnADriveTest(Drive):
         self.assertTrue(again.fit_due())
         again.mark_fitted()
         self.assertFalse(again.fit_due())
+
+    def test_an_upgrade_that_brings_another_llama_build_makes_a_fit_due(self):
+        self.stock()
+        d = self.drive()
+        Config(library_dir=self.root / "library", models_dir=self.root / "models", base=self.root).save(d.config_path())
+        package.write(self.root, package.Package("0.1.0", helpers={"llama.cpp/vulkan": "one", "kiwix-tools": "k"}))
+        with mock.patch("museion.hardware.detect", return_value=GPU):
+            state = self.state()
+        state.mark_fitted()
+        self.assertFalse(state.fit_due())
+        # Another kiwix-serve changes nothing; another llama.cpp does.
+        package.write(self.root, package.Package("0.2.0", helpers={"llama.cpp/vulkan": "one", "kiwix-tools": "k2"}))
+        self.assertFalse(state.fit_due())
+        package.write(self.root, package.Package("0.3.0", helpers={"llama.cpp/vulkan": "two", "kiwix-tools": "k2"}))
+        self.assertTrue(state.fit_due())
+        state.mark_fitted()
+        self.assertFalse(state.fit_due())
+        # A profile from before builds were noted: due once an upgrade has
+        # replaced the helpers.
+        p = MachineProfile.load(d.profile_path())
+        p.llama_build = ""
+        p.save(d.profile_path())
+        self.assertFalse(state.fit_due())
+        touch(self.root / "support" / "installed.json").write_text(json.dumps([{"to": "0.3.0", "parts": ["app", "bin"]}]))
+        self.assertTrue(state.fit_due())
 
     def test_saving_writes_relative_paths_and_this_computers_choices_to_its_profile(self):
         self.stock()

@@ -136,6 +136,9 @@ class MachineProfile:
     chat_gpu_layers: int = 0
     # Whether llama-fit-params has measured the split on this computer.
     fitted: bool = False
+    # Which llama.cpp builds the drive held when it did (package.llama_build):
+    # an upgrade that brings another build makes a fit due again.
+    llama_build: str = ""
 
     @classmethod
     def load(cls, path: Path) -> MachineProfile | None:
@@ -153,6 +156,7 @@ class MachineProfile:
         p.chat_args = [str(a) for a in data.get("chat_args") or []]
         p.chat_gpu_layers = int(data.get("chat_gpu_layers") or 0)
         p.fitted = bool(data.get("fitted"))
+        p.llama_build = str(data.get("llama_build") or "")
         return p
 
     def save(self, path: Path) -> None:

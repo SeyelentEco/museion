@@ -1,89 +1,181 @@
-# The release: Museion for a drive, as one zip per platform. Each holds the
-# code (with its tests, docs and AGENTS.md), the portable Python that runs
-# it, and the helper programs (llama.cpp, kiwix-serve, pdfium, opencode and
-# ripgrep), laid out by `python -m museion prepare --skeleton`. Unzipped onto
-# a drive it runs with nothing installed, finds an empty library, and offers
-# to fetch a bundle and a model into the drive. Content and models are never
+# The release: Museion as one download per system. Each holds the code (with
+# its tests, docs and AGENTS.md), the portable Python that runs it, and the
+# helper programs (llama.cpp, kiwix-serve, pdfium, opencode and ripgrep),
+# laid out by `python -m museion prepare --skeleton`. Unpacked anywhere it
+# runs with nothing installed, finds an empty library, and offers to fetch a
+# bundle and a model into its own folder. Content and models are never
 # mirrored here; they are fetched from where they live, with the catalogue's
 # hashes. See docs/portable.md.
 #
-# On a version tag the zips are attached to a GitHub release. On a pull
-# request that changes how a drive is laid out, the drive is built and its
-# own Python runs its own tests, so a broken release is found before the tag.
-# Run by hand (workflow_dispatch), the zips are kept as the run's artifacts.
+#   museion-<version>-windows.zip     Windows, x86-64
+#   museion-<version>-macos.zip       macOS on Apple silicon
+#   museion-<version>-linux.tar.gz    Linux, x86-64
+#   SHA256SUMS.txt                    a checksum for each
 #
-# There is no Linux zip: the catalogue has no Linux builds of llama.cpp or
-# kiwix-serve yet. The macOS zip is for Apple silicon.
+# To release: set VERSION in museion/version.py and give CHANGELOG.md a
+# section for it. Then either push the tag v<VERSION>, or run this workflow by
+# hand (Actions > release > Run workflow) with "publish" ticked, which makes
+# the tag itself. Every package is built and runs Museion's tests with its own
+# Python from its own app/; only if all of them pass is the release made, with
+# the change list's section as its text. Each package also upgrades a real
+# copy of an older release before it counts as passing.
+#
+# A pull request that changes how a package is laid out builds and tests them
+# too, so a broken release is found before it is made. Run by hand without
+# "publish", the packages are kept as the run's artifacts for a week, to try
+# one before releasing it.
 name: release
 on:
   push:
     tags: ['v*']
   pull_request:
-    paths: ['.github/workflows/release.yml', 'museion/prepare.py', 'museion/launchers.py',
-            'museion/portable.py', 'museion/tools.py', 'tools/**', 'drive/**']
+    paths: ['.github/workflows/release.yml', '.github/upgrade_check.py', 'museion/prepare.py', 'museion/launchers.py',
+            'museion/portable.py', 'museion/tools.py', 'museion/version.py', 'museion/package.py',
+            'museion/upgrade*.py', 'museion/switch.py', 'museion/appmerge.py', 'museion/merge3.py',
+            'tools/**', 'drive/**']
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish these packages as the release v<VERSION>
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
-  drive:
+  package:
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: windows-latest
             platform: windows
-            accelerators: cuda,vulkan,cpu
+            ext: zip
             python: python/python.exe
           - os: macos-latest
             platform: macos
-            accelerators: metal
+            ext: zip
+            python: python/bin/python3
+          - os: ubuntu-latest
+            platform: linux
+            ext: tar.gz
             python: python/bin/python3
     runs-on: ${{ matrix.os }}
-    permissions:
-      contents: write
     defaults:
       run:
         shell: bash
-    env:
-      ZIP: museion-drive-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'test' }}-${{ matrix.platform }}.zip
     steps:
       - uses: actions/checkout@v4
 
-      # Any Python 3.11 or newer can lay the drive out; the drive gets the
-      # pinned portable one from drive/python.toml.
+      # Any Python 3.11 or newer can lay the package out; the package gets
+      # the pinned portable one from drive/python.toml.
       - uses: actions/setup-python@v5
         with: { python-version: '3.12' }
 
-      - name: Lay out the drive
-        run: python -m museion prepare --skeleton --dest drive-out --accelerators ${{ matrix.accelerators }}
-
-      - name: Zip it
+      # The file is named for the version in the code, and a tag has to agree
+      # with it: v0.2.0 on code that says 0.1.0 would publish a package that
+      # every copy of Museion takes for an older one.
+      - name: The version
         run: |
-          if [ "$RUNNER_OS" = macOS ]; then
-            # ditto keeps the programs executable for Archive Utility.
-            ditto -c -k drive-out "$ZIP"
-          else
-            python -c "import shutil, sys; shutil.make_archive(sys.argv[1][:-4], 'zip', 'drive-out')" "$ZIP"
+          VERSION=$(python -m museion version --number)
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "v$VERSION" ]; then
+            echo "::error::the tag is $GITHUB_REF_NAME but museion/version.py says $VERSION"
+            exit 1
           fi
-          ls -l "$ZIP"
+          echo "FILE=museion-$VERSION-${{ matrix.platform }}.${{ matrix.ext }}" >> "$GITHUB_ENV"
 
-      # After zipping, so nothing the tests write ends up in the zip. From
-      # app/ on the drive, the tests find the drive's own pdfium, so this also
-      # proves the helpers landed where Museion looks for them.
-      - name: The drive's Python runs the drive's tests
-        working-directory: drive-out/app
+      # Every llama.cpp build the catalogue has for this system, so the same
+      # folder works on a computer with any kind of graphics card.
+      - name: Lay out the package
+        run: python -m museion prepare --skeleton --dest out/Museion
+
+      # Windows' "Extract All" makes a folder named after the zip, so that zip
+      # holds the files themselves. The other two hold one folder, Museion:
+      # tar unpacks into wherever it is run, and ditto keeps the programs
+      # executable for Archive Utility.
+      - name: Pack it
+        run: |
+          case "${{ matrix.platform }}" in
+            windows) python -c "import shutil, sys; shutil.make_archive(sys.argv[1][:-4], 'zip', 'out/Museion')" "$FILE" ;;
+            macos)   ditto -c -k --keepParent out/Museion "$FILE" ;;
+            linux)   tar -czf "$FILE" -C out Museion ;;
+          esac
+          ls -l "$FILE"
+
+      # After packing, so nothing the tests write ends up in the package.
+      # From app/ in the package, the tests find the package's own pdfium, so
+      # this also proves the helpers landed where Museion looks for them.
+      - name: The package's Python runs the package's tests
+        working-directory: out/Museion/app
         run: '../${{ matrix.python }} -m unittest discover -s tests'
 
+      # A release has to be able to upgrade the copies people already have.
+      # UPGRADE_FROM is the oldest release still supported: its download for
+      # this system is unpacked, lived in a little, upgraded by the package
+      # just built, taken back, and upgraded again from its own page
+      # (.github/upgrade_check.py, docs/upgrading.md). Raise it only when
+      # upgrading from that release is deliberately given up.
+      - name: An older release is upgraded by this package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPGRADE_FROM: v0.1.0
+        run: |
+          if [ "$UPGRADE_FROM" = "v$(python -m museion version --number)" ]; then
+            echo "This is $UPGRADE_FROM itself; nothing older to upgrade."
+            exit 0
+          fi
+          gh release download "$UPGRADE_FROM" --repo "$GITHUB_REPOSITORY" --dir older \
+            --pattern "museion-*-${{ matrix.platform }}.${{ matrix.ext }}"
+          python .github/upgrade_check.py --old older/museion-*-${{ matrix.platform }}.${{ matrix.ext }} \
+            --new out/Museion --work upgrade-test
+
       - uses: actions/upload-artifact@v4
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name != 'pull_request'
         with:
-          name: ${{ env.ZIP }}
-          path: ${{ env.ZIP }}
+          name: ${{ env.FILE }}
+          path: ${{ env.FILE }}
           retention-days: 7
+          compression-level: 0
+
+  # Only when every package passed: a release with one system missing would
+  # look complete to whoever downloads it.
+  publish:
+    if: startsWith(github.ref, 'refs/tags/') || inputs.publish
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: packages
+          merge-multiple: true
+
+      - name: Checksums and the change list
+        run: |
+          cd packages
+          sha256sum museion-* > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          cd ..
+          python -m museion version --notes > notes.md
+          cat notes.md
+          echo "VERSION=$(python -m museion version --number)" >> "$GITHUB_ENV"
 
       - uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: ${{ env.ZIP }}
+          # The tag is made here when the run was started by hand; started
+          # by a tag, this names the same one (the package job checked).
+          tag_name: v${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
+          name: Museion ${{ env.VERSION }}
+          body_path: notes.md
+          files: |
+            packages/museion-*
+            packages/SHA256SUMS.txt
+          fail_on_unmatched_files: true

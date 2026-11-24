@@ -13,6 +13,7 @@
 //   welcome.js   first-run set-up (welcome-run.js is its last step)
 //   dom.js       small helpers
 //   models.js    the model chooser, in set-up and Settings
+//   upgrade.js   version and upgrades, in Settings
 
 import { closeEvents, invoke, listen } from './api.js';
 import { $, el } from './dom.js';
@@ -31,6 +32,7 @@ import './home.js';
 import './models.js';
 import './welcome.js';
 import './prepare.js';
+import './upgrade.js';
 
 /**
  * Bring the services up on launch, narrating in the Ask tab. A person who
@@ -61,6 +63,11 @@ async function autostartServices() {
     await refreshServiceDots();
   }
 }
+
+// Which Museion this is, beside the name.
+fetch('/api/hello').then((r) => r.json()).then((hello) => {
+  if (hello.version) $('#version').textContent = hello.version;
+}).catch(() => {});
 
 // The browser cannot end Museion by closing a window, so there is a button
 // for it. Closing the last Museion tab also ends it, a minute later.

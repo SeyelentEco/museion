@@ -11,7 +11,7 @@ from collections.abc import Callable
 from contextlib import closing
 from pathlib import Path
 
-from museion import config, hardware, portable, sidecar
+from museion import config, hardware, package, portable, sidecar, switch
 from museion.config import Config
 from museion.index import Index
 from museion.portable import MachineProfile, Portable
@@ -96,7 +96,16 @@ class AppState:
         if not self.drive:
             return False
         profile = MachineProfile.load(self.drive.profile_path())
-        return not (profile and profile.fitted)
+        if not (profile and profile.fitted):
+            return True
+        # Measured with one llama.cpp build, and an upgrade has brought
+        # another: a newer build can use the card's memory differently. A
+        # profile from before builds were noted counts as measured with the
+        # build the drive first had.
+        build = package.llama_build(self.drive.root)
+        if profile.llama_build:
+            return bool(build) and profile.llama_build != build
+        return any("bin" in (entry.get("parts") or []) for entry in switch.history(self.drive.root))
 
     def mark_fitted(self) -> None:
         """Record that the split has been measured on this computer."""
@@ -104,6 +113,7 @@ class AppState:
             path = self.drive.profile_path()
             profile = MachineProfile.load(path) or MachineProfile()
             profile.fitted = True
+            profile.llama_build = package.llama_build(self.drive.root)
             try:
                 profile.save(path)
             except OSError:
