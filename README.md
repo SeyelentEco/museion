@@ -45,9 +45,9 @@ No git, no installer, and no Python to install. Get the file for your system fro
 
 | System | File | Size |
 |---|---|---|
-| Windows 10 or 11 | `museion-<version>-windows.zip` | about 820 MB |
-| macOS on Apple silicon | `museion-<version>-macos.zip` | about 105 MB |
-| Linux, x86-64 | `museion-<version>-linux.tar.gz` | about 190 MB |
+| Windows 10 or 11 | `museion-<version>-windows.zip` | about 840 MB |
+| macOS on Apple silicon | `museion-<version>-macos.zip` | about 120 MB |
+| Linux, x86-64 | `museion-<version>-linux.tar.gz` | about 245 MB |
 
 1. **Unpack it** somewhere with room for a library (1 GB to 250 GB) and a model (3 GB to
    37 GB): the computer's own disk, or a removable drive. It does not run from inside the
