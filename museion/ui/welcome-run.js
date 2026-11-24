@@ -27,7 +27,7 @@ export function reviewAndRun(w) {
   function items() {
     const out = [];
     // A release or a prepared drive already carries its helper programs.
-    if (!plan().portable) for (const t of plan().tools) out.push({ title: t.title, what: 'Helper program', bytes: t.size_bytes, where: 2 });
+    if (!plan().tools_here) for (const t of plan().tools) out.push({ title: t.title, what: 'Helper program', bytes: t.size_bytes, where: 2 });
     if (plan().reranker) {
       const have = chooser.data()?.reranker_on_disk;
       out.push({ title: plan().reranker.title, what: 'Puts the best passages first', bytes: have ? 0 : plan().reranker.size_bytes, where: 1, have });
@@ -177,7 +177,7 @@ export function reviewAndRun(w) {
 
       begin('tools', 'Fetching helper programs…');
       await invoke('fetch_tools', { dest: f.tools });
-      stage('tools', plan().tools.length && !plan().portable ? 'done' : 'skipped');
+      stage('tools', plan().tools.length && !plan().tools_here ? 'done' : 'skipped');
 
       begin('models', 'Fetching models…');
       if (plan().reranker) {

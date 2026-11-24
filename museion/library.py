@@ -69,7 +69,19 @@ def setup_plan(state: AppState) -> dict:
         "own_programs": own_programs.missing(state),
         "suggested_base": str(Path.home() / "Museion"),
         "portable": bool(state.drive),
+        # True when there are no helper programs to fetch, so the wizard's
+        # list and total leave them out.
+        "tools_here": helpers_on_drive(state),
     }
+
+
+def helpers_on_drive(state: AppState) -> bool:
+    """A prepared drive, and an unzipped release, already carry the helper
+    programs -- for every kind of graphics card, chosen at launch -- so
+    there is nothing to fetch, and set-up must not list them as downloads."""
+    cfg = state.config()
+    return bool(state.drive and cfg.kiwix_exe and cfg.kiwix_exe.exists()
+                and cfg.llama_exe and cfg.llama_exe.exists())
 
 
 def setup_room(state: AppState, folders: list[str]) -> list[dict]:
@@ -97,9 +109,7 @@ def progress(state: AppState, item: str, received: int, total: int, note: str = 
 def fetch_tools(state: AppState, dest: str) -> str:
     """Download the helper programs into `dest` and point the config at them."""
     cfg = state.config()
-    # A prepared drive already carries the helpers -- for every kind of
-    # graphics card, chosen at launch. Nothing to fetch.
-    if state.drive and cfg.kiwix_exe and cfg.kiwix_exe.exists() and cfg.llama_exe and cfg.llama_exe.exists():
+    if helpers_on_drive(state):
         return f"Already on the drive: {cfg.kiwix_exe} and {cfg.llama_exe}"
 
     def report(step: tools.Step) -> None:

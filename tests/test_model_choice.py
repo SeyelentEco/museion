@@ -111,6 +111,20 @@ class Choices(unittest.TestCase):
             got = model_choice.model_choices(state, str(folder))
         self.assertTrue(next(m for m in got["models"] if m["id"] == small.id)["on_disk"])
 
+    def test_a_model_only_named_in_settings_is_not_in_use(self):
+        # A fresh release names the small model before any is downloaded.
+        with StateWith(LAPTOP) as state:
+            folder = state.config_path.parent
+            small = model("qwen3-4b-instruct-q4")
+            cfg = state.config()
+            cfg.chat_model = folder / small.filename
+            state.save_config(cfg)
+            named = next(m for m in model_choice.model_choices(state)["models"] if m["id"] == small.id)
+            self.assertFalse(named["current"])
+            (folder / small.filename).write_bytes(b"gguf")
+            there = next(m for m in model_choice.model_choices(state)["models"] if m["id"] == small.id)
+            self.assertTrue(there["current"])
+
     def test_no_room_is_said(self):
         with StateWith(RTX3060) as state:
             real = model_choice.disk.free_space

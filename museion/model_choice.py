@@ -142,7 +142,9 @@ def model_choices(state: AppState, models_dir: str | None = None) -> dict:
             "fits": too_small is None, "why_not": too_small,
             "on_disk": present,
             "no_room": not present and free is not None and m.size_bytes > free,
-            "current": cfg.chat_model is not None and cfg.chat_model.name == m.filename,
+            # A fresh release names a model in its settings before any is
+            # downloaded: "in use" means the file is there.
+            "current": cfg.chat_model is not None and cfg.chat_model.name == m.filename and cfg.chat_model.is_file(),
             "helpers_run": runs, "helpers_not": not_runs,
         })
     reranker = catalog.reranker_model()

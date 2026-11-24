@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from museion import catalog, hardware, own_programs, pdf
+from museion import catalog, hardware, library, own_programs, pdf
 from museion.appstate import UiError, open_state
 from museion.hardware import Accelerator, Hardware
 
@@ -105,6 +105,28 @@ class Use(unittest.TestCase):
             (folder / "lib").mkdir()
             (folder / "lib" / pdf.library_filename()).write_bytes(b"")
             self.assertIsNone(own_programs.problem(entry, str(folder)))
+
+
+class CarriedAlready(unittest.TestCase):
+    """A release or a prepared drive holds its helper programs: set-up must
+    not list them as downloads, and fetching them is a no-op."""
+
+    def test_only_a_drive_that_holds_them_has_nothing_to_fetch(self):
+        with On("windows") as (state, folder):
+            self.assertFalse(library.setup_plan(state)["tools_here"])
+            cfg = state.config()
+            cfg.kiwix_exe, cfg.llama_exe = program(folder, "kiwix-serve"), program(folder, "llama-server")
+            state.save_config(cfg)
+            # The programs are set, but this is not a drive: a fetch would
+            # still run and check them against the catalogue.
+            self.assertFalse(library.setup_plan(state)["tools_here"])
+            state.drive = object()
+            plan = library.setup_plan(state)
+            self.assertTrue(plan["tools_here"])
+            self.assertTrue(plan["tools"])  # still says what they would be
+            self.assertIn("Already on the drive", library.fetch_tools(state, str(folder / "bin")))
+            cfg.llama_exe.unlink()
+            self.assertFalse(library.setup_plan(state)["tools_here"])
 
 
 if __name__ == "__main__":
