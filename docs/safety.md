@@ -18,15 +18,43 @@ use in exactly the situation it was built for.
 
 Concretely:
 
-- Every answer cites the articles it came from, and every citation opens the real page.
-- When the library does not cover something, the answer says so. "The library doesn't have
-  anything on this" is a correct and useful answer.
-- With no content installed, the app refuses to answer rather than falling back on the
-  model's own recollection. An ungrounded answer is the failure mode that makes a tool
-  like this dangerous.
+- An answer from the library cites the pages it came from, and every citation opens the
+  real page.
+- Every answer is labelled by what produced it: *from your library*, *from your library,
+  with calculation*, *computed*, *from your own notes*, or *general knowledge — not from
+  your library, unverified*. The label is worked out by the program from what actually
+  happened (which passages were cited, whether the calculator ran), not written by the
+  model.
+- When the library does not cover a medical, drug or dose, chemical, electrical or other
+  safety-critical question, saying so is the whole answer. "The library has nothing on
+  this" is a correct and useful answer, and the assistant is told to give no doses,
+  amounts or schedules from memory, however well known.
+- For a general question the library does not cover (history, background science), it
+  may answer briefly from general knowledge, under that last label and beginning with the
+  words "The library has nothing on this, so from general knowledge". That is a deliberate
+  allowance and the only one.
+- Arithmetic is done by a calculator, not by the model, and the calculation is shown
+  under the answer. A model scaling a bleach dose in its head got it wrong by a factor of
+  five before this was so.
 
-The retrieval-quality tests in the repo assert this behaviour directly, including the case
-where the correct response is an admission of ignorance.
+These are instructions to a language model, checked by tests and by a benchmark
+([evals.md](evals.md)) that includes questions where the right response is an admission
+of ignorance. They make a wrong answer less likely and easier to catch. They do not make
+one impossible: a small local model can misread a passage, cite one that does not say
+what it claims, or stray from its instructions. The citation is there so that you read
+the page before acting on anything that matters.
+
+## The agents
+
+The agents (clinic, first steps, water planner and the rest) run on the same loop and
+the same rules as the librarian. Three things are added for them:
+
+- An agent that must answer from the library searches it before it answers; the program
+  checks that it did.
+- The clinic agent gives a medicine or a dose only from a passage it found, quoted as the
+  book gives it, with danger signs first. If the library has no dose, it says so.
+- An agent changes one of your notes or records only after you press Allow on a card
+  that shows the change. Nothing is written behind your back.
 
 ## Medicine
 

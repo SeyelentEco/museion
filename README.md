@@ -21,7 +21,7 @@ questions.
 
 **1. Setting this up requires internet. Using it does not.**
 
-The library is between 800 MB and 250 GB depending on how much you want. That cannot live
+The library is between 800 MB and 270 GB depending on how much you want. That cannot live
 in a git repository. This repo ships *manifests* — verified checksums, mirrors, and torrent
 links — and fetches content on first run. A preparedness tool you can only install *before*
 the disaster is one most people won't have when it matters, so set it up now, and see
@@ -49,13 +49,15 @@ No git, no installer, and no Python to install. Get the file for your system fro
 | macOS on Apple silicon | `museion-<version>-macos.zip` | about 120 MB |
 | Linux, x86-64 | `museion-<version>-linux.tar.gz` | about 245 MB |
 
-1. **Unpack it** somewhere with room for a library (1 GB to 250 GB) and a model (3 GB to
+1. **Unpack it** somewhere with room for a library (1 GB to 270 GB) and a model (3 GB to
    37 GB): the computer's own disk, or a removable drive. It does not run from inside the
    zip.
 2. **Start it**: double-click `Museion.cmd` on Windows or `Museion.command` on a Mac; on
    Linux run `./museion.sh`. Museion opens in your web browser.
 3. **Set it up**: the page shows what it would fetch and how large each piece is, and
    fetches it when you say so. This is the only step that needs the internet.
+
+![The first page of set-up: what it will ask, and what it found on this computer](docs/images/wizard-start.png)
 
 The first start may meet a warning, because the download is not signed:
 
@@ -244,9 +246,13 @@ producing a corrupt double-length file.
 | Bundle | Size | Contents |
 |---|---|---|
 | **Go Bag** | 822 MB | Post-disaster, water, medicine, food preparation, knots |
-| Medicine | ~5 GB | Field medicine, US military medical manuals, MDWiki / WikiMed, MedlinePlus, NHS medicines A to Z, Wikipedia's medicine articles *(planned)* |
-| Homestead | ~21 GB | + Appropedia, energypedia and CD3WD (power, water, building), the USDA canning guide, iFixit, Wikibooks, Wikipedia in summary *(planned)* |
-| Library | ~250 GB+ | + full Wikipedia, Gutenberg, Wikiversity, Stack Exchange, maps *(planned)* |
+| Medicine | 4.9 GB | Field medicine, US military medical manuals, MDWiki, WikiMed (Wikipedia's medicine articles), MedlinePlus, NHS medicines A to Z |
+| Homestead | 21 GB | The Go Bag + Appropedia, energypedia and CD3WD (power, water, building), the USDA canning guide, iFixit, Wikibooks, Wikipedia in summary |
+| Library | 269 GB | Everything in Homestead and Medicine, with all of Wikipedia (no images) in place of the summary, + Wikipedia's chemistry articles and Project Gutenberg |
+
+All four can be fetched today. The Go Bag is the one the benchmark's PDF questions and
+most of the testing ran on; the larger bundles have had less use, so say so in an issue
+if one misbehaves.
 
 In the app, the **Library** tab shows what you have and what you could fetch, by category
 with sizes; click to read, click to fetch — verified, served, and indexed, so it's askable
@@ -267,6 +273,14 @@ when after a disaster they come up (the first month, six months, a year, five ye
 scored by machine against the basis label, the cited sources and the calculator's log.
 Runs are saved and can be compared side by side, so a new model or setting is judged
 against the last one. See [docs/evals.md](docs/evals.md).
+
+## Problems, questions and changes
+
+Something did not work, or an answer was wrong in a way that matters? Open
+[an issue](https://github.com/SeyelentEco/museion/issues) with the version (beside the
+name on the page), your system, and what `python -m museion hardware` prints.
+[CONTRIBUTING.md](CONTRIBUTING.md) says what kinds of changes fit, and
+[SECURITY.md](SECURITY.md) how to report something that should not be public yet.
 
 ## License
 
