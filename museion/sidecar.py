@@ -22,7 +22,7 @@ Museion's life by the operating system where it offers a way:
     that started it dies. Helpers are therefore always started from one
     long-lived thread (see Supervisor._spawner).
   * macOS has no equivalent. A graceful quit still stops the helpers; a
-    crash leaves them running, as it did in the Rust version.
+    crash leaves them running.
 """
 
 from __future__ import annotations

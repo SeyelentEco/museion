@@ -1,11 +1,9 @@
-"""The calculator: the tests ported from calc.rs, then a parity table.
+"""The calculator: how it behaves, then tables of recorded results.
 
-The calculator computes doses, so it must give the same answers as the Rust
-version it replaces. The tables at the bottom are Rust's own output: each
-expression was run through the Rust calc.rs (now on the archive/rust-app
-branch), unchanged, and
-the exact value (to the last bit), formatted text, or error message it gave is
-what the Python version is held to here."""
+The calculator computes doses, so its answers must never drift. The tables at
+the bottom are a record of what the first version of Museion answered: the
+exact value (to the last bit), formatted text, or error message for each
+expression is what the calculator is held to here."""
 
 import math
 import unittest
@@ -85,36 +83,36 @@ class CalcTest(unittest.TestCase):
                 calc.evaluate(src)
 
 
-class RustParityTest(unittest.TestCase):
-    def test_results_match_rust_exactly(self):
-        for src, value, text in RUST_RESULTS:
+class RecordedResultsTest(unittest.TestCase):
+    def test_results_match_the_record_exactly(self):
+        for src, value, text in RECORDED_RESULTS:
             with self.subTest(src=src):
                 got = calc.evaluate(src)
                 # Bit for bit, so the sign of a zero counts too.
                 self.assertEqual((got, math.copysign(1.0, got)), (value, math.copysign(1.0, value)))
                 self.assertEqual(calc.format_number(got), text)
 
-    def test_errors_match_rust(self):
-        for src, message in RUST_ERRORS:
+    def test_errors_match_the_record(self):
+        for src, message in RECORDED_ERRORS:
             with self.subTest(src=src):
                 with self.assertRaises(ValueError) as caught:
                     calc.evaluate(src)
                 self.assertEqual(str(caught.exception), message)
 
-    def test_formatting_matches_rust(self):
-        for value, text in RUST_FORMATS:
+    def test_formatting_matches_the_record(self):
+        for value, text in RECORDED_FORMATS:
             with self.subTest(value=value):
                 self.assertEqual(calc.format_number(value), text)
 
-    def test_questions_match_rust(self):
-        for question, arithmetic, normalised in RUST_QUESTIONS:
+    def test_questions_match_the_record(self):
+        for question, arithmetic, normalised in RECORDED_QUESTIONS:
             with self.subTest(question=question):
                 self.assertEqual(calc.looks_like_arithmetic(question), arithmetic)
                 self.assertEqual(calc.normalise(question), normalised)
 
 
-# (expression, the value Rust computed, Rust's calc::format of it)
-RUST_RESULTS = [
+# (expression, its value, the value as formatted text)
+RECORDED_RESULTS = [
     ("10*10", 100.0, "100"),
     ("2+3*4", 14.0, "14"),
     ("(2+3)*4", 20.0, "20"),
@@ -196,9 +194,9 @@ RUST_RESULTS = [
     ("\f2 *\u2003 3\u205f", 6.0, "6"),
 ]
 
-# (expression, Rust's error message)
-RUST_ERRORS = [
-    # Rust ignored a second value here and answered 3; it is refused now,
+# (expression, the error message)
+RECORDED_ERRORS = [
+    # A second value here was once ignored, answering 3; it is refused now,
     # since round(5/12, 2) the same way gave 0 and passed for exact.
     ("sqrt(9, 100)", "sqrt takes one value, not 2"),
     ("max()", "result is not a finite number"),
@@ -240,10 +238,10 @@ RUST_ERRORS = [
     ("1\u001c+1", "unexpected '\u001c' at position 2"),
 ]
 
-# (value, Rust's calc::format of it). The two small values are the exception:
-# Rust printed 1e-05 as "0" and -4.9e-05 as "-0", which hid a dose, so they
+# (value, the value as formatted text). The two small values are the exception:
+# 1e-05 was once printed as "0" and -4.9e-05 as "-0", which hid a dose, so they
 # now keep three significant figures.
-RUST_FORMATS = [
+RECORDED_FORMATS = [
     (100.0, "100"),
     (2.5, "2.5"),
     (67.772672, "67.77"),
@@ -269,8 +267,8 @@ RUST_FORMATS = [
     (math.nan, "NaN"),
 ]
 
-# (question, Rust's looks_like_arithmetic, Rust's normalise)
-RUST_QUESTIONS = [
+# (question, looks_like_arithmetic, normalise)
+RECORDED_QUESTIONS = [
     ("10*10", True, "10*10"),
     ("what is 12 x 12?", True, "12 * 12"),
     ("(3+4)/2 =", True, "(3+4)/2"),

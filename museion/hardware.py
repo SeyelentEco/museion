@@ -195,10 +195,10 @@ def other_gpu(adapters: list[tuple[str, int]]) -> tuple[str, int] | None:
     a PC with a 16 GB Radeon by its 128 MB of integrated graphics fetched the
     smallest model.
 
-    The Rust version asked wmic, whose AdapterRAM is a 32-bit field that wraps
-    above 4 GB, so it could only establish that a GPU existed. The registry
+    wmic's AdapterRAM is a 32-bit field that wraps above 4 GB, so it can only
+    establish that a GPU exists. The registry
     holds the true size in a 64-bit value on current drivers, so an AMD or
-    Intel card with more than 4 GB is now judged on its real memory."""
+    Intel card with more than 4 GB is judged on its real memory."""
     usable = [(size, name.strip()) for name, size in adapters if name.strip() and size > 0]
     if not usable:
         return None
@@ -246,7 +246,7 @@ def vulkan_loader() -> bool:
 def windows_adapters() -> list[tuple[str, int]]:
     """Display adapters from the registry, as (name, bytes of memory).
 
-    wmic, which the Rust version used, is deprecated and absent on current
+    wmic is deprecated and absent on current
     Windows 11 builds. The registry needs no process and no WMI."""
     import winreg
 

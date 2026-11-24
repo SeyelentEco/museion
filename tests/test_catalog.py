@@ -1,5 +1,5 @@
 """The catalogue as shipped: it parses, bundles resolve, and the choices the
-Rust tests pinned down come out the same. Plus what a person editing the
+tests pin down come out the same. Plus what a person editing the
 files by hand needs: a mistake names the file and the field."""
 
 import os
@@ -32,7 +32,7 @@ class ShippedCatalogueTest(unittest.TestCase):
         self.assertIn("Capable", catalog.chat_model_for("Capable", 64_000).tiers)
 
     def test_cuda_machine_gets_the_cuda_llama_build_with_its_companion(self):
-        # The Rust test ran only on Windows; naming the platform runs it anywhere.
+        # Naming the platform runs this on any system.
         key, v = catalog.tool_variant(llama_cpp(), "cuda", platform="windows", arch="x64")
         self.assertEqual(key, "windows-cuda")
         self.assertEqual(v.also, ["windows-cudart"])

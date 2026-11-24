@@ -234,11 +234,6 @@ the top eight, and the answer comes out right: pressure canner, 240 °F, 10/11 l
 The rewrite is an aid, not a dependency: if the chat model is unreachable, retrieval runs
 on the question alone, exactly as before.
 
-A note on the harness, because it cost an hour: the evaluation script was pointed at a
-stale, pre-workspace build directory, so every "gather-mode" result it reported for a day
-came from a binary that predated the changes under test. It now uses the workspace target,
-and the stale directory is gone.
-
 ## Contents pages are not answers
 
 Index and contents pages match almost any question about a book, because they list every

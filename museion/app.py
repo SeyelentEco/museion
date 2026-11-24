@@ -12,8 +12,7 @@ program over HTTP on 127.0.0.1:
                         {"error": "<a sentence for the person>"}.
   GET  /api/events      a stream of events (Server-Sent Events) -- answer
                         tokens, progress -- so the page can show work as it
-                        happens. These are the events the Rust app's window
-                        listened to, with the same names.
+                        happens.
   GET  /file?path=...   a PDF from one of the extra content folders, so a
                         citation of one opens in the reader at its page.
   GET  anything else    the page's own files.
@@ -64,8 +63,7 @@ DEFAULT_PORT = 8070
 IDLE_GRACE = 60
 IDLE_POLL = 5
 
-# Every command the page can call, by the name it calls it. The same names as
-# the Rust app's commands, so the page is a straight port of that one.
+# Every command the page can call, by the name it calls it.
 COMMANDS = {f.__name__: f for f in [
     commands.get_hardware, commands.get_status, commands.get_config, commands.set_config,
     commands.kiwix_url, commands.ask, commands.list_models, commands.run_evals,

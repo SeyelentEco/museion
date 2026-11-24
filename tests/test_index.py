@@ -1,6 +1,6 @@
 """The local full-text index. Nothing here needs a helper program: documents
-are built in memory, and tests/fixtures/rust-index.db stands in for an index
-made by the Rust version (see tests/index_corpus.py)."""
+are built in memory, and tests/fixtures/old-index.db stands in for an index
+made by the first version (see tests/index_corpus.py)."""
 
 import json
 import math
@@ -229,7 +229,7 @@ class QueryTermsTest(unittest.TestCase):
     def test_empty_for_a_question_of_pure_stopwords(self):
         self.assertEqual(to_fts_query("what is it?"), "")
 
-    def test_splits_words_as_the_rust_version_does(self):
+    def test_splits_words_as_the_first_version_did(self):
         # Underscores separate words; "can" is a topic, not a stopword.
         self.assertEqual(content_terms("can_beans, CAN beans"), ["can", "beans"])
         # Letters outside ASCII are part of words, and "longer than two" is
@@ -239,17 +239,17 @@ class QueryTermsTest(unittest.TestCase):
         self.assertEqual(content_terms("पानी कैसे साफ करें"), ["पानी", "कैसे", "साफ", "करें"])
 
 
-class RustIndexTest(unittest.TestCase):
-    """An index built by the Rust version opens and searches the same here."""
+class OldIndexTest(unittest.TestCase):
+    """An index built by the first version opens and searches the same here."""
 
     @classmethod
     def setUpClass(cls):
         # A copy, because opening a database in WAL mode writes beside it.
         cls.tmp = tempfile.TemporaryDirectory()
-        cls.path = Path(cls.tmp.name) / "rust-index.db"
-        shutil.copyfile(index_corpus.RUST_DB, cls.path)
+        cls.path = Path(cls.tmp.name) / "old-index.db"
+        shutil.copyfile(index_corpus.OLD_DB, cls.path)
         cls.ix = Index(cls.path)
-        cls.expected = json.loads(index_corpus.RUST_SEARCH.read_text())
+        cls.expected = json.loads(index_corpus.OLD_SEARCH.read_text())
 
     @classmethod
     def tearDownClass(cls):
@@ -275,7 +275,7 @@ class RustIndexTest(unittest.TestCase):
         # FTS5 checks its own index structures against the table's contents.
         self.ix.conn.execute("INSERT INTO pages(pages) VALUES ('integrity-check')")
 
-    def test_search_returns_what_the_rust_version_returned(self):
+    def test_search_returns_what_the_first_version_returned(self):
         for want in self.expected["results"]:
             query, limit = want["query"], want["limit"]
             with self.subTest(query=query):

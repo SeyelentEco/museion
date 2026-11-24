@@ -206,8 +206,8 @@ def _index_library(library, extra_dirs, db, kiwix_url, pdfium_dir, force, report
             done = ArchiveDone(book)
             for i, name in enumerate(pdfs):
                 # Joined as text rather than with Path, which would tidy
-                # "./found" into "found": the Rust version stores the folder
-                # exactly as it was given, and so does this.
+                # "./found" into "found": the folder is stored exactly as
+                # it was given.
                 path = os.path.join(os.fspath(dir), name)
                 title = title_from_filename(name)
                 try:

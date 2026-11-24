@@ -3,8 +3,7 @@
 // invoke('ask', { question }) runs a command and resolves with its result,
 // or rejects with the error as a sentence for the person. listen('name', fn)
 // calls fn({ payload }) for every event of that name until the function it
-// returns is called. Both mirror the Tauri calls the Rust app's page made,
-// so the code of that page came across nearly unchanged.
+// returns is called.
 
 export async function invoke(command, args = {}) {
   let response;

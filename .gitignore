@@ -50,8 +50,7 @@
 *.sqlite
 *.sqlite3
 
-# Build output, from anything run in the checkout. (node_modules/ and target/
-# are what a checkout of the archived Rust app leaves behind.)
+# Build output, from anything run in the checkout.
 node_modules/
 target/
 dist/

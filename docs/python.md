@@ -1,32 +1,18 @@
-# The Python version
+# How the code works
 
-Museion was rewritten from Rust and TypeScript into plain Python, so that
-someone who has been offline for a long time can change it themselves with a
-local coding agent (opencode on the same local model Museion runs). The Rust
-and TypeScript version is kept on the
-[`archive/rust-app`](https://github.com/SeyelentEco/museion/tree/archive/rust-app)
-branch; this page says how the Python version works, and what the rewrite found.
+Museion is plain Python, so that someone who has been offline for a long time
+can change it themselves with a local coding agent (opencode on the same local
+model Museion runs). This page says how the code works, and what testing it on
+real machines found.
 
-The rules the Python code keeps:
+The rules the code keeps:
 
 - **Standard library only.** Nothing to `pip install`, so it runs on the
   portable Python carried on the drive with no network.
 - **The heavy work stays native.** llama-server, kiwix-serve, pdfium and SQLite
-  FTS5 are the same pinned programs as before; Python only drives them.
-- **One concern per file, each short enough for a local model to read whole.**
-  Each module keeps the name of the Rust module it replaces (`pdf.py` for
-  `pdf.rs`), and the comments that explain *why* come across with the code.
-
-## Status
-
-| Phase | What | State |
-| --- | --- | --- |
-| 0 | Prove the portable runtime: FTS5, pdfium through ctypes, starting and stopping llama-server, helpers dying with Museion | Done: `museion/pdf.py`, `sidecar.py`, `llama.py`, `doctor.py` |
-| 1 | Port the core as a command line: index, search, ask, evals | Done: `python -m museion` (see below); asks exactly as the Rust version does |
-| 2 | Browser UI in plain HTML and JavaScript | Done: `python -m museion` opens it (see below); every screen of the Rust app |
-| 3 | The drive: portable mode, prepare, `AGENTS.md`, opencode | Done: tested on a real PC with real models (see [The drive](#the-drive-and-changing-museion)) |
-| 4 | Rehearse offline edits with a local coding agent | Done: three tasks on a drive with the 35B, each re-run after `AGENTS.md` was fixed (see [What phase 4 found](#what-phase-4-found)) |
-| 5 | Retire the Rust code | Done: the Rust and TypeScript app moved to the `archive/rust-app` branch, the Node scripts became commands, the `.toml` files became the only data, and a release is a zip per platform (see [What phase 5 changed](#what-phase-5-changed)) |
+  FTS5 are pinned programs; Python only drives them.
+- **One concern per file, each short enough for a local model to read whole,**
+  with comments that explain *why*.
 
 ## Running it
 
@@ -51,13 +37,11 @@ python -m museion
 ```
 
 That starts Museion and opens it in the default browser at
-`http://127.0.0.1:8070/`: Ask, Library, Evals, Settings, and the first-run
-set-up, as the Rust app's window had them. It reads and writes the settings
-the Rust app wrote, so a machine set up with that is still set up. See
-[The browser page](#the-browser-page) for how it works.
+`http://127.0.0.1:8070/`: Ask, Agents, Notes, Map, Library, Evals, Settings,
+and the first-run set-up. See [The browser page](#the-browser-page) for how it
+works.
 
-The command line has the Rust `museion` program's commands and options, and
-the Node scripts' jobs as commands of their own:
+The command line does the same jobs without the page:
 
 ```bash
 python -m museion index  --library E:/museion-library --pdfium bin
@@ -162,7 +146,7 @@ What testing on a real PC (Windows, RTX 3060 12 GB) showed:
   `&&` does not work there.
 - A USB disk whose flushes fail made SQLite fail every write; the index is
   opened with `synchronous=OFF` in such a folder (it can always be rebuilt).
-- The machine profile holds absolute paths, as the Rust app's did, so a drive
+- The machine profile holds absolute paths, so a drive
   under a new letter looks for each one again under its new root rather than
   dropping it and running on the CPU.
 
@@ -173,12 +157,11 @@ web server on `127.0.0.1` only, and opens the page in the browser. The page is
 plain HTML, CSS and JavaScript in `museion/ui/`, with no build step: change a
 file, reload the page, and the change is there.
 
-- **Settings** are `config.json`, where the Rust app kept it: `%APPDATA%\org.museion.desktop`
+- **Settings** are `config.json`, in `%APPDATA%\org.museion.desktop`
   on Windows, `~/Library/Application Support/org.museion.desktop` on macOS,
   `~/.config/org.museion.desktop` on Linux. `--config-dir` points elsewhere.
 - **How the page asks for things.** `POST /api/<command>` runs the Python
-  function of that name (the list is `COMMANDS` in `app.py`; the names are the
-  Rust app's) and answers `{"ok": result}` or `{"error": "a sentence"}`.
+  function of that name (the list is `COMMANDS` in `app.py`) and answers `{"ok": result}` or `{"error": "a sentence"}`.
   Progress (the answer as it is written, downloads, indexing) arrives on one
   event stream, `GET /api/events`. `museion/ui/api.js` wraps both.
 - **Only this page can use it.** Commands need a header another site's page
@@ -200,33 +183,27 @@ file, reload the page, and the change is there.
 The catalogue (`catalog/`, `models/`, `tools/`, `drive/`), the benchmark and
 the retrieval check (`evals/`) and the prompts and limits
 (`museion/tuning.toml`) are TOML, which Python reads with no library. They are
-the source: edit them directly. (The Rust app read YAML twins of them, which
-went with it.)
+the source: edit them directly.
 
-## What it kept from the Rust version
+## What the tests hold it to
 
-While both existed, a parity test asked the same question with both command
-lines, against the same index and the same scripted model, and required the
-requests sent to the model and the printed answers to be identical. It passed
-on the last commit that had both, and went with the Rust code. What stays:
+Two records in `tests/fixtures/` come from the first version of Museion, so
+that what a person built with it keeps working:
 
-- `tests/test_index.py` opens an index the Rust indexer built
-  (`tests/fixtures/rust-index.db`) and requires the search results the Rust
-  version gave (`rust-search.json`), in the same order, and
-  `tests/test_indexer.py` requires the Python indexer to build the same rows.
-  So an index someone built with the Rust app keeps working.
-- `tests/test_calc.py` holds the calculator to the Rust calculator's own
-  output, to the last bit.
+- `tests/test_index.py` opens an index that version built (`old-index.db`) and
+  requires the search results it gave (`old-search.json`), in the same order,
+  and `tests/test_indexer.py` requires the indexer to build the same rows.
+- `tests/test_calc.py` holds the calculator to recorded results, to the last
+  bit.
 
-Where the Python version deliberately differs:
+Choices worth knowing about:
 
-- **Citations.** A passage was identified by its book and page, so two PDFs in
-  one archive that both had a page 2 shared a citation number, and a citation
-  of the second named the first. The Rust version is fixed in the same change,
-  so the two still match.
+- **Citations.** A passage is identified by its file as well as its book and
+  page. By book and page alone, two PDFs in one archive that both had a page 2
+  shared a citation number, and a citation of the second named the first.
 - **Windows GPU detection** reads the display adapters from the registry
   rather than `wmic`, which current Windows 11 no longer has. Cards over 4 GB
-  now report their real memory.
+  report their real memory.
 - **Unpacking** uses Python's own `zipfile` and `tarfile` rather than the
   system's `tar`, and refuses archive entries that would land outside the
   folder.
@@ -234,12 +211,10 @@ Where the Python version deliberately differs:
   silently ignored.
 - **Helper programs** get a timeout when Museion only asks them a question
   (`nvidia-smi`, `sysctl`), so a hung driver cannot hang the hardware check.
-
 - **The page** renumbers an answer's citations to match its source list once
-  the answer is complete (the Rust app kept showing the model's own numbers,
-  which need not match the list), opens PDFs from extra folders in the reader at the cited page,
-  and shows commands' failures as sentences in the page rather than as
-  console errors.
+  the answer is complete (the model's own numbers need not match the list),
+  opens PDFs from extra folders in the reader at the cited page, and shows
+  commands' failures as sentences in the page rather than as console errors.
 - **Set-up** keeps helper programs already configured when the catalogue has
   none for this system, rather than clearing their paths.
 
@@ -248,7 +223,7 @@ Linux came later than the other two: the catalogue has Linux builds of llama.cpp
 the release has a Linux package. The graphics-card paths on Linux are tested
 with stand-ins only; nobody has yet run them on a real Linux machine with a card.
 
-## What phase 4 found
+## What rehearsing offline edits found
 
 On a prepared drive on a Windows PC (RTX 3060 12 GB), with Qwen3.6-35B-A3B
 chosen in Settings, opencode was given three tasks through `Edit Museion`,
@@ -307,33 +282,18 @@ Still rough:
   `curl` ignores the proxy variables, so the rehearsal could not stop that; on
   a computer with no network it fails.
 
-## What phase 5 changed
+## Releases
 
-- The Rust and TypeScript app (`crates/`, `apps/`, Cargo and npm) moved to the
-  `archive/rust-app` branch, at the last commit where both versions lived side
-  by side, and its release job went with it.
-- The Node scripts became commands: `fetch.js` is `fetch`, `verify.js` is
-  `verify --library`, `catalog-sync.js` is `sync-source` and `check-sources`,
-  and `retrieval-eval.mjs` is `retrieval-eval`, its questions now in
-  `evals/retrieval.toml`. Written again from what Kiwix published, every entry
-  in `catalog/sources/` comes out byte for byte as the Node script wrote it; a
-  test holds it to that. `fetch-tools.mjs` was already `tools`.
-- The YAML went, and with it the "generated, edit the YAML" line at the top of
-  every `.toml`, which phase 4 showed opencode copying into a new entry.
-- A release is `prepare --skeleton`, zipped, per platform, and the drive's own
-  Python runs the drive's own tests before it is attached. A pull request that
-  changes how a drive is laid out builds and tests it too.
-- The drive's README said to unzip the undo archive over `app/`; its entries
-  start with `app/`, so it now says to unzip it into the drive's top folder, as
-  `AGENTS.md` does.
+A release is `prepare --skeleton`, zipped, per platform, and the drive's own
+Python runs the drive's own tests before it is attached. A pull request that
+changes how a drive is laid out builds and tests it too.
 
-## What phase 0 found
+## What proving the portable Python found
 
 - The portable Python's `sqlite3` has FTS5 (SQLite 3.50.4).
 - pdfium works through ctypes with no compiled glue; a few dozen lines declare
   the eleven functions Museion uses.
-- A helper dies when Museion is killed outright on Windows (a Job Object, as
-  the Rust version did) and on Linux (`PR_SET_PDEATHSIG`, which the Rust
-  version did not have). On Linux the signal follows the *thread* that started
+- A helper dies when Museion is killed outright on Windows (a Job Object) and
+  on Linux (`PR_SET_PDEATHSIG`). On Linux the signal follows the *thread* that started
   the helper, so every helper is started from one long-lived thread. macOS has
   no equivalent; a normal quit still stops the helpers there.

@@ -6,8 +6,8 @@ not the hours of GPU time that embedding every chunk into a vector database
 would cost before the tool became usable at all.
 
 The file is an ordinary SQLite database (museion-index.db) with an FTS5 table
-for the text. Its schema and queries are exactly those of the Rust version,
-so an index built by either one opens and searches the same in the other.
+for the text. Its schema and queries are exactly those of the first version
+of Museion, so an index it built opens and searches the same here.
 """
 
 from __future__ import annotations
@@ -219,8 +219,8 @@ class Index:
         """Open the index at `path`, creating it if it does not exist."""
         try:
             # Autocommit: transactions are begun and committed explicitly
-            # below, as the Rust version does, rather than by the sqlite3
-            # module guessing where they should go.
+            # below, rather than by the sqlite3 module guessing where they
+            # should go.
             self.conn = sqlite3.connect(str(path), isolation_level=None)
             # Before journal_mode, which is itself a write.
             sync = "NORMAL" if str(path) == ":memory:" or can_flush(Path(path).parent) else "OFF"
@@ -377,8 +377,8 @@ class Index:
             raise RuntimeError(f"running search for {fts!r}: {e}") from e
 
         weights = self._term_weights(terms)
-        # Added up one by one, as the Rust version does: sum() is more careful
-        # with rounding, and would make a full match 0.9999999999999999.
+        # Added up one by one: sum() is more careful with rounding, and
+        # would make a full match 0.9999999999999999.
         total = 0.0
         for weight in weights:
             total += weight
@@ -520,8 +520,8 @@ def content_terms(text: str) -> list[str]:
     seen: list[str] = []
     for w in _words(text):
         w = w.lower()
-        # "Longer than two" is counted in UTF-8 bytes, as the Rust version
-        # counts it, so both pick the same terms from the same question.
+        # "Longer than two" is counted in UTF-8 bytes, not characters; the
+        # search results recorded in tests/fixtures depend on it.
         if len(w.encode("utf-8")) > 2 and w not in STOP_WORDS and w not in seen:
             seen.append(w)
     return seen
@@ -532,7 +532,7 @@ def _words(text: str) -> list[str]:
 
     The marks that combine with a letter count as part of the word, so that
     "पानी" (water) is one word and not the consonants on either side of its
-    vowel signs. The Rust version splits text the same way, apart from a few
+    vowel signs. The first version split text the same way, apart from a few
     rare marks and symbols that Unicode lists as letters and Python cannot
     tell apart from the rest."""
     words: list[str] = []

@@ -8,7 +8,7 @@ drive in a cupboard prove it is still intact years later.
 
 They are TOML, read from the folders beside the package, which travel on
 the drive with the code, so a corrected URL or a new model is an edit to a
-text file. (The Rust version compiled them into its binary, as YAML.)
+text file.
 
 Every function reads the files afresh, so an edit shows at once.
 """
@@ -162,7 +162,7 @@ def _check(value: object, kind: str, where: str) -> object:
 
 def _build(cls: type, data: dict, where: str = "") -> object:
     """Builds a dataclass from a TOML table. Keys it does not know are
-    ignored, as the Rust parser ignored them (the files carry notes such as
+    ignored (the files carry notes such as
     the quantisation that nothing reads)."""
     args, missing = {}, []
     for f in fields(cls):

@@ -59,7 +59,7 @@ BASIS_LABELS = {
 def main(argv: list[str] | None = None) -> None:
     # Answers are full of characters like × and ±. A console shows them, but
     # output redirected to a file on Windows would be written in the old
-    # code page and stop at the first one; write UTF-8 there, as Rust did.
+    # code page and stop at the first one; write UTF-8 there.
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure") and not stream.isatty():
             stream.reconfigure(encoding="utf-8")
