@@ -280,6 +280,28 @@ class WithTheSourcesChanges(UpgradeCase):
         self.assertEqual((outcome.old, outcome.new, outcome.brought), ("0.2.0", "0.2.0", ["museion/theirs.py"]))
         self.assertEqual(self.app("museion/theirs.py"), "made on the computer\n")
 
+    def test_changes_that_break_the_tests_there_are_left_behind(self):
+        write(self.new / "app" / "museion" / "theirs.py", "breaks the tests\n")
+        write(self.old / "app" / "museion" / "mine.py", "made on the drive\n")
+        outcome = self.install(with_changes=True, tests=lambda app, log: not (app / "museion" / "theirs.py").exists())
+        self.assertEqual((outcome.brought, outcome.left_behind), ([], ["museion/theirs.py"]))
+        self.assertEqual((outcome.carried, outcome.dropped_changes), (["museion/mine.py"], False))
+        self.assertEqual(self.app("museion/ask.py"), NEW_ASK)
+        self.assertFalse((self.old / "app" / "museion" / "theirs.py").exists())
+        self.assertEqual(switch.history(self.old)[-1]["left_behind"], ["museion/theirs.py"])
+
+    def test_and_a_copy_with_no_changes_of_its_own_still_gets_the_version(self):
+        write(self.new / "app" / "museion" / "theirs.py", "breaks the tests\n")
+        outcome = self.install(with_changes=True, tests=lambda app, log: not (app / "museion" / "theirs.py").exists())
+        self.assertEqual((outcome.new, outcome.left_behind, outcome.aside), ("0.2.0", ["museion/theirs.py"], []))
+
+    def test_between_two_copies_of_one_version_they_change_nothing(self):
+        self.install()
+        write(self.new / "app" / "museion" / "theirs.py", "breaks the tests\n")
+        with self.assertRaisesRegex(UpgradeError, "nothing was changed"):
+            self.install(with_changes=True, tests=lambda app, log: not (app / "museion" / "theirs.py").exists())
+        self.assertFalse((self.old / "app" / "museion" / "theirs.py").exists())
+
     def test_a_change_on_both_sides_to_the_same_lines_is_set_aside(self):
         write(self.new / "app" / "museion" / "tuning.toml", "passages = 30\nlength = 400\n")
         write(self.old / "app" / "museion" / "tuning.toml", "passages = 12\nlength = 400\n")

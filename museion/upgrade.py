@@ -74,6 +74,7 @@ class Outcome:
     parts: list[str]                                  # of "app", "python", "bin"
     carried: list[str] = field(default_factory=list)  # the person's changes now in the new code
     brought: list[str] = field(default_factory=list)  # changes made in the source copy, taken along
+    left_behind: list[str] = field(default_factory=list)  # ... and those left there: the tests failed with them
     aside: list[str] = field(default_factory=list)    # those that could not be carried
     aside_folder: str = ""
     # True when the merged code failed its tests and the new version went in
@@ -232,21 +233,35 @@ def stage(source: Source, target: Path, *, force: bool = False, consume: bool = 
     except OSError:
         earlier = ""
     _write_app(new_dir / "app", merged, label, source.version, aside_name, earlier)
-    dropped = False
+    dropped, left = False, []
     if tests is not None:
         report("Testing the new version before it is used (a minute or two)")
         if not tests(new_dir / "app", work / "tests.log"):
             failed = UpgradeError(f"version {source.version} did not pass its own tests here, so nothing was "
                                   f"changed. The tests' output is in {work / 'tests.log'}.")
-            if not merged.changes:
+            if not (merged.changes or brought):
                 raise failed
             if not keep_changes:
-                report("The tests fail with your changes in; trying the new version as shipped")
-                merged = appmerge.without_changes(base, mine, new)
-                _write_app(new_dir / "app", merged, label, source.version, aside_name, earlier)
-                if not tests(new_dir / "app", work / "tests.log"):
+                passed = False
+                if brought:
+                    # The changes taken along are the likeliest cause, and
+                    # they are safe where they came from: leave them there.
+                    if old == source.version:
+                        raise UpgradeError("that copy did not pass its tests with this copy's changes in it, so "
+                                           f"nothing was changed. The tests' output is in {work / 'tests.log'}.")
+                    report("The tests fail with this copy's changes in; trying without them")
+                    left, brought = brought, []
+                    merged = appmerge.merge(base, mine, new)
+                    _write_app(new_dir / "app", merged, label, source.version, aside_name, earlier)
+                    passed = tests(new_dir / "app", work / "tests.log")
+                if not passed and merged.changes:
+                    report("The tests fail with your changes in; trying the new version as shipped")
+                    merged = appmerge.without_changes(base, mine, new)
+                    _write_app(new_dir / "app", merged, label, source.version, aside_name, earlier)
+                    passed = tests(new_dir / "app", work / "tests.log")
+                    dropped = passed
+                if not passed:
                     raise failed
-                dropped, brought = True, []
     if merged.aside:
         appmerge.write_aside(merged, new_dir / "aside")
 
@@ -267,7 +282,7 @@ def stage(source: Source, target: Path, *, force: bool = False, consume: bool = 
             held.helpers[name] = sha
     package.write(new_dir, held)
 
-    outcome = Outcome(old, source.version, parts, merged.carried(), brought, merged.set_aside(),
+    outcome = Outcome(old, source.version, parts, merged.carried(), brought, left, merged.set_aside(),
                       aside_name if merged.aside else "", dropped)
     disk.write_text(work / STAGED, json.dumps({**asdict(outcome), "fingerprint": seen}, indent=2))
     return outcome
@@ -299,7 +314,8 @@ def switch_staged(target: Path, report: Report = lambda line: None) -> Outcome:
     (target / WORK / STAGED).unlink()
     try:
         switch.switch(target, {"from": outcome.old, "to": outcome.new, "moves": moves, "parts": outcome.parts,
-                               "carried": outcome.carried, "brought": outcome.brought, "aside": outcome.aside,
+                               "carried": outcome.carried, "brought": outcome.brought, "left_behind": outcome.left_behind,
+                               "aside": outcome.aside,
                                "aside_folder": outcome.aside_folder, "dropped_changes": outcome.dropped_changes}, report)
     except switch.Refused as e:
         disk.write_text(target / WORK / STAGED, json.dumps({**asdict(outcome), "fingerprint": seen}, indent=2))

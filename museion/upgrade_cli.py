@@ -317,6 +317,11 @@ def summary(outcome: upgrade.Outcome, target: Path) -> list[str]:
         n = len(outcome.brought)
         lines.append(f"{n} change{'s' if n != 1 else ''} made to this copy's code {'were' if n != 1 else 'was'} "
                      f"taken along: {', '.join(outcome.brought)}.")
+    if outcome.left_behind:
+        n = len(outcome.left_behind)
+        lines.append(f"The new version did not pass its tests with the change{'s' if n != 1 else ''} made to this "
+                     f"copy's code, so {'they were' if n != 1 else 'it was'} not taken along: "
+                     f"{', '.join(outcome.left_behind)}. {'They are' if n != 1 else 'It is'} still in this copy.")
     if outcome.aside:
         n = len(outcome.aside)
         why = ("The new version did not pass its tests with your changes in it, so they were all set aside"

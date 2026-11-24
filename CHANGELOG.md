@@ -26,6 +26,12 @@ internet. `docs/upgrading.md` explains all of it.
   version changed the same lines, is set aside in `my-changes/` with a note in
   `app/UPGRADE-NOTES.md` saying how to put it back, which Edit Museion can do.
   `python -m museion changes` lists what you have changed.
+- **Two copies of your own**: bringing another copy up to date can take along
+  the changes you made to this copy's code (a tick box, or `--with-changes`),
+  so a drive and a computer copy can be kept the same.
+- **Check for a newer version** (a button on the card): asks GitHub for the
+  latest release and can download it, check it and upgrade from it. It is the
+  only part that uses the internet, and nothing is asked unless you press it.
 - **Go back** (the card's button, or `upgrade --back`): the version an upgrade
   replaced is kept in `previous/` until the next upgrade.
 - An upgrade cut short by a power failure or a pulled drive is finished the

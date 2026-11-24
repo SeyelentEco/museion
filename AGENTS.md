@@ -93,7 +93,7 @@ and the unit tests. A change shows in a new chat; no restart is needed.
 | Starting and stopping the helper programs | `museion/sidecar.py`, `services.py` |
 | What can be downloaded, with checksums | `catalog/`, `models/`, `tools/`, `drive/` (`.toml` files), read by `museion/catalog.py`; `catalog_add.py` adds an archive (`catalog_sync.py` does it from a Kiwix link, with internet) |
 | Running from a drive, preparing one | `museion/portable.py`, `prepare.py`, `manifest.py`, `launchers.py` |
-| Upgrading a copy from a newer one, and carrying the person's code changes across | `museion/upgrade.py`, `switch.py`, `appmerge.py`, `merge3.py`, `upgrade_cli.py`, `upgrade_commands.py`, `ui/upgrade.js`; see `docs/upgrading.md` |
+| Upgrading a copy from a newer one, and carrying the person's code changes across | `museion/upgrade.py`, `switch.py`, `appmerge.py`, `merge3.py`, `upgrade_cli.py`, `upgrade_commands.py`, `newer.py` (asking for the latest release), `ui/upgrade.js`; see `docs/upgrading.md` |
 | This editing set-up | `museion/edit.py` |
 | The benchmark of questions and expected answers | `evals/benchmark.toml`, `museion/evals.py`; retrieval alone: `evals/retrieval.toml`, `retrieval_eval.py` |
 | Agents: the harness, its tools, chats | `agents/` (one folder each), `museion/harness.py`, `agent_tools/` (one tool per file), `agents.py` (settings), `chat_commands.py`, `agent_commands.py`; see `docs/agents.md` |

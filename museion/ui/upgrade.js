@@ -27,6 +27,10 @@ function describe(last) {
   if (last.brought?.length) {
     lines.push(`${plural(last.brought.length, 'change', 'changes')} made in the copy it came from ${last.brought.length === 1 ? 'was' : 'were'} taken along.`);
   }
+  if (last.left_behind?.length) {
+    lines.push(`The new version did not pass its tests with the ${last.left_behind.length === 1 ? 'change' : 'changes'} made in the copy it came from, so ${last.left_behind.length === 1 ? 'it was' : 'they were'} not taken along (still there, in that copy):`);
+    lines.push(`  ${last.left_behind.join(', ')}`);
+  }
   if (last.carried?.length) {
     lines.push(`${plural(last.carried.length, 'change', 'changes')} you had made to the code ${last.carried.length === 1 ? 'was' : 'were'} carried over.`);
   }

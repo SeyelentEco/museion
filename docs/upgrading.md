@@ -24,7 +24,12 @@ on a stick; nothing is fetched.
   keeps running, then restarts itself as the new version. The page reloads
   when it is back and says what was done.
 - *Bring another copy up to this version*: choose the folder or drive of an
-  older copy. Close Museion in that copy first.
+  older copy. Close Museion in that copy first. If you have changed this
+  copy's code, a tick box offers to take those changes along (below).
+- *Check for a newer version*: asks GitHub what the latest release is, and
+  can download it into this copy, check it against the release's checksum and
+  upgrade from it. This is the only thing on the card that uses the internet,
+  and nothing is asked unless you press it.
 
 **From the command line.** Use the launcher in the copy's folder
 (`Museion.cmd` on Windows, `Museion.command` on macOS, `./museion.sh` on
@@ -34,6 +39,7 @@ Linux), with Museion closed:
 Museion.cmd upgrade D:\Downloads\museion-0.3.0-windows.zip    this copy, from a download
 Museion.cmd upgrade E:\                                       this copy, from a newer copy or drive
 Museion.cmd upgrade --into E:\                                put this version into that copy
+Museion.cmd upgrade --into E:\ --with-changes                 ... and your changes to this copy's code
 Museion.cmd upgrade --back                                    go back to the version before
 Museion.cmd changes                                           what you have changed in the code
 ```
@@ -102,6 +108,19 @@ fails its tests even as shipped, nothing is changed at all.
 `python -m museion changes` (or the card in Settings) lists what you have
 changed at any time; `--diff` shows each change.
 
+### Two copies of your own
+
+Someone with Museion on their computer and on a drive may have changed the
+code on one of them. *Bring another copy up to this version* with the box
+ticked (`upgrade --into <folder> --with-changes`) puts this copy's code into
+the other **as it stands here**, changes included, merged with whatever was
+changed there by the same rules. It works between two copies of the same
+version too, when only the changes are new. The other copy still records the
+version as it shipped, so everything taken along shows there as a change, and
+its next upgrade carries it on. If the tests fail there with this copy's
+changes in, the other copy gets the new version without them, and the summary
+lists what was left behind (it is all still here).
+
 ## Going back
 
 What an upgrade replaced is kept in `previous/<version>/`: the old `app/`, and
@@ -159,8 +178,9 @@ inside the copy (`upgrade/incoming/`) and starts that command there.
 | Merging a person's changes | `museion/appmerge.py` (which file wins), `merge3.py` (lines within a file) |
 | The commands, starting the newer copy's program, restarting Museion | `museion/upgrade_cli.py` |
 | The card in Settings | `museion/upgrade_commands.py`, `ui/upgrade.js` |
+| Asking for the latest release, fetching it | `museion/newer.py` |
 | What a copy holds | `museion/package.py` (`support/package.json`) |
-| Tests | `tests/test_upgrade.py`, `test_appmerge.py`, `test_merge3.py`, `test_upgrade_cli.py`; the release job upgrades a real older release on each system (`.github/upgrade_check.py`) |
+| Tests | `tests/test_upgrade.py`, `test_appmerge.py`, `test_merge3.py`, `test_upgrade_cli.py`, `test_newer.py`; the release job upgrades a real older release on each system (`.github/upgrade_check.py`) |
 
 Two rules keep old copies upgradable. The folder layout above is a promise:
 a new version may add to it, and must go on reading what the old ones wrote
