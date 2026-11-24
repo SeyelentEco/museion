@@ -27,7 +27,7 @@ from contextlib import closing
 from pathlib import Path
 
 from museion import (agent_cli, app, ask, calc, catalog_cli, climate_cli, drive_cli, evals, fit, hardware, indexer, map_cli,
-                     retrieval_eval, tools, tuning)
+                     retrieval_eval, tools, tuning, upgrade_cli)
 from museion.appstate import UiError
 from museion.index import Index
 from museion.kiwix import Kiwix, book_id_from_filename
@@ -181,6 +181,7 @@ def parser() -> argparse.ArgumentParser:
     drive_cli.add_commands(commands)
     map_cli.add_commands(commands)
     climate_cli.add_commands(commands)
+    upgrade_cli.add_commands(commands)
     return top
 
 

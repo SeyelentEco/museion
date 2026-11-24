@@ -508,6 +508,51 @@
               </div>
               <p id="radio-card-status" class="status" role="status"></p>
             </div>
+            <div class="card" id="card-upgrade">
+              <h2>Version and upgrades</h2>
+              <p id="upgrade-summary" class="muted"></p>
+              <p id="upgrade-last" class="upgrade-last" hidden></p>
+              <details id="upgrade-changes" class="upgrade-changes" hidden>
+                <summary></summary>
+                <p class="muted">
+                  Measured against the code as this version shipped it. An upgrade carries these
+                  changes into the new version; one it cannot carry is set aside for you, not lost.
+                </p>
+                <ul></ul>
+              </details>
+              <div id="upgrade-own" hidden>
+                <div class="field">
+                  <label for="upgrade-source">Upgrade this copy</label>
+                  <span class="what">
+                    A newer Museion download (the .zip or .tar.gz file, as it was downloaded), or the
+                    folder or drive of a newer copy. It works without the internet. Your library,
+                    models, notes and settings are not touched; the version you have now is kept, so
+                    you can go back.
+                  </span>
+                  <div class="row">
+                    <input id="upgrade-source" type="text" placeholder="The newer download, or a folder holding a newer Museion" autocomplete="off" />
+                    <button id="upgrade-pick" type="button">Choose…</button>
+                    <button id="upgrade-start" type="button">Upgrade</button>
+                  </div>
+                </div>
+                <div class="actions">
+                  <button id="upgrade-back" type="button" hidden></button>
+                </div>
+              </div>
+              <div class="field">
+                <label for="upgrade-target">Bring another copy up to this version</label>
+                <span class="what">
+                  An older Museion folder, or a Museion drive, on this computer. Its own library,
+                  models, notes and settings stay as they are. Close Museion in that copy first.
+                </span>
+                <div class="row">
+                  <input id="upgrade-target" type="text" placeholder="The other copy's folder: E:\ or /Volumes/MUSEION" autocomplete="off" />
+                  <button id="upgrade-target-pick" type="button">Choose…</button>
+                  <button id="upgrade-other" type="button">Upgrade that copy</button>
+                </div>
+              </div>
+              <p id="upgrade-status" class="status" role="status"></p>
+            </div>
             <div class="card" id="card-drive" hidden>
               <h2>This drive</h2>
               <p class="muted">

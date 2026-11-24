@@ -11,6 +11,7 @@
 //   settings.js  the Settings tab     tabs.js     switching tabs
 //   home.js      your home area, in Settings and first-run set-up
 //   welcome.js   first-run set-up     dom.js      small helpers
+//   upgrade.js   version and upgrades, in Settings
 
 import { closeEvents, invoke, listen } from './api.js';
 import { $, el } from './dom.js';
@@ -28,6 +29,7 @@ import './settings.js';
 import './home.js';
 import './welcome.js';
 import './prepare.js';
+import './upgrade.js';
 
 /**
  * Bring the services up on launch, narrating in the Ask tab. A person who

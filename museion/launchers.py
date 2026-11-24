@@ -16,16 +16,16 @@ WINDOWS = {
     "Museion.cmd": """@echo off
 rem Starts Museion from this drive and opens it in the browser.
 rem Close this window, or the last Museion tab, to stop it.
+rem The last line is one line on purpose: cmd reads this file a line at a
+rem time as it runs, and an upgrade may rewrite the file while Museion runs.
 cd /d "%~dp0app"
-"%~dp0python\\python.exe" -m museion %*
-if errorlevel 1 pause
+"%~dp0python\\python.exe" -m museion %* & if errorlevel 1 (pause & exit /b 1) else (exit /b 0)
 """,
     "Edit Museion.cmd": """@echo off
 rem Opens opencode on Museion's own code, answering with the chat model on
 rem this drive. See app\\AGENTS.md for how the code is laid out.
 cd /d "%~dp0app"
-"%~dp0python\\python.exe" -m museion edit %*
-if errorlevel 1 pause
+"%~dp0python\\python.exe" -m museion edit %* & if errorlevel 1 (pause & exit /b 1) else (exit /b 0)
 """,
 }
 

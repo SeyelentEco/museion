@@ -7,7 +7,7 @@ The release is made by pushing the tag v<VERSION>; the release job refuses a
 tag that does not match. CHANGELOG.md says what each version changed.
 """
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 
 
 def parse(text: str) -> tuple[int, ...]:
