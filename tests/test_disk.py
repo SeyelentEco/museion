@@ -72,8 +72,22 @@ class DiskTest(unittest.TestCase):
 
     def test_volume_names(self):
         self.assertEqual(disk.volume_name(Path(r"E:\museion-library")), "E:")
-        self.assertEqual(disk.volume_name(Path("/home/x")), "/")
+        self.assertEqual(disk.volume_name(Path("/")), "/")
         self.assertEqual(disk.volume_name("e:/museion"), "E:")
+
+    @unittest.skipIf(os.name == "nt", "device numbers are not how Windows names a drive")
+    def test_off_windows_a_volume_is_the_top_of_the_drive_the_path_is_on(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            here = Path(tmp)
+            name = Path(disk.volume_name(here))
+            # Above or at the path, on the same drive, and nothing above it is.
+            self.assertTrue(name == here or name in here.parents)
+            self.assertEqual(os.stat(name).st_dev, os.stat(here).st_dev)
+            self.assertTrue(name.parent == name or os.stat(name.parent).st_dev != os.stat(name).st_dev)
+            # A folder not made yet is on the drive of the nearest one that exists,
+            # so two folders about to be made side by side are counted together.
+            self.assertEqual(disk.volume_name(here / "not" / "made" / "yet"), str(name))
+            self.assertEqual(disk.volume_name(here / "models"), disk.volume_name(here / "library"))
 
 
 if __name__ == "__main__":

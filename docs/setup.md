@@ -3,13 +3,31 @@
 Everything below needs internet. Once it is done, nothing does. Do it *before* you need it.
 
 **The short way:** run `python -m museion` in a copy of this repository (or double-click
-`Museion.cmd` in an unzipped release). On a machine that isn't set up the page shows only
-a welcome screen: choose three folders (library, models, helper programs), pick a bundle,
-and press **Set up this machine**. It does steps 2–6 below for you, shows what it will
-download and how large it is before it starts, and resumes if interrupted. When it
-finishes it gets out of the way — Ask, Library, Evals and Settings are what you see from
-then on. (*Run first-time set-up again* under Settings brings it back for a new machine.)
-The rest of this page is the same thing by hand.
+`Museion.cmd` in an unzipped release). On a computer that isn't set up the page shows only
+a set-up wizard, one question per step:
+
+1. **Start** — what set-up does, and what Museion found when it looked at this computer.
+2. **Folders** — one folder for everything, on a drive with room (or the library, models
+   and helper programs in separate places). It shows the free space as you type.
+   On a system Museion has no helper program to download for (llama.cpp on a Mac with an
+   Intel processor; all three on Linux with an ARM processor), one extra step,
+   **Programs**, asks where your own `llama-server`, `kiwix-serve` and pdfium are, fills
+   in any it finds, and checks them before anything large is fetched.
+3. **Model** — each model with whether it fits this computer, its size, what it is good
+   at and what it cannot do, and one marked *Recommended for this computer*. It also offers
+   the small model as a spare that runs on any computer. See
+   [hardware.md](hardware.md#choosing-a-model).
+4. **Library** — which bundle to start with, from the 1 GB Go Bag upwards.
+5. **Home area** — optional: your town, for frost dates and a map.
+6. **Set up** — the full list of what will be downloaded, its total size, and whether it
+   fits. Nothing downloads before you press **Set up this computer** here. Then it does
+   steps 2–6 below for you, ticking off each stage, and carries on where it stopped if it
+   is interrupted and you press **Try again**.
+
+When it finishes it gets out of the way — Ask, Library, Evals and Settings are what you
+see from then on. (*Run first-time set-up again* under Settings brings it back for a new
+computer, and **Settings › Models › Help me choose a model** is the model step on its
+own, for changing model later.) The rest of this page is the same thing by hand.
 
 **Room:** the top of the Library shelf shows what the library takes on disk and what is
 free on its drive. Anything that would not fit is marked with how much more it needs, and

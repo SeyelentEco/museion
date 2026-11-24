@@ -37,6 +37,24 @@ internet. `docs/upgrading.md` explains all of it.
 - An upgrade cut short by a power failure or a pulled drive is finished the
   next time Museion starts.
 
+Setting up: first-run set-up is now a wizard, and it helps choose the model.
+
+- **The set-up wizard**: one question per step (folders, model, library, home
+  area), then a list of everything it will download with sizes and whether
+  it fits each drive. Nothing downloads before that list. A run that stops
+  carries on from **Try again**.
+- **Help choosing a model** (the wizard's Model step, and Settings › Models ›
+  Help me choose a model): what this computer has, which models fit it, what
+  each is good at and cannot do, which agents it runs, and one marked
+  *Recommended for this computer*. In Settings each model has a button that
+  downloads it if needed, measures it against the graphics card and loads it.
+- The small model is offered as a spare that runs on any computer.
+- Agents follow the chat model in use as well as the computer: with the small
+  model chosen, the Agents tab says which agents need a bigger one.
+- Where Museion has no helper programs to download for a system, a
+  **Programs** step asks where your own are and checks them first.
+- `python -m museion hardware` also lists which models fit.
+
 ## 0.1.0
 
 The first version that can be downloaded and run without git or an installed

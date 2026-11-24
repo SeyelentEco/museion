@@ -50,7 +50,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
 from museion import (agent_commands, chat_commands, commands, drives, home_commands, library, map_commands,
-                     maps, notes_commands, radio_commands, services, sidecar, switch, upgrade_commands)
+                     maps, model_choice, notes_commands, own_programs, radio_commands, services, sidecar, switch,
+                     upgrade_commands)
 from museion.appstate import AppState, UiError, open_state
 from museion.version import VERSION
 
@@ -71,9 +72,10 @@ COMMANDS = {f.__name__: f for f in [
     commands.list_eval_runs, commands.eval_cases, commands.tuning_info,
     commands.write_default_tuning, commands.open_path, commands.browse,
     services.service_state, services.start_services, services.stop_services, services.fit_chat_model,
-    library.setup_plan, library.fetch_tools, library.fetch_model, library.fetch_bundle,
+    library.setup_plan, library.setup_room, library.fetch_tools, library.fetch_model, library.fetch_bundle,
     library.list_content, library.library_space, library.fetch_source, library.add_content_dir,
     library.remove_content_dir, library.build_index,
+    model_choice.model_choices, model_choice.use_model, own_programs.use_own_programs,
     drives.prepare_options, drives.prepare_estimate, drives.prepare_drive, drives.verify_drive,
     chat_commands.list_chats, chat_commands.new_chat, chat_commands.get_chat, chat_commands.rename_chat,
     chat_commands.delete_chat, chat_commands.send_message, chat_commands.answer_agent, chat_commands.stop_run,

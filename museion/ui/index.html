@@ -412,11 +412,15 @@
               <h2>Models</h2>
               <div class="field">
                 <label for="chat-model">Chat model</label>
-                <span class="what">Writes the answers. Chosen for your hardware tier; holds most of the GPU while running.</span>
+                <span class="what">Writes the answers. Holds most of the graphics card while running. The guide below says which ones fit this computer and what each can do.</span>
                 <div class="row">
                   <input id="chat-model" type="text" placeholder="Path to a .gguf file" />
                   <button id="pick-chat" type="button">Choose…</button>
                 </div>
+                <div class="actions">
+                  <button id="model-guide-open" type="button">Help me choose a model…</button>
+                </div>
+                <div id="model-guide" class="model-guide" hidden></div>
               </div>
               <div class="field">
                 <label for="reranker-model">Reranker <span class="opt">optional</span></label>
@@ -644,7 +648,7 @@
           </div>
         </section>
 
-        <!-- Welcome: first run only -->
+        <!-- Welcome: the first-run set-up wizard (welcome.js) -->
         <section id="panel-welcome" class="panel">
           <div class="setup">
             <h1>Welcome to Museion</h1>
@@ -653,45 +657,172 @@
               when it can't. Setting up needs internet once. After that, nothing does.
             </p>
 
+            <ol class="wiz-steps" id="wiz-steps" aria-label="Set-up steps"></ol>
+
             <div class="card wizard" id="card-wizard">
-              <h2>Set up this machine</h2>
-              <p class="muted">
-                Museion never chooses where things go — pick folders with room. It will show
-                what it plans to fetch, and how large each piece is, before anything downloads.
-              </p>
-              <div class="row">
-                <input id="wiz-library" type="text" placeholder="Folder for the library (archives + index)" />
-                <button id="wiz-pick-library" type="button">Choose…</button>
+              <!-- Start -->
+              <div class="wiz-step" data-step="start">
+                <h2>Set up this computer</h2>
+                <p>
+                  This takes about ten minutes of your attention, then some hours of downloading that
+                  you can leave running. You will choose:
+                </p>
+                <ul class="wiz-list">
+                  <li><b>Where things go</b> — a folder on a drive with room.</li>
+                  <li><b>A model</b> — the program that reads the library and writes the answers.
+                    Museion looks at this computer and recommends one.</li>
+                  <li><b>A library</b> — from a 1 GB survival shelf up to all of Wikipedia.</li>
+                  <li><b>Your home area</b> — optional, for frost dates and a local map.</li>
+                </ul>
+                <p class="muted">
+                  Nothing downloads until you have seen the full list and its size, on the last step.
+                  If it is interrupted, pressing the button again carries on where it stopped.
+                </p>
+                <div class="model-machine" id="wiz-machine"><div class="model-machine-title">This computer</div>
+                  <ul><li class="muted">Looking at this computer…</li></ul></div>
               </div>
-              <div class="row">
-                <input id="wiz-models" type="text" placeholder="Folder for models (2–37 GB)" />
-                <button id="wiz-pick-models" type="button">Choose…</button>
+
+              <!-- Folders -->
+              <div class="wiz-step" data-step="folders" hidden>
+                <h2>Where should Museion keep things?</h2>
+                <p class="muted">
+                  Pick a folder on a drive with room: at least 10 GB for the smallest set-up, 50 GB
+                  or more for a large model and a bigger library. An external drive is fine.
+                </p>
+                <p class="small-print" id="wiz-portable" hidden>
+                  You are running Museion from its own folder, and it suggests keeping everything
+                  there: the whole folder can then be moved to another drive or computer and still work.
+                </p>
+                <div class="field" id="wiz-base-field">
+                  <label for="wiz-base">Museion's folder</label>
+                  <div class="row">
+                    <input id="wiz-base" type="text" placeholder="A folder for everything Museion downloads" />
+                    <button id="wiz-pick-base" type="button">Choose…</button>
+                  </div>
+                </div>
+                <details id="wiz-separate">
+                  <summary>Put the library, models and helper programs in separate places</summary>
+                  <div class="field">
+                    <label for="wiz-library">Library</label>
+                    <span class="what">The archives you read and ask about, and their index. The biggest part: 1 GB to 270 GB.</span>
+                    <div class="row">
+                      <input id="wiz-library" type="text" placeholder="Folder for the library (archives + index)" />
+                      <button id="wiz-pick-library" type="button">Choose…</button>
+                    </div>
+                  </div>
+                  <div class="field">
+                    <label for="wiz-models">Models</label>
+                    <span class="what">2 to 37 GB. Loads faster from an internal drive than from a USB stick.</span>
+                    <div class="row">
+                      <input id="wiz-models" type="text" placeholder="Folder for models (2–37 GB)" />
+                      <button id="wiz-pick-models" type="button">Choose…</button>
+                    </div>
+                  </div>
+                  <div class="field">
+                    <label for="wiz-tools">Helper programs</label>
+                    <span class="what">The programs that run the model and serve the archives. Under 1 GB.</span>
+                    <div class="row">
+                      <input id="wiz-tools" type="text" placeholder="Folder for helper programs" />
+                      <button id="wiz-pick-tools" type="button">Choose…</button>
+                    </div>
+                  </div>
+                </details>
+                <p class="small-print" id="wiz-room"></p>
+                <p class="hint">
+                  Already have archives and models from another computer? Point the folders at
+                  them — anything present and verified is skipped, not downloaded again.
+                </p>
               </div>
-              <div class="row">
-                <input id="wiz-tools" type="text" placeholder="Folder for helper programs" />
-                <button id="wiz-pick-tools" type="button">Choose…</button>
+
+              <!-- Only on a system the catalogue has no helper programs for (welcome.js) -->
+              <div class="wiz-step" data-step="programs" hidden>
+                <h2>Helper programs for this system</h2>
+                <p class="muted">
+                  Museion normally downloads these itself, but it has no ready-made copies for this
+                  kind of computer. Install them, then say where they are. Anything Museion could
+                  find is filled in already.
+                </p>
+                <div id="wiz-own"></div>
+                <p class="small-print" id="wiz-own-note"></p>
               </div>
-              <dl id="wiz-plan"><dd class="muted">Working out what this machine needs…</dd></dl>
-              <div class="field">
-                <label>Your home area <span class="opt">optional</span></label>
-                <span class="what">Where you live, so the almanac knows your frost dates and hardiness zone with no
-                  internet. You can set it up later in Settings.</span>
+
+              <!-- Model -->
+              <div class="wiz-step" data-step="model" hidden>
+                <h2>Choose a model</h2>
+                <p class="muted">
+                  The model reads what the library finds and writes the answer. A bigger one reasons
+                  better and can do more, but needs a stronger computer and a longer download.
+                  You can change it later in Settings.
+                </p>
+                <div id="wiz-model-list"></div>
+                <label class="check" id="wiz-spare-row" hidden>
+                  <input type="checkbox" id="wiz-spare" checked />
+                  <span id="wiz-spare-label">Also fetch the small model as a spare</span>
+                  <span class="hint">If this computer's graphics card fails, or you move to an older computer,
+                    the small model still answers on the processor alone. It cannot be fetched later
+                    without internet.</span>
+                </label>
+              </div>
+
+              <!-- Library -->
+              <div class="wiz-step" data-step="library" hidden>
+                <h2>Choose a library to start with</h2>
+                <p class="muted">
+                  Start with what you have room and time for. Anything else in the catalogue can be
+                  added from the Library tab later, one archive at a time, while you still have internet.
+                </p>
+                <div id="wiz-bundles" class="bundle-choices"></div>
+                <select id="wiz-bundle" aria-label="Content bundle" hidden></select>
+              </div>
+
+              <!-- Home area -->
+              <div class="wiz-step" data-step="home" hidden>
+                <h2>Your home area <span class="opt">optional</span></h2>
+                <p class="muted">
+                  Where you live, so the almanac knows your frost dates and hardiness zone with no
+                  internet. Leave it empty to skip; you can set it up later in Settings.
+                </p>
                 <div id="home-welcome" class="home-area"></div>
               </div>
-              <div class="row">
-                <select id="wiz-bundle" aria-label="Content bundle"></select>
-                <button id="wiz-go" type="button" class="primary">Set up this machine</button>
+
+              <!-- Review and run -->
+              <div class="wiz-step" data-step="review" hidden>
+                <h2>Check and set up</h2>
+                <p class="muted" id="wiz-review-lede">This is what Museion will download. Anything already there is checked and skipped.</p>
+                <table class="wiz-review" id="wiz-review"></table>
+                <p class="small-print" id="wiz-review-room"></p>
+                <dl id="wiz-plan" hidden></dl>
+                <ul class="wiz-stages" id="wiz-stages" hidden></ul>
+                <div class="progress" id="wiz-progress" hidden>
+                  <div class="bar"><div class="fill" id="wiz-fill"></div></div>
+                  <div class="label" id="wiz-label"></div>
+                </div>
               </div>
-              <div class="progress" id="wiz-progress" hidden>
-                <div class="bar"><div class="fill" id="wiz-fill"></div></div>
-                <div class="label" id="wiz-label"></div>
+
+              <!-- Done -->
+              <div class="wiz-step" data-step="done" hidden>
+                <h2>Museion is ready</h2>
+                <p id="wiz-done-note"></p>
+                <ul class="wiz-list">
+                  <li><b>Ask something.</b> Try “How do I make water safe to drink?” Every answer
+                    says which page it came from, and you can open that page.</li>
+                  <li><b>Test it offline once.</b> Unplug the network cable or turn off Wi-Fi and ask
+                    again. It is the only test that proves it works when you need it.</li>
+                  <li><b>Add more later.</b> The Library tab fetches more archives; Settings changes
+                    the model, your home area, and brings this set-up back for a new computer.</li>
+                </ul>
+                <button id="wiz-done" type="button" class="primary">Go to Ask</button>
               </div>
-              <button id="wiz-done" type="button" class="primary" hidden>Go to Ask</button>
+
+              <div class="wiz-nav" id="wiz-nav">
+                <button id="wiz-back" type="button">Back</button>
+                <span class="wiz-nav-note small-print" id="wiz-nav-note"></span>
+                <button id="wiz-next" type="button" class="primary">Start</button>
+                <button id="wiz-go" type="button" class="primary" hidden>Set up this computer</button>
+              </div>
             </div>
 
-            <p class="hint">
-              Already have archives and models from another machine? Point the folders at
-              them — anything present and verified is skipped, not re-downloaded.
+            <p class="hint" id="welcome-skip-row">
               <a href="#" id="welcome-skip">Skip set-up and configure by hand</a>
             </p>
           </div>

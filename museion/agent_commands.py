@@ -55,11 +55,13 @@ def list_agents(state: AppState) -> dict:
             "id": spec.id, "name": spec.name, "goal": spec.goal, "min_tier": spec.min_tier,
             "tools": spec.tools, "memory": spec.memory, "enabled": spec.enabled,
             "examples": spec.examples, "problems": spec.problems,
-            "cannot_run": spec.problems[0] if spec.problems else agents.tier_problem(spec, env.tier),
+            "cannot_run": spec.problems[0] if spec.problems else env.tier_problem(spec),
             "shipped": spec.folder is not None, "yours": spec.override is not None,
             "last_test": last_test(env, spec),
         })
-    return {"agents": out, "tier": env.tier, "model": env.model_id}
+    # `tier` is what agents are resolved for; it is below the computer's own
+    # when a smaller chat model is in use, and the page says which is which.
+    return {"agents": out, "tier": env.tier, "machine_tier": env.machine_tier or env.tier, "model": env.model_id}
 
 
 def get_agent(state: AppState, id: str) -> dict:

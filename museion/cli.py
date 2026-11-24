@@ -26,8 +26,8 @@ import sys
 from contextlib import closing
 from pathlib import Path
 
-from museion import (agent_cli, app, ask, calc, catalog_cli, climate_cli, drive_cli, evals, fit, hardware, indexer, map_cli,
-                     retrieval_eval, tools, tuning, upgrade_cli)
+from museion import (agent_cli, app, appstate, ask, calc, catalog_cli, climate_cli, drive_cli, evals, fit, hardware,
+                     indexer, map_cli, model_choice, retrieval_eval, tools, tuning, upgrade_cli)
 from museion.appstate import UiError
 from museion.index import Index
 from museion.kiwix import Kiwix, book_id_from_filename
@@ -455,7 +455,8 @@ def cmd_status(args) -> None:
 
 
 def cmd_hardware(args) -> None:
-    hw = hardware.detect()
+    state = appstate.open_state()
+    hw = state.hardware()
     a = hw.accelerator
     api = {hardware.CUDA: "CUDA", hardware.METAL: "Metal", hardware.VULKAN: "Vulkan"}.get(a.kind)
     label = f"{a.name} ({api})" if api else "no usable GPU"
@@ -465,6 +466,10 @@ def cmd_hardware(args) -> None:
         print(f"  Memory      : {memory:,} MB")
     print(f"  System RAM  : {hw.system_ram_mb:,} MB")
     print(f"  Tier        : {hw.tier} -- {hardware.describe_tier(hw.tier)}")
+    # What the set-up wizard's model step would say here.
+    print("\n  Models:")
+    for line in model_choice.summary(state):
+        print(f"    {line}")
     print()
 
 

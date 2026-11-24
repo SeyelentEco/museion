@@ -124,6 +124,9 @@ answer_tokens = 900
         spec.min_tier = hardware.CAPABLE
         self.assertIsNone(agents.tier_problem(spec, hardware.GENEROUS))
         self.assertIn("Needs a Capable computer", agents.tier_problem(spec, hardware.MODEST))
+        # A big enough computer held back by a small chat model is told so.
+        self.assertIn("bigger chat model", agents.tier_problem(spec, hardware.MODEST, hardware.CAPABLE))
+        self.assertIn("Needs a Capable computer", agents.tier_problem(spec, hardware.MODEST, hardware.MODEST))
 
     def test_workspace(self):
         spec = self.load()

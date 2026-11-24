@@ -33,3 +33,16 @@ server_args = [
   "32768",
 ]
 license = { name = "Apache-2.0", attribution = "Alibaba Qwen team; GGUF quantisation by Unsloth" }
+
+# What the model chooser in set-up and Settings says about it.
+summary = "The best fit for a computer with a graphics card of 8 GB or more. A large model that still runs fast, because only a small part of it works on each word."
+good_for = [
+  "The best answers of the models tested: 28 of 29 on Museion's benchmark",
+  "Runs every agent: first steps, clinic, stores keeper, water planner and the rest",
+  "Can change Museion's own code with Edit Museion, with no internet",
+]
+limits = [
+  "A long download: a few hours on a normal connection",
+  "Needs 24 GB of system memory as well as the graphics card",
+]
+speed = "Measured on an RTX 3060 (12 GB): reads about 400 and writes about 40 tokens a second."

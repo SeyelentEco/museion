@@ -22,6 +22,32 @@ names the tier and this fetches its model like any other content:
 python -m museion fetch qwen3.6-35b-a3b-q4 --dest /path/to/models
 ```
 
+## Choosing a model
+
+The set-up wizard's **Model** step, and **Settings › Models › Help me choose a model**,
+show this for the computer you are sitting at. In short:
+
+| Model | Download | Needs | Can | Cannot |
+|---|---|---|---|---|
+| Qwen3 4B | 2.3 GB | Any computer, no graphics card needed | Answer from the library with citations; the librarian and ration scaler agents | Run the other agents; change Museion's code with Edit Museion; reason as well as the big ones |
+| Qwen3.6 35B-A3B Q4 (recommended from 8 GB cards up) | 21 GB | Graphics card with 8 GB + 24 GB system memory, or a Mac with 32 GB | Everything: every agent, 28 of 29 on the benchmark, edits Museion's code offline | — |
+| Gemma 4 26B-A4B Q4 | 16 GB | The same | Every agent; tied Qwen on the benchmark | Match Qwen's speed on a 12 GB card; not yet tried with Edit Museion |
+| Qwen3.6 35B-A3B Q8 | 34 GB | Graphics card with 32 GB, or a Mac with 64 GB | Everything, slightly better | Run well on less |
+
+Two pieces of advice the chooser gives:
+
+- **Take the recommended one.** It is the largest model that runs well on the computer
+  as measured, not the largest that loads.
+- **Keep the small model as a spare.** If the graphics card fails, or the library moves to
+  an older computer, the 4B still answers on the processor alone. It is 2.3 GB, and it
+  cannot be fetched once the internet is gone.
+
+The words about each model are in its file under `models/` (`summary`, `good_for`,
+`limits`, `speed`), so a new measurement is a one-line edit. Whether a model fits, which
+agents it runs and whether there is room for it are worked out in
+`museion/model_choice.py`. Agents are offered by the model chosen, not only by the
+computer: the 4B on a 12 GB card gets the 4B's agents.
+
 ## The counterintuitive part
 
 The instinct on a mid-range GPU is to pick the largest dense model that fits in VRAM. That
@@ -54,12 +80,18 @@ than the biggest dense model that fits.
 | 2 | 16–24 GB VRAM | Same MoE, more layers resident, larger context |
 | 3 | Apple Silicon: 32 GB+ unified for the 35B at Q4, 64 GB+ for Q8; less gets tier 0 | Larger MoE |
 
-Detection: `nvidia-smi` on Windows, falling back to the registry's display adapters for
-AMD and Intel (Vulkan build), else CPU. On macOS, architecture plus `sysctl hw.memsize`
-selects the Metal build and the tier. On Linux, `nvidia-smi` for an NVIDIA card and
-`/sys/class/drm` for an AMD one; either runs the Vulkan build, since llama.cpp publishes
-no CUDA build for Linux, and counts only when the system can load Vulkan
-(`libvulkan.so.1`). Without it, and for Intel graphics, Linux gets the CPU build.
+Detection, with nothing to install on any of the three systems:
+
+| System | Graphics card | System memory |
+|---|---|---|
+| Windows | `nvidia-smi` for NVIDIA (CUDA); otherwise the display adapters in the registry, largest first, for AMD and Intel (Vulkan) | `GlobalMemoryStatusEx` |
+| macOS | Apple Silicon is Metal on its unified memory (`sysctl hw.memsize`); an Intel Mac runs on the processor | `sysctl hw.memsize` |
+| Linux | `nvidia-smi` for NVIDIA, otherwise the AMD driver's own figure in `/sys/class/drm/card*/device/mem_info_vram_total`. Either runs the Vulkan build, since llama.cpp publishes no CUDA build for Linux, and counts only when the system can load Vulkan (`libvulkan.so.1`). Without it, and for Intel graphics, Linux gets the CPU build | `/proc/meminfo` |
+
+`python -m museion hardware` prints what was found, and which models fit. Windows on an
+RTX 3060 and Linux with no graphics card have been run for real; the macOS and Linux
+graphics-card paths are covered by tests that stand in for the system's answers, not yet
+by a real machine.
 
 ## Offload splits are computed, not guessed
 
