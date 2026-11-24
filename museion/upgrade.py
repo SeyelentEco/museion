@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -168,9 +169,11 @@ def run_tests(app: Path, log: Path) -> bool:
     """The staged code's own tests, with the Python running this upgrade."""
     if not (app / "tests").is_dir():
         return True
+    # No caches written: this folder is about to become app/.
+    env = {k: v for k, v in os.environ.items() if k not in ("PYTHONPATH", "PYTHONHOME")}
     with open(log, "wb") as out:
-        done = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tests"],
-                              cwd=app, stdout=out, stderr=subprocess.STDOUT, timeout=1800)
+        done = subprocess.run([sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests"],
+                              cwd=app, env=env, stdout=out, stderr=subprocess.STDOUT, timeout=1800)
     return done.returncode == 0
 
 

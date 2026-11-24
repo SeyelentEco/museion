@@ -107,7 +107,9 @@ def from_source(args) -> int:
         spawn(command + ["--pause"], folder, None)
         print("The upgrade continues in the new window.")
         return 0
-    return subprocess.run(command, cwd=folder, env=clean_env()).returncode
+    code = subprocess.run(command, cwd=folder, env=clean_env()).returncode
+    switch.tidy(root)  # the unpacked download, which that program was running from
+    return code
 
 
 def into(args) -> None:
