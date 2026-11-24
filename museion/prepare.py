@@ -28,7 +28,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from museion import catalog, disk, download, indexer, launchers, manifest, tools
+from museion import catalog, disk, download, indexer, launchers, manifest, package, tools
+from museion.version import VERSION
 from museion.portable import APP_DIR, MARKER
 
 # Port a temporary kiwix-serve uses while the index is built on the drive,
@@ -250,6 +251,7 @@ def run(plan: Plan, report: Callable[[Progress], None] = lambda p: None) -> Path
         tools.install_selected("cpu", part, ["kiwix-tools", "pdfium"], on_tool)
         server = tools.find_exe(part, "kiwix-serve")
         move_in(part, bin_dir, last=server.name if server else "")
+        record_helpers(root, "cpu", ["kiwix-tools", "pdfium"])
     for a in plan.accelerators:
         folder = bin_dir / "llama" / a
         if tools.find_exe(folder, "llama-server") is None:
@@ -257,6 +259,7 @@ def run(plan: Plan, report: Callable[[Progress], None] = lambda p: None) -> Path
             tools.install_selected(a, part, ["llama.cpp"], on_tool)
             shutil.rmtree(folder, ignore_errors=True)
             part.rename(folder)
+            record_helpers(root, a, ["llama.cpp"], suffix=f"/{a}")
     for t in catalog.drive_tools():
         if carried(plan, t) and not drive_tool_present(root, t):
             install_drive_tool(t, root, report)
@@ -289,6 +292,15 @@ def run(plan: Plan, report: Callable[[Progress], None] = lambda p: None) -> Path
     manifest.write(root, plan.bundle, plan.accelerators, [] if plan.skeleton else [*sources, *chosen])
     report(Progress(NOTE, "Done."))
     return root
+
+
+def record_helpers(root: Path, accel: str, names: list[str], suffix: str = "") -> None:
+    """Write down which build of each helper just went onto the drive (see
+    package.py), so an upgrade can tell whether a newer copy's differs."""
+    for tool in catalog.tools():
+        picked = catalog.tool_variant_named(tool, accel) if tool.name in names else None
+        if picked is not None:
+            package.record_helper(root, tool.name + suffix, package.variant_sha(tool, picked[1]))
 
 
 def fetch_verified(title: str, urls: list[str], target: Path, size: int, sha256: str,
@@ -333,6 +345,7 @@ def install_drive_tool(tool: catalog.Tool, root: Path, report: Callable[[Progres
             shutil.move(str(program), str(part))
             part.chmod(0o755)
             part.replace(target)
+    package.record_helper(root, tool.id, package.variant_sha(tool, v))
     report(Progress(NOTE, f"{tool.name} ready"))
 
 
@@ -370,6 +383,7 @@ def copy_app(root: Path, report: Callable[[Progress], None]) -> None:
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(f, dest)
         staging.rename(target)
+        package.record_version(root, VERSION)
         report(Progress(NOTE, "Museion's code copied to app/"))
     original = root / "support" / ORIGINAL_ZIP
     if not original.exists():

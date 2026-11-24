@@ -19,7 +19,7 @@ import zipfile
 from pathlib import Path
 from unittest import mock
 
-from museion import catalog, hardware, launchers, manifest, portable, prepare
+from museion import catalog, hardware, launchers, manifest, package, portable, prepare, version
 from museion.appstate import AppState
 
 CPU = hardware.Hardware(hardware.Accelerator(hardware.CPU), 16000, hardware.MODEST)
@@ -131,6 +131,11 @@ class PrepareTest(unittest.TestCase):
                 self.assertEqual(data.count(b"\r\n"), text.count("\n"))
         readme = (root / "README.txt").read_text(encoding="utf-8")
         self.assertTrue(all(name in readme for name in launchers.launchers()))
+        # What the drive holds is written down for a later upgrade to read.
+        held = package.read(root)
+        self.assertEqual((held.version, held.platform), (version.VERSION, catalog.current_platform()))
+        self.assertEqual(package.app_version(root), version.VERSION)
+        self.assertIn("kiwix-tools", held.helpers)
         # A skeleton says it has no library yet, not that it carries one.
         self.assertIn("does not hold a library", readme)
         self.assertNotIn("This drive carries", readme)
