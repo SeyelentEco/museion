@@ -53,7 +53,9 @@ function show(name) {
   $('#wiz-go').hidden = name !== 'review';
   $('#wiz-next').textContent = name === 'start' ? 'Start' : 'Next';
   note('');
-  $('#card-wizard').scrollIntoView({ block: 'nearest' });
+  // Each step starts at its top: Next is at the foot of a long step, and the
+  // next one opened scrolled to its own foot.
+  $('#panel-welcome .setup').scrollTop = 0;
 }
 
 function note(text, isError = false) {
@@ -265,7 +267,10 @@ function items() {
   const out = [];
   // A release or a prepared drive already carries its helper programs.
   if (!plan.portable) for (const t of plan.tools) out.push({ title: t.title, what: 'Helper program', bytes: t.size_bytes, where: 2 });
-  if (plan.reranker) out.push({ title: plan.reranker.title, what: 'Puts the best passages first', bytes: plan.reranker.size_bytes, where: 1 });
+  if (plan.reranker) {
+    const have = chooser.data()?.reranker_on_disk;
+    out.push({ title: plan.reranker.title, what: 'Puts the best passages first', bytes: have ? 0 : plan.reranker.size_bytes, where: 1, have });
+  }
   const model = chooser.chosen();
   if (model) out.push({ title: model.title, what: 'The model that writes the answers', bytes: model.on_disk ? 0 : model.size_bytes, where: 1, have: model.on_disk });
   if (spare() && $('#wiz-spare').checked) out.push({ title: spare().title, what: 'Spare model for any computer', bytes: spare().size_bytes, where: 1 });
@@ -346,6 +351,12 @@ function stage(id, state) {
   li.querySelector('.tick').textContent = { doing: '…', done: '✓', skipped: '–', failed: '✗' }[state] ?? '';
 }
 
+/** A model's name as the person chose it, for an id in a progress event. */
+function titleOf(id) {
+  if (id === plan?.reranker?.id) return plan.reranker.title;
+  return chooser.data()?.models.find((m) => m.id === id)?.title ?? id;
+}
+
 function showProgress(label, frac) {
   $('#wiz-progress').hidden = false;
   $('#wiz-label').textContent = label;
@@ -356,8 +367,8 @@ listen('fetch-progress', (e) => {
   if (!running) return;
   const p = e.payload;
   const frac = p.total > 0 ? p.received / p.total : null;
-  const size = p.total > 0 ? ` ${gb(p.received)} / ${gb(p.total)}` : '';
-  showProgress(`${p.item}${p.note ? ` — ${p.note}` : ''}${size}`, frac);
+  const size = p.total > 0 ? ` ${gb(p.received)} of ${gb(p.total)}` : '';
+  showProgress(`${titleOf(p.item)}${p.note ? ` — ${p.note}` : ''}${size}`, frac);
 });
 listen('service-progress', (e) => {
   if (running) showProgress(String(e.payload), null);
@@ -391,6 +402,8 @@ $('#wiz-go').addEventListener('click', async () => {
   }
   list.hidden = false;
   note('');
+  // The list of downloads fills the window; what is happening is below it.
+  list.scrollIntoView({ block: 'start', behavior: 'smooth' });
   let at = '';
   const begin = (id, label) => {
     at = id;

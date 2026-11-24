@@ -145,6 +145,7 @@ def model_choices(state: AppState, models_dir: str | None = None) -> dict:
             "current": cfg.chat_model is not None and cfg.chat_model.name == m.filename,
             "helpers_run": runs, "helpers_not": not_runs,
         })
+    reranker = catalog.reranker_model()
     smallest = min(chats, key=lambda m: m.size_bytes) if chats else None
     return {
         "machine": describe_machine(hw),
@@ -153,6 +154,7 @@ def model_choices(state: AppState, models_dir: str | None = None) -> dict:
         "free_bytes": free,
         "models": out,
         "recommended": recommended.id if recommended else None,
+        "reranker_on_disk": reranker is not None and on_disk(folder, reranker),
         # The small model as a spare: if the graphics card dies, another
         # computer's processor can still run it. Offered beside anything
         # bigger, since someone cut off for years cannot fetch it later.
