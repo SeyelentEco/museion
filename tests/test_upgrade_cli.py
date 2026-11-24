@@ -119,6 +119,8 @@ class Commands(Case):
         out, _ = self.run_cli("changes")
         self.assertIn("as it was shipped", out)
         write(self.old / "app" / "museion" / "ask.py", "def ask():\n    return 'mine'\n")
+        out, _ = self.run_cli("changes")
+        self.assertIn("1 file differs from the code as it was shipped. An upgrade carries it over.", out)
         write(self.old / "app" / "museion" / "mine.py", "mine\n")
         out, _ = self.run_cli("changes", "--diff")
         self.assertIn("2 files differ", out)

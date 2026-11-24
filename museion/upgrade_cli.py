@@ -174,8 +174,9 @@ def cmd_changes(args) -> None:
     if not changes:
         print("The code is as it was shipped.")
         return
-    print(f"{len(changes)} file{'s' if len(changes) != 1 else ''} differ from the code as it was shipped. "
-          "An upgrade carries these over.\n")
+    one = len(changes) == 1
+    print(f"{len(changes)} file{' differs' if one else 's differ'} from the code as it was shipped. "
+          f"An upgrade carries {'it' if one else 'these'} over.\n")
     base = appmerge.read_original(root / upgrade.ORIGINAL) or {}
     for path, kind in changes.items():
         print(f"  {kind:8} {path}")
