@@ -52,6 +52,7 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from museion import (agent_commands, chat_commands, commands, drives, home_commands, library, map_commands,
                      maps, notes_commands, radio_commands, services, sidecar)
 from museion.appstate import AppState, UiError, open_state
+from museion.version import VERSION
 
 UI_DIR = Path(__file__).with_name("ui")
 DEFAULT_PORT = 8070
@@ -201,7 +202,7 @@ class Handler(BaseHTTPRequestHandler):
         if url.path == "/api/events":
             return self.stream_events()
         if url.path == "/api/hello":
-            return self.send_json(200, {"app": "museion"})
+            return self.send_json(200, {"app": "museion", "version": VERSION})
         if url.path == "/file":
             return self.send_content_file(urllib.parse.parse_qs(url.query).get("path", [""])[0])
         if url.path.startswith("/tiles/"):

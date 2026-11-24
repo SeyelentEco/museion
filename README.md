@@ -38,10 +38,41 @@ is silent, Hypatia is built to say so rather than invent something — see
 
 ---
 
-## Status
+## Download
 
-Working end to end: fetch a library, index it, ask it questions, get cited answers. All
-it needs is Python 3.11 or newer; it uses nothing outside Python's standard library.
+No git, no installer, and no Python to install. Get the file for your system from the
+[latest release](https://github.com/SeyelentEco/museion/releases/latest):
+
+| System | File | Size |
+|---|---|---|
+| Windows 10 or 11 | `museion-<version>-windows.zip` | about 820 MB |
+| macOS on Apple silicon | `museion-<version>-macos.zip` | about 105 MB |
+| Linux, x86-64 | `museion-<version>-linux.tar.gz` | about 190 MB |
+
+1. **Unpack it** somewhere with room for a library (1 GB to 250 GB) and a model (3 GB to
+   37 GB): the computer's own disk, or a removable drive. It does not run from inside the
+   zip.
+2. **Start it**: double-click `Museion.cmd` on Windows or `Museion.command` on a Mac; on
+   Linux run `./museion.sh`. Museion opens in your web browser.
+3. **Set it up**: the page shows what it would fetch and how large each piece is, and
+   fetches it when you say so. This is the only step that needs the internet.
+
+The first start may meet a warning, because the download is not signed:
+
+- **Windows** says "Windows protected your PC". Choose *More info*, then *Run anyway*.
+- **macOS** refuses programs from an unsigned download. In Terminal, run
+  `xattr -dr com.apple.quarantine` followed by the unpacked folder, once.
+
+The Windows file is the largest because it carries a llama.cpp build for every kind of
+graphics card, so the same folder works on the next computer too. Each file has a
+checksum in `SHA256SUMS.txt` on the release page. [CHANGELOG.md](CHANGELOG.md) says what
+each version changed.
+
+## From the source
+
+Working end to end: fetch a library, index it, ask it questions, get cited answers. From
+a copy of this repository all it needs is Python 3.11 or newer; it uses nothing outside
+Python's standard library.
 
 ```bash
 git clone https://github.com/SeyelentEco/museion
@@ -55,12 +86,6 @@ fetch and how large each piece is — helper programs, the reranker, the chat mo
 your tier, the content bundle you pick — then downloads it all (resumable, verified),
 fits the model to your GPU, starts the services and builds the index. Then it gets out of
 the way, leaving Ask, Agents, Notes, Map, Library, Evals and Settings.
-
-Or skip the clone: each [release](https://github.com/SeyelentEco/museion/releases) is a
-zip for Windows or macOS holding Museion, the portable Python that runs it and every
-helper program. Unzip it onto a drive, double-click `Museion.cmd` (`Museion.command` on a
-Mac), and the same welcome screen fetches the library into the drive. Nothing is
-installed on the computer.
 
 Everything the page does, the command line does too:
 
@@ -233,4 +258,4 @@ against the last one. See [docs/evals.md](docs/evals.md).
 
 ## License
 
-MIT for the code. The content it fetches carries its own licenses.
+MIT for the code; see [LICENSE](LICENSE). The content it fetches carries its own licenses.

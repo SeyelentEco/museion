@@ -33,6 +33,8 @@ from museion.index import Index
 from museion.kiwix import Kiwix, book_id_from_filename
 from museion.llama import Llama
 from museion.model_text import cited_numbers
+from museion import version
+from museion.version import VERSION
 
 KIWIX_URL = "http://127.0.0.1:8090"
 CHAT_URL = "http://127.0.0.1:8080"
@@ -64,6 +66,8 @@ def main(argv: list[str] | None = None) -> None:
     argv = sys.argv[1:] if argv is None else argv
     # No command, or only the window's options (--port 8075): open the
     # window, which is what a person double-clicking Museion wants.
+    if argv[:1] == ["--version"]:
+        argv = ["version"]
     if not argv or (argv[0].startswith("-") and argv[0] not in ("-h", "--help")):
         argv = ["app", *argv]
     args = parser().parse_args(argv)
@@ -76,9 +80,25 @@ def main(argv: list[str] | None = None) -> None:
         sys.exit(130)
 
 
+def version_command(args: argparse.Namespace) -> None:
+    if args.notes:
+        changelog = Path(__file__).resolve().parent.parent / "CHANGELOG.md"
+        text = version.notes(changelog.read_text(encoding="utf-8")) if changelog.is_file() else ""
+        if not text:
+            raise UiError(f"CHANGELOG.md has no section for {VERSION}")
+        print(text)
+    else:
+        print(VERSION if args.number else f"Museion {VERSION}")
+
+
 def parser() -> argparse.ArgumentParser:
     top = argparse.ArgumentParser(prog="museion", description="Offline library: the window, index and search.")
     commands = top.add_subparsers(dest="command", metavar="<command>")
+
+    c = commands.add_parser("version", help="which Museion this is")
+    c.add_argument("--number", action="store_true", help="only the number, for scripts")
+    c.add_argument("--notes", action="store_true", help="what this version changed, from CHANGELOG.md")
+    c.set_defaults(run=version_command)
 
     c = commands.add_parser("app", help="open Museion in the browser (what no command does)")
     app.add_arguments(c)
