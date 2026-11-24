@@ -162,6 +162,24 @@ def model_choices(state: AppState, models_dir: str | None = None) -> dict:
     }
 
 
+def summary(state: AppState) -> list[str]:
+    """What the chooser would say on this computer, as lines for the
+    command line (`python -m museion hardware`): which model is recommended,
+    which others fit, and which helper programs the person must bring."""
+    from museion import own_programs  # own_programs has no need of this module
+
+    got = model_choices(state)
+    lines = []
+    for m in got["models"]:
+        mark = "recommended" if m["recommended"] else "fits" if m["fits"] else "too big"
+        lines.append(f"{m['title']:28} {disk.gb(m['size_bytes']):>7}  {mark}" + (f": {m['why_not']}" if m["why_not"] else ""))
+    own = own_programs.missing(state)
+    if own:
+        lines.append("No ready-made helper programs for this system; set-up asks where yours are: "
+                     + ", ".join(p["id"] + (f" (found {p['path']})" if p["path"] else "") for p in own))
+    return lines
+
+
 def use_model(state: AppState, id: str) -> str:
     """Make a catalogue model the chat model: fetch it if it is not in the
     models folder, measure it against the graphics card, and load it if the

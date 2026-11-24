@@ -56,11 +56,16 @@ def _walk(d: Path, depth: int) -> int:
 
 
 def volume_name(path: Path) -> str:
-    """A short name for the drive a path is on: "E:" on Windows, and where
-    the drive is mounted elsewhere ("/", "/Volumes/MUSEION", "/media/x/usb").
+    """A short name for the drive a path is on: "E:" on Windows, and
+    elsewhere the topmost folder above the path that is still on the same
+    drive ("/", "/Volumes/MUSEION", "/media/x/usb"; on a Mac, "/Users" for
+    the home folders, which are on the data volume and not the system's).
+
     It once answered "/" for every path off Windows, so a library on an
     external drive was said to be on "/" and its size counted against the
-    wrong disk's free space."""
+    wrong disk's free space. The drive is told by its device number, going
+    up the path as it was typed: following links first named a Mac's /home
+    "/System/Volumes/Data/home"."""
     s = str(path)
     if len(s) >= 2 and s[1] == ":":
         return s[:2].upper()
@@ -70,8 +75,8 @@ def volume_name(path: Path) -> str:
     while not p.exists() and p.parent != p:  # a folder not made yet
         p = p.parent
     try:
-        p = p.resolve()
-        while not os.path.ismount(p) and p.parent != p:
+        device = os.stat(p).st_dev
+        while p.parent != p and os.stat(p.parent).st_dev == device:
             p = p.parent
     except OSError:
         return "/"

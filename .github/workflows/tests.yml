@@ -92,5 +92,12 @@ jobs:
       - name: Tests
         run: '"$MUSEION_PYTHON" -m unittest discover -s tests -v'
 
+      # What the set-up wizard would be told on this system: the graphics card
+      # and memory as detected, the model recommended, and whether the
+      # catalogue has helper programs for it. Read it in the log; it fails
+      # only if detection itself breaks.
+      - name: What set-up would say here
+        run: '"$MUSEION_PYTHON" -m museion hardware'
+
       - name: Doctor
         run: '"$MUSEION_PYTHON" -m museion.doctor --pdfium "$MUSEION_PDFIUM" --llama-server "$MUSEION_LLAMA_SERVER"'
