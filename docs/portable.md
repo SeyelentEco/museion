@@ -148,6 +148,9 @@ card's driver; without them Museion uses the CPU build.
 **Not covered.** Intel Macs and ARM Linux have no package: the release job has no runner
 that would test one.
 
+Putting a newer release into a copy someone already has, without losing what
+is theirs, is `docs/upgrading.md`.
+
 ## Not doing
 
 - Disk images. Sizes vary by edition and Windows users have no easy way to write one.

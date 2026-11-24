@@ -68,6 +68,16 @@ graphics card, so the same folder works on the next computer too. Each file has 
 checksum in `SHA256SUMS.txt` on the release page. [CHANGELOG.md](CHANGELOG.md) says what
 each version changed.
 
+### Upgrading
+
+A newer download upgrades the copy you have, offline, without touching your library,
+models, notes or settings, and carrying over changes you made to Museion's code. In
+Settings › Version and upgrades, choose the newer download and press Upgrade; the version
+you had is kept, so you can go back. A copy of version 0.1.0 has no such button: unpack
+the newer download beside it and run `Museion.cmd upgrade --into` followed by the old
+folder (`./museion.sh` or `Museion.command` elsewhere). [docs/upgrading.md](docs/upgrading.md)
+explains all of it.
+
 ## From the source
 
 Working end to end: fetch a library, index it, ask it questions, get cited answers. From

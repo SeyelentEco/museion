@@ -113,6 +113,10 @@ Running from a flash drive means the model is read from it on every start; a
 copy of this whole folder on the computer's own disk starts much faster, and
 works the same.
 
+To upgrade it:  a newer Museion download is put in from Museion's page,
+Settings > Version and upgrades, with no internet. Your library, models,
+notes and settings are not touched. app/docs/upgrading.md explains it.
+
 support/LICENSES/README.txt says what is on the drive and under what terms.
 MANIFEST.yaml lists every downloaded file with its checksum. To check them
 years from now, use Settings > This drive in Museion, or run: {start} verify

@@ -16,6 +16,7 @@ nothing known: every part of it differs.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from dataclasses import dataclass, field
@@ -82,6 +83,13 @@ def variant_sha(tool: catalog.Tool, variant: catalog.ToolVariant) -> str:
     archives, and a change to either is a different build."""
     parts = [variant.sha256, *(tool.variants[k].sha256 for k in variant.also if k in tool.variants)]
     return "+".join(parts)
+
+
+def llama_build(root: Path) -> str:
+    """A short name for the llama.cpp builds a drive holds, which changes
+    when an upgrade replaces them. Empty for a drive with no record."""
+    builds = sorted(f"{name}={sha}" for name, sha in read(root).helpers.items() if name.startswith("llama.cpp"))
+    return hashlib.sha256("\n".join(builds).encode()).hexdigest()[:16] if builds else ""
 
 
 def made_for(root: Path) -> tuple[str, str]:

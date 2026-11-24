@@ -17,7 +17,8 @@
 # hand (Actions > release > Run workflow) with "publish" ticked, which makes
 # the tag itself. Every package is built and runs Museion's tests with its own
 # Python from its own app/; only if all of them pass is the release made, with
-# the change list's section as its text.
+# the change list's section as its text. Each package also upgrades a real
+# copy of an older release before it counts as passing.
 #
 # A pull request that changes how a package is laid out builds and tests them
 # too, so a broken release is found before it is made. Run by hand without
@@ -28,8 +29,10 @@ on:
   push:
     tags: ['v*']
   pull_request:
-    paths: ['.github/workflows/release.yml', 'museion/prepare.py', 'museion/launchers.py',
-            'museion/portable.py', 'museion/tools.py', 'museion/version.py', 'tools/**', 'drive/**']
+    paths: ['.github/workflows/release.yml', '.github/upgrade_check.py', 'museion/prepare.py', 'museion/launchers.py',
+            'museion/portable.py', 'museion/tools.py', 'museion/version.py', 'museion/package.py',
+            'museion/upgrade*.py', 'museion/switch.py', 'museion/appmerge.py', 'museion/merge3.py',
+            'tools/**', 'drive/**']
   workflow_dispatch:
     inputs:
       publish:
@@ -106,6 +109,26 @@ jobs:
       - name: The package's Python runs the package's tests
         working-directory: out/Museion/app
         run: '../${{ matrix.python }} -m unittest discover -s tests'
+
+      # A release has to be able to upgrade the copies people already have.
+      # UPGRADE_FROM is the oldest release still supported: its download for
+      # this system is unpacked, lived in a little, upgraded by the package
+      # just built, taken back, and upgraded again from its own page
+      # (.github/upgrade_check.py, docs/upgrading.md). Raise it only when
+      # upgrading from that release is deliberately given up.
+      - name: An older release is upgraded by this package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPGRADE_FROM: v0.1.0
+        run: |
+          if [ "$UPGRADE_FROM" = "v$(python -m museion version --number)" ]; then
+            echo "This is $UPGRADE_FROM itself; nothing older to upgrade."
+            exit 0
+          fi
+          gh release download "$UPGRADE_FROM" --repo "$GITHUB_REPOSITORY" --dir older \
+            --pattern "museion-*-${{ matrix.platform }}.${{ matrix.ext }}"
+          python .github/upgrade_check.py --old older/museion-*-${{ matrix.platform }}.${{ matrix.ext }} \
+            --new out/Museion --work upgrade-test
 
       - uses: actions/upload-artifact@v4
         if: github.event_name != 'pull_request'

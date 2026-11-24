@@ -95,7 +95,7 @@ def upgrade_other(state: AppState, path: str) -> str:
         if not path.strip() or not target.is_dir():
             raise UpgradeError("choose the folder or drive that holds the other copy")
         upgrade_cli.closed(target)
-        outcome = upgrade.install(upgrade.this_museion(), target.resolve(), report=report)
+        outcome = upgrade.install(upgrade.this_museion(), target.resolve(), report=report, tests=upgrade.run_tests)
     except UpgradeError as e:
         raise UiError(str(e)) from e
     return "\n".join(upgrade_cli.summary(outcome, target)).strip()
