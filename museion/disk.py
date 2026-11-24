@@ -56,11 +56,26 @@ def _walk(d: Path, depth: int) -> int:
 
 
 def volume_name(path: Path) -> str:
-    """A short name for the volume: "E:" on Windows, "/" otherwise."""
+    """A short name for the drive a path is on: "E:" on Windows, and where
+    the drive is mounted elsewhere ("/", "/Volumes/MUSEION", "/media/x/usb").
+    It once answered "/" for every path off Windows, so a library on an
+    external drive was said to be on "/" and its size counted against the
+    wrong disk's free space."""
     s = str(path)
     if len(s) >= 2 and s[1] == ":":
         return s[:2].upper()
-    return "/"
+    if os.name == "nt" or not s.startswith("/"):
+        return "/"
+    p = Path(s)
+    while not p.exists() and p.parent != p:  # a folder not made yet
+        p = p.parent
+    try:
+        p = p.resolve()
+        while not os.path.ismount(p) and p.parent != p:
+            p = p.parent
+    except OSError:
+        return "/"
+    return str(p)
 
 
 def gb(n: int) -> str:

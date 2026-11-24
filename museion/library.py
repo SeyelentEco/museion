@@ -13,7 +13,7 @@ import os
 from contextlib import closing
 from pathlib import Path
 
-from museion import catalog, disk, download, hardware, indexer, tools
+from museion import catalog, disk, download, hardware, indexer, own_programs, tools
 from museion.appstate import AppState, UiError, local
 from museion.config import Config
 from museion.index import Index
@@ -64,6 +64,9 @@ def setup_plan(state: AppState) -> dict:
         "bundles": bundle_items(),
         # One folder to offer someone who has not chosen any yet; from a
         # drive or an unzipped release the config already names them.
+        # Helper programs the catalogue has no build of for this system, for
+        # the wizard to ask where the person's own are.
+        "own_programs": own_programs.missing(state),
         "suggested_base": str(Path.home() / "Museion"),
         "portable": bool(state.drive),
     }

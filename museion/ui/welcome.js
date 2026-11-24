@@ -1,28 +1,25 @@
 // First-run set-up, as a wizard: one question per step, in plain words, and
 // nothing downloads until the last step has shown the whole list and its
-// size. The steps are the .wiz-step blocks in index.html, in ORDER below.
+// size. The steps are the .wiz-step blocks in index.html, in STEPS below.
 //
-// Set-up itself is the same run it always was -- programs, reranker, chat
-// model, content, fit, services, index, home area -- each part resumable, so
-// a failure partway costs a retry, not a restart.
+// This file is the steps; the last one, which lists what will be downloaded
+// and then runs set-up, is welcome-run.js.
 
-import { invoke, listen } from './api.js';
+import { invoke } from './api.js';
 import { pickInto } from './chooser.js';
-import { $, el, gb, statusMsg } from './dom.js';
-import { refreshServiceDots } from './dots.js';
+import { $, el, gb } from './dom.js';
 import { homeForm } from './home.js';
 import { modelChooser } from './models.js';
-import { refreshSetup } from './settings.js';
 import { leaveWelcome, onTab } from './tabs.js';
+import { reviewAndRun } from './welcome-run.js';
 
-const ORDER = ['start', 'folders', 'model', 'library', 'home', 'review', 'done'];
-const NAMES = { start: 'Start', folders: 'Folders', model: 'Model', library: 'Library', home: 'Home area', review: 'Set up' };
-// What your home area downloads, for the list on the last step (home.js says the same).
-const HOME_BYTES = 150 * 1048576;
+const STEPS = ['start', 'folders', 'programs', 'model', 'library', 'home', 'review', 'done'];
+const NAMES = {
+  start: 'Start', folders: 'Folders', programs: 'Programs', model: 'Model', library: 'Library', home: 'Home area', review: 'Set up',
+};
 
 let plan = null;
 let step = 'start';
-let running = false;
 let room = []; // free space for the library, models and helper folders
 const home = homeForm($('#home-welcome'), { button: false });
 const chooser = modelChooser($('#wiz-model-list'), { onChange: showSpare });
@@ -33,6 +30,10 @@ const folders = () => ({
   tools: $('#wiz-tools').value.trim(),
 });
 
+/** The steps this computer gets: Programs only where Museion has none to
+ * download for it (plan.own_programs, from museion/own_programs.py). */
+const order = () => STEPS.filter((s) => s !== 'programs' || plan?.own_programs?.length);
+
 // ── moving between steps ────────────────────────────────────────────────────
 
 function show(name) {
@@ -40,6 +41,7 @@ function show(name) {
   for (const s of document.querySelectorAll('.wiz-step')) s.hidden = s.dataset.step !== name;
   const steps = $('#wiz-steps');
   steps.textContent = '';
+  const ORDER = order();
   for (const id of ORDER.filter((s) => NAMES[s])) {
     const li = el('li', undefined, NAMES[id]);
     if (id === name) li.setAttribute('aria-current', 'step');
@@ -48,6 +50,7 @@ function show(name) {
   }
   steps.hidden = name === 'done';
   $('#wiz-nav').hidden = name === 'done';
+  $('#welcome-skip-row').hidden = name === 'done';
   $('#wiz-back').hidden = name === 'start';
   $('#wiz-next').hidden = name === 'review';
   $('#wiz-go').hidden = name !== 'review';
@@ -73,25 +76,32 @@ async function blocked() {
     await showRoom();
     if (room.some((r) => r.free_bytes === null)) return 'Museion cannot use one of those folders. Check the drive is plugged in and the path is right.';
   }
+  if (step === 'programs') {
+    try {
+      $('#wiz-own-note').textContent = await invoke('use_own_programs', { paths: ownPaths() });
+    } catch (e) {
+      return String(e);
+    }
+  }
   if (step === 'model' && !chooser.chosen()) return 'None of the models fits in that folder. Go back and choose a folder with more room.';
   return '';
 }
 
 async function enter(name) {
   if (name === 'model') await chooser.refresh(folders().models);
-  if (name === 'review') await showReview();
+  if (name === 'review') await run.showReview();
   show(name);
 }
 
 $('#wiz-next').addEventListener('click', async () => {
   const why = await blocked();
   if (why) return note(why, true);
-  await enter(ORDER[ORDER.indexOf(step) + 1]);
+  await enter(order()[order().indexOf(step) + 1]);
 });
 
 $('#wiz-back').addEventListener('click', () => {
-  if (running) return;
-  show(ORDER[ORDER.indexOf(step) - 1]);
+  if (run.running()) return;
+  show(order()[order().indexOf(step) - 1]);
 });
 
 // ── step 1: this computer ───────────────────────────────────────────────────
@@ -99,7 +109,7 @@ $('#wiz-back').addEventListener('click', () => {
 async function loadPlan() {
   plan = null;
   show('start');
-  resetRun();
+  run.reset();
   const machine = $('#wiz-machine ul');
   let cfg;
   // The folders first, from Settings: filled in after the plan, they would
@@ -112,9 +122,9 @@ async function loadPlan() {
     for (const line of choices.machine) machine.append(el('li', undefined, line));
     const rec = choices.models.find((m) => m.recommended);
     if (rec) machine.append(el('li', undefined, `Museion's suggestion for it: ${rec.title}. You will see the other choices and why.`));
-    if (!plan.tools.length) {
-      machine.append(el('li', 'err', 'The catalogue has no helper programs for this system (Linux has none yet). '
-        + 'Set-up will fetch the models and library; point Settings at your own llama-server and kiwix-serve.'));
+    if (plan.own_programs.length) {
+      machine.append(el('li', undefined, 'Museion has no ready-made helper programs for this kind of computer, '
+        + 'so one extra step asks where yours are.'));
     }
   } catch (e) {
     machine.textContent = '';
@@ -124,6 +134,8 @@ async function loadPlan() {
   const tools = cfg.kiwix_exe?.replace(/[\\/][^\\/]*$/, '') ?? '';
   $('#wiz-portable').hidden = !plan.portable;
   fillFolders(cfg.library_dir ?? '', cfg.models_dir ?? '', tools);
+  showOwn();
+  show('start'); // again, now the plan says which steps this computer gets
   showBundles();
 }
 
@@ -205,6 +217,33 @@ $('#wiz-pick-library').addEventListener('click', () => pick('#wiz-library', 'Fol
 $('#wiz-pick-models').addEventListener('click', () => pick('#wiz-models', 'Folder for models'));
 $('#wiz-pick-tools').addEventListener('click', () => pick('#wiz-tools', 'Folder for helper programs'));
 
+// ── the person's own helper programs, where Museion has none to download ────
+
+function showOwn() {
+  const box = $('#wiz-own');
+  box.textContent = '';
+  for (const p of plan.own_programs) {
+    const field = el('div', 'field');
+    const label = el('label', undefined, p.label);
+    const input = el('input');
+    input.type = 'text';
+    input.id = `wiz-own-${p.id}`;
+    input.dataset.program = p.id;
+    input.value = p.path;
+    input.placeholder = p.kind === 'dir' ? 'Path to the folder' : `Path to ${p.id}`;
+    label.htmlFor = input.id;
+    const row = el('div', 'row');
+    const pickButton = el('button', undefined, 'Choose…');
+    pickButton.type = 'button';
+    pickButton.addEventListener('click', () => pickInto(`#${CSS.escape(input.id)}`, p.kind === 'dir', p.label, p.kind === 'dir' ? undefined : 'program'));
+    row.append(input, pickButton);
+    field.append(label, el('span', 'what', p.path ? `${p.what} Found one on this computer.` : p.what), row);
+    box.append(field);
+  }
+}
+
+const ownPaths = () => Object.fromEntries([...document.querySelectorAll('#wiz-own input')].map((i) => [i.dataset.program, i.value.trim()]));
+
 // ── step 3: the model ───────────────────────────────────────────────────────
 
 /** The small model, when something bigger is chosen and it is not here yet. */
@@ -259,241 +298,10 @@ function showBundles() {
   $('#wiz-bundle').value = before;
 }
 
-// ── step 6: check, then run ─────────────────────────────────────────────────
+// ── the last step: check, then run (welcome-run.js) ─────────────────────────
 
-/** Everything set-up will fetch: { title, bytes, where } with `where` an
- * index into `room` (library, models, helper programs). */
-function items() {
-  const out = [];
-  // A release or a prepared drive already carries its helper programs.
-  if (!plan.portable) for (const t of plan.tools) out.push({ title: t.title, what: 'Helper program', bytes: t.size_bytes, where: 2 });
-  if (plan.reranker) {
-    const have = chooser.data()?.reranker_on_disk;
-    out.push({ title: plan.reranker.title, what: 'Puts the best passages first', bytes: have ? 0 : plan.reranker.size_bytes, where: 1, have });
-  }
-  const model = chooser.chosen();
-  if (model) out.push({ title: model.title, what: 'The model that writes the answers', bytes: model.on_disk ? 0 : model.size_bytes, where: 1, have: model.on_disk });
-  if (spare() && $('#wiz-spare').checked) out.push({ title: spare().title, what: 'Spare model for any computer', bytes: spare().size_bytes, where: 1 });
-  const bundle = plan.bundles.find((b) => b.id === $('#wiz-bundle').value);
-  if (bundle) out.push({ title: bundle.title, what: `Library: ${bundle.description}`, bytes: bundle.size_bytes, where: 0 });
-  if (home.wanted()) out.push({ title: 'Your home area', what: 'Weather records and towns near you', bytes: HOME_BYTES, where: 0, about: true });
-  return out;
-}
-
-/** Fills the list and says whether it all fits. */
-async function showReview() {
-  await showRoom();
-  const table = $('#wiz-review');
-  table.textContent = '';
-  const list = items();
-  for (const it of list) {
-    const tr = el('tr');
-    const name = el('td');
-    name.append(el('div', 't', it.title), el('div', 'meta', it.what));
-    tr.append(name, el('td', 'size', it.have ? 'already here' : `${it.about ? 'about ' : ''}${gb(it.bytes)}`));
-    table.append(tr);
-  }
-  const total = list.reduce((n, it) => n + it.bytes, 0);
-  const tr = el('tr', 'total');
-  tr.append(el('td', undefined, 'Total to download'), el('td', 'size', gb(total)));
-  table.append(tr);
-
-  // Room, drive by drive: the three folders may share one or not.
-  const need = new Map();
-  for (const it of list) {
-    const r = room[it.where];
-    if (r) need.set(r.volume, (need.get(r.volume) ?? 0) + it.bytes);
-  }
-  const short = [];
-  const fine = [];
-  for (const [volume, bytes] of need) {
-    const free = room.find((r) => r.volume === volume)?.free_bytes ?? 0;
-    // The index and unpacking need a little beyond the downloads themselves.
-    if (bytes * 1.05 > free) short.push(`${volume} needs ${gb(bytes)} and has ${gb(free)} free`);
-    else fine.push(`${gb(free)} free on ${volume}`);
-  }
-  const p = $('#wiz-review-room');
-  p.className = `small-print ${short.length ? 'err' : 'muted'}`;
-  p.textContent = short.length
-    ? `Not enough room: ${short.join('; ')}. Go back and choose a smaller library or model, or a folder on a bigger drive.`
-    : `There is room: ${fine.join(', ')}. At 5 MB a second (a 40 megabit connection) this is about ${duration(total / 5e6)}; you can leave it running.`;
-  $('#wiz-go').disabled = short.length > 0;
-}
-
-function duration(seconds) {
-  const minutes = Math.max(1, Math.round(seconds / 60));
-  if (minutes < 90) return `${minutes} minute${minutes === 1 ? '' : 's'}`;
-  return `${Math.round(minutes / 60)} hours`;
-}
-
-const STAGES = [
-  ['tools', 'Helper programs'],
-  ['models', 'Models'],
-  ['library', 'Library'],
-  ['fit', 'Measure the model against this computer'],
-  ['services', 'Start the model'],
-  ['index', 'Build the search index'],
-  ['home', 'Your home area'],
-];
-
-function resetRun() {
-  $('#wiz-stages').hidden = true;
-  $('#wiz-progress').hidden = true;
-  $('#wiz-go').textContent = 'Set up this computer';
-  $('#wiz-go').disabled = false;
-}
-
-/** Marks a stage 'doing', 'done', 'skipped' or 'failed'. */
-function stage(id, state) {
-  const li = $(`#wiz-stages li[data-stage="${id}"]`);
-  if (!li) return;
-  li.className = state;
-  li.querySelector('.tick').textContent = { doing: '…', done: '✓', skipped: '–', failed: '✗' }[state] ?? '';
-}
-
-/** A model's name as the person chose it, for an id in a progress event. */
-function titleOf(id) {
-  if (id === plan?.reranker?.id) return plan.reranker.title;
-  return chooser.data()?.models.find((m) => m.id === id)?.title ?? id;
-}
-
-function showProgress(label, frac) {
-  $('#wiz-progress').hidden = false;
-  $('#wiz-label').textContent = label;
-  $('#wiz-fill').style.width = frac === null ? '100%' : `${Math.round(frac * 100)}%`;
-}
-
-listen('fetch-progress', (e) => {
-  if (!running) return;
-  const p = e.payload;
-  const frac = p.total > 0 ? p.received / p.total : null;
-  const size = p.total > 0 ? ` ${gb(p.received)} of ${gb(p.total)}` : '';
-  showProgress(`${titleOf(p.item)}${p.note ? ` — ${p.note}` : ''}${size}`, frac);
-});
-listen('service-progress', (e) => {
-  if (running) showProgress(String(e.payload), null);
-});
-listen('index-progress', (e) => {
-  if (running) showProgress(String(e.payload), null);
-});
-
-/**
- * The whole first run, in order. Each step is resumable and skips what is
- * already present, so a failure partway through costs a retry, not a restart.
- */
-$('#wiz-go').addEventListener('click', async () => {
-  if (running) return;
-  const f = folders();
-  const model = chooser.chosen();
-  const small = spare() && $('#wiz-spare').checked ? spare() : null;
-  const bundle = $('#wiz-bundle').value;
-  const bundleTitle = plan.bundles.find((b) => b.id === bundle)?.title ?? bundle;
-  const btn = $('#wiz-go');
-  running = true;
-  btn.disabled = true;
-  $('#wiz-back').disabled = true;
-  const list = $('#wiz-stages');
-  list.textContent = '';
-  for (const [id, name] of STAGES) {
-    const li = el('li');
-    li.dataset.stage = id;
-    li.append(el('span', 'tick', ''), el('span', undefined, name));
-    list.append(li);
-  }
-  list.hidden = false;
-  note('');
-  // The list of downloads fills the window; what is happening is below it.
-  list.scrollIntoView({ block: 'start', behavior: 'smooth' });
-  let at = '';
-  const begin = (id, label) => {
-    at = id;
-    stage(id, 'doing');
-    showProgress(label, null);
-  };
-  try {
-    const current = await invoke('get_config');
-    await invoke('set_config', { config: { ...current, library_dir: f.library } });
-
-    begin('tools', 'Fetching helper programs…');
-    await invoke('fetch_tools', { dest: f.tools });
-    stage('tools', plan.tools.length ? 'done' : 'skipped');
-
-    begin('models', 'Fetching models…');
-    if (plan.reranker) {
-      showProgress(`Fetching ${plan.reranker.title}…`, 0);
-      await invoke('fetch_model', { id: plan.reranker.id, dest: f.models });
-    }
-    // The spare before the chosen model: the last one fetched is the one
-    // Museion is set to use.
-    if (small) {
-      showProgress(`Fetching ${small.title}…`, 0);
-      await invoke('fetch_model', { id: small.id, dest: f.models });
-    }
-    if (model) {
-      showProgress(`Fetching ${model.title}…`, 0);
-      await invoke('fetch_model', { id: model.id, dest: f.models });
-    }
-    stage('models', 'done');
-
-    begin('library', `Fetching the ${bundleTitle} library…`);
-    await invoke('fetch_bundle', { id: bundle });
-    stage('library', 'done');
-
-    // Fit before anything is loaded. The fit measures free GPU memory, and
-    // with the chat model already resident it reads the card as full and
-    // returns a split far more cautious than the machine deserves.
-    const data = chooser.data();
-    const fitWanted = model && model.id !== data.spare && plan.hardware.memory_mb > 0;
-    if (fitWanted) {
-      begin('fit', 'Measuring the model against this graphics card…');
-      await invoke('fit_chat_model');
-      stage('fit', 'done');
-    } else {
-      stage('fit', 'skipped');
-    }
-
-    begin('services', 'Starting the model — a large one takes a few minutes to load…');
-    await invoke('start_services');
-    stage('services', 'done');
-
-    begin('index', 'Building the search index…');
-    await invoke('build_index', { force: false });
-    stage('index', 'done');
-
-    // Last, and not a reason to stop: everything else works without it,
-    // and Settings can do it again.
-    let homeTrouble = '';
-    if (home.wanted()) {
-      begin('home', 'Your home area…');
-      try {
-        await home.run((t) => showProgress(`Your home area: ${t}`, null));
-        stage('home', 'done');
-      } catch (e) {
-        homeTrouble = String(e);
-        stage('home', 'failed');
-      }
-    } else {
-      stage('home', 'skipped');
-    }
-
-    statusMsg('Set-up complete.');
-    await refreshSetup();
-    await refreshServiceDots();
-    $('#wiz-done-note').textContent = homeTrouble
-      ? `Everything is in place, but your home area was not set up: ${homeTrouble} You can set it up in Settings.`
-      : `${model ? `${model.title} is loaded` : 'Museion is set up'} and the ${bundleTitle} library is indexed.`;
-    show('done');
-  } catch (e) {
-    if (at) stage(at, 'failed');
-    showProgress(`Stopped: ${String(e)}`, null);
-    note('Nothing downloaded is lost. Fix the problem if you can, then try again.', true);
-    statusMsg(String(e), true);
-    btn.textContent = 'Try again';
-  } finally {
-    running = false;
-    btn.disabled = false;
-    $('#wiz-back').disabled = false;
-  }
+const run = reviewAndRun({
+  plan: () => plan, room: () => room, chooser, home, folders, spare, showRoom, show, note,
 });
 
 $('#wiz-done').addEventListener('click', () => leaveWelcome('ask'));

@@ -55,7 +55,7 @@ def list_agents(state: AppState) -> dict:
             "id": spec.id, "name": spec.name, "goal": spec.goal, "min_tier": spec.min_tier,
             "tools": spec.tools, "memory": spec.memory, "enabled": spec.enabled,
             "examples": spec.examples, "problems": spec.problems,
-            "cannot_run": spec.problems[0] if spec.problems else agents.tier_problem(spec, env.tier),
+            "cannot_run": spec.problems[0] if spec.problems else env.tier_problem(spec),
             "shipped": spec.folder is not None, "yours": spec.override is not None,
             "last_test": last_test(env, spec),
         })

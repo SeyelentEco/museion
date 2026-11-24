@@ -79,14 +79,15 @@ def environment(args, library: Path | None = None) -> Agents:
             model = ""
     lib = library or (Path(args.library) if getattr(args, "library", None) else cfg.library_dir)
     work = Path(args.work) / WORK if getattr(args, "work", None) else None
-    return Agents(lib, agents.override_dir(state.tuning_path), tier, model, work_dir=work)
+    return Agents(lib, agents.override_dir(state.tuning_path), tier, model, work_dir=work,
+                  machine_tier="" if getattr(args, "tier", None) else state.hardware().tier)
 
 
 def cmd_list(args) -> None:
     env = environment(args)
     print(f"\n  This computer: {env.tier}\n")
     for spec in env.all():
-        why = spec.problems[0] if spec.problems else agents.tier_problem(spec, env.tier)
+        why = spec.problems[0] if spec.problems else env.tier_problem(spec)
         mark = "  " if not why else "x "
         print(f"  {mark}{spec.id:20} {spec.name:18} {spec.min_tier:9} {why or spec.goal}")
     print()

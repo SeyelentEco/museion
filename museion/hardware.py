@@ -102,9 +102,13 @@ def run(args: list[str]) -> str | None:
     return out.stdout.decode("utf-8", errors="replace")
 
 
+# Where Linux lists graphics cards, one folder per card.
+LINUX_DRM = Path("/sys/class/drm")
+
+
 def detect(platform: str = sys.platform, run: Run = run,
-           meminfo: Path = Path("/proc/meminfo")) -> Hardware:
-    accelerator = detect_accelerator(platform, run)
+           meminfo: Path = Path("/proc/meminfo"), drm: Path = LINUX_DRM) -> Hardware:
+    accelerator = detect_accelerator(platform, run, drm=drm)
     system_ram_mb = detect_system_ram_mb(platform, run, meminfo)
     return Hardware(accelerator, system_ram_mb, pick_tier(accelerator, system_ram_mb))
 
@@ -141,9 +145,11 @@ def pick_tier(accel: Accelerator, system_ram_mb: int) -> str:
 
 
 def detect_accelerator(platform: str = sys.platform, run: Run = run,
-                       adapters: Callable[[], list[tuple[str, int]]] | None = None) -> Accelerator:
+                       adapters: Callable[[], list[tuple[str, int]]] | None = None,
+                       drm: Path = LINUX_DRM) -> Accelerator:
     """`adapters` lists Windows display adapters as (name, bytes of memory);
-    by default they are read from the registry."""
+    by default they are read from the registry. `drm` is where Linux lists
+    its graphics cards."""
     if platform == "darwin":
         mb = macos_unified_memory_mb(run)
         if mb is not None:
@@ -161,7 +167,39 @@ def detect_accelerator(platform: str = sys.platform, run: Run = run,
         found = other_gpu((adapters or windows_adapters)())
         if found is not None:
             return Accelerator(VULKAN, *found)
+    if platform.startswith("linux"):
+        found = other_gpu(linux_adapters(drm))
+        if found is not None:
+            return Accelerator(VULKAN, *found)
     return Accelerator(CPU)
+
+
+# PCI vendor numbers, for naming a card Linux only gives a number for.
+_VENDORS = {"0x1002": "AMD Radeon graphics", "0x8086": "Intel graphics", "0x10de": "NVIDIA graphics"}
+
+
+def linux_adapters(drm: Path = LINUX_DRM) -> list[tuple[str, int]]:
+    """Graphics cards on Linux as (name, bytes of their own memory), from
+    the kernel's own files: no program to run and nothing to install.
+
+    The AMD driver says how much memory a card has (mem_info_vram_total).
+    NVIDIA cards are asked through nvidia-smi before this is reached, and a
+    card whose driver does not say -- most Intel graphics, which share the
+    system's memory -- is left out, so the computer is judged as having no
+    graphics card, as it was before this looked at all."""
+    found = []
+    try:
+        cards = sorted(p for p in drm.iterdir() if p.name.startswith("card") and p.name[4:].isdigit())
+    except OSError:
+        return found
+    for card in cards:
+        try:
+            size = int((card / "device" / "mem_info_vram_total").read_text().strip())
+            vendor = (card / "device" / "vendor").read_text().strip().lower()
+        except (OSError, ValueError):
+            continue
+        found.append((_VENDORS.get(vendor, "Graphics card"), size))
+    return found
 
 
 def nvidia_smi(run: Run = run) -> tuple[str, int] | None:

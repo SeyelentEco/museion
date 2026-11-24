@@ -75,6 +75,17 @@ class DiskTest(unittest.TestCase):
         self.assertEqual(disk.volume_name(Path("/home/x")), "/")
         self.assertEqual(disk.volume_name("e:/museion"), "E:")
 
+    @unittest.skipIf(os.name == "nt", "mount points are not a Windows idea")
+    def test_off_windows_a_volume_is_where_the_drive_is_mounted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            here = Path(tmp).resolve()
+            mount = here
+            while not os.path.ismount(mount):
+                mount = mount.parent
+            self.assertEqual(disk.volume_name(here), str(mount))
+            # A folder not made yet is on the drive of the nearest one that exists.
+            self.assertEqual(disk.volume_name(here / "not" / "made" / "yet"), str(mount))
+
 
 if __name__ == "__main__":
     unittest.main()

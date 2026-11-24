@@ -600,7 +600,7 @@
             <ol class="wiz-steps" id="wiz-steps" aria-label="Set-up steps"></ol>
 
             <div class="card wizard" id="card-wizard">
-              <!-- 1. Start -->
+              <!-- Start -->
               <div class="wiz-step" data-step="start">
                 <h2>Set up this computer</h2>
                 <p>
@@ -622,7 +622,7 @@
                   <ul><li class="muted">Looking at this computer…</li></ul></div>
               </div>
 
-              <!-- 2. Folders -->
+              <!-- Folders -->
               <div class="wiz-step" data-step="folders" hidden>
                 <h2>Where should Museion keep things?</h2>
                 <p class="muted">
@@ -674,7 +674,19 @@
                 </p>
               </div>
 
-              <!-- 3. Model -->
+              <!-- Only on a system the catalogue has no helper programs for (welcome.js) -->
+              <div class="wiz-step" data-step="programs" hidden>
+                <h2>Helper programs for this system</h2>
+                <p class="muted">
+                  Museion normally downloads these itself, but it has no ready-made copies for this
+                  kind of computer. Install them, then say where they are. Anything Museion could
+                  find is filled in already.
+                </p>
+                <div id="wiz-own"></div>
+                <p class="small-print" id="wiz-own-note"></p>
+              </div>
+
+              <!-- Model -->
               <div class="wiz-step" data-step="model" hidden>
                 <h2>Choose a model</h2>
                 <p class="muted">
@@ -692,7 +704,7 @@
                 </label>
               </div>
 
-              <!-- 4. Library -->
+              <!-- Library -->
               <div class="wiz-step" data-step="library" hidden>
                 <h2>Choose a library to start with</h2>
                 <p class="muted">
@@ -703,7 +715,7 @@
                 <select id="wiz-bundle" aria-label="Content bundle" hidden></select>
               </div>
 
-              <!-- 5. Home area -->
+              <!-- Home area -->
               <div class="wiz-step" data-step="home" hidden>
                 <h2>Your home area <span class="opt">optional</span></h2>
                 <p class="muted">
@@ -713,7 +725,7 @@
                 <div id="home-welcome" class="home-area"></div>
               </div>
 
-              <!-- 6. Review and run -->
+              <!-- Review and run -->
               <div class="wiz-step" data-step="review" hidden>
                 <h2>Check and set up</h2>
                 <p class="muted" id="wiz-review-lede">This is what Museion will download. Anything already there is checked and skipped.</p>
@@ -727,7 +739,7 @@
                 </div>
               </div>
 
-              <!-- 7. Done -->
+              <!-- Done -->
               <div class="wiz-step" data-step="done" hidden>
                 <h2>Museion is ready</h2>
                 <p id="wiz-done-note"></p>
@@ -750,7 +762,7 @@
               </div>
             </div>
 
-            <p class="hint">
+            <p class="hint" id="welcome-skip-row">
               <a href="#" id="welcome-skip">Skip set-up and configure by hand</a>
             </p>
           </div>

@@ -63,9 +63,10 @@ def environment(state: AppState) -> Agents:
         model = Llama(local(cfg.chat_port), timeout=3).model_id()
     except Exception:  # noqa: BLE001 -- no model running: resolve without its table
         model = ""
+    machine = state.hardware().tier
     return Agents(cfg.library_dir, agents.override_dir(state.tuning_path),
-                  model_choice.agent_tier(state.hardware().tier, cfg.chat_model),
-                  model, work_dir=work)
+                  model_choice.agent_tier(machine, cfg.chat_model),
+                  model, work_dir=work, machine_tier=machine)
 
 
 def store(state: AppState) -> ChatStore:
@@ -83,7 +84,7 @@ def list_chats(state: AppState, agent: str | None = None) -> dict:
     # Only agents that can run here, and are on, are offered for a new chat.
     return {"chats": chats, "agents": [
         {"id": s.id, "name": s.name,
-         "can_start": s.enabled and not s.problems and agents.tier_problem(s, env.tier) is None}
+         "can_start": s.enabled and not s.problems and env.tier_problem(s) is None}
         for s in specs]}
 
 
@@ -93,7 +94,7 @@ def new_chat(state: AppState, agent: str = "librarian") -> dict:
         spec = env.get(agent)
     except KeyError:
         raise UiError(f"There is no agent called {agent}.") from None
-    why = spec.problems[0] if spec.problems else agents.tier_problem(spec, env.tier)
+    why = spec.problems[0] if spec.problems else env.tier_problem(spec)
     if why:
         raise UiError(f"{spec.name} cannot run here: {why}")
     return chat_view(env, ChatStore(env.work.parent / "chats").new(agent))

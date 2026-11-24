@@ -284,11 +284,18 @@ def problems_of(spec: AgentSpec) -> list[str]:
     return out
 
 
-def tier_problem(spec: AgentSpec, tier: str) -> str | None:
-    """Why this agent cannot run on a computer of this tier, or None."""
-    if spec.min_tier in hardware.TIERS and hardware.TIERS.index(tier) < hardware.TIERS.index(spec.min_tier):
-        return f"Needs a {spec.min_tier} computer or better; this one is {tier}."
-    return None
+def tier_problem(spec: AgentSpec, tier: str, machine_tier: str = "") -> str | None:
+    """Why this agent cannot run at this tier, or None. `machine_tier` is the
+    computer's own tier when it is higher than `tier`: the computer is big
+    enough and it is the chat model chosen that is too small, which calls for
+    a different remedy than a new computer."""
+    order = hardware.TIERS
+    if spec.min_tier not in order or order.index(tier) >= order.index(spec.min_tier):
+        return None
+    if machine_tier in order and order.index(machine_tier) >= order.index(spec.min_tier):
+        return ("Needs a bigger chat model than the one in use. This computer can run one: "
+                "Settings › Models › Help me choose a model.")
+    return f"Needs a {spec.min_tier} computer or better; this one is {tier}."
 
 
 def workspace(root: Path, spec: AgentSpec, chat_id: str | None = None) -> Path | None:

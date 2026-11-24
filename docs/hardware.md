@@ -80,9 +80,17 @@ than the biggest dense model that fits.
 | 2 | 16–24 GB VRAM | Same MoE, more layers resident, larger context |
 | 3 | Apple Silicon: 32 GB+ unified for the 35B at Q4, 64 GB+ for Q8; less gets tier 0 | Larger MoE |
 
-Detection: `nvidia-smi` on Windows, falling back to WMI/DXGI for AMD and Intel (Vulkan
-build), else CPU. On macOS, architecture plus `sysctl hw.memsize` selects the Metal build
-and the tier.
+Detection, with nothing to install on any of the three systems:
+
+| System | Graphics card | System memory |
+|---|---|---|
+| Windows | `nvidia-smi` for NVIDIA (CUDA); otherwise the display adapters in the registry, largest first, for AMD and Intel (Vulkan) | `GlobalMemoryStatusEx` |
+| macOS | Apple Silicon is Metal on its unified memory (`sysctl hw.memsize`); an Intel Mac runs on the processor | `sysctl hw.memsize` |
+| Linux | `nvidia-smi` for NVIDIA (CUDA); otherwise the AMD driver's own figure in `/sys/class/drm/card*/device/mem_info_vram_total` (Vulkan); other cards run on the processor | `/proc/meminfo` |
+
+`python -m museion hardware` prints what was found. Windows on an RTX 3060 and Linux
+with no graphics card have been run for real; the macOS and Linux-AMD paths are covered
+by tests that stand in for the system's answers, not yet by a real machine.
 
 ## Offload splits are computed, not guessed
 
