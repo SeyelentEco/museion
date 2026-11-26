@@ -10,6 +10,12 @@ open and read yourself**.
 
 No internet. No account. No cloud. Nothing leaves the machine.
 
+![Museion at work: a question about bleach and drinking water answered from the library with a citation, the cited page opened in the reader, a map of the home area with places marked, and the almanac's frost dates](docs/images/museion-demo.gif)
+
+*A real session on a computer with a 12 GB graphics card, recorded as it ran. The 35
+seconds the model spent searching and writing are played eight times faster; everything
+else is real time. [The same recording as a video](docs/images/museion-demo.mp4).*
+
 The assistant is called **Hypatia**, after the last great teacher of Alexandria. Museion is
 the institution around her — named for the Alexandrian research establishment, which was
 never merely a room full of scrolls but a place where scholars lived, taught, and answered
@@ -101,6 +107,8 @@ downloads it all (resumable, verified), fits the model to your GPU, starts the s
 and builds the index. Then it gets out of the way, leaving Ask, Agents, Notes, Map,
 Library, Evals and Settings.
 
+![The model step of set-up: each model with what it can and cannot do on this computer, and one recommended](docs/images/setup-model.png)
+
 Everything the page does, the command line does too:
 
 ```bash
@@ -121,6 +129,13 @@ Asked for a 55-gallon drum instead, it searches, reads the dose, and hands the a
 to a calculator — `convert(55 * 0.25, tsp, ml) = 67.77` — then shows that calculation
 under the answer as ground truth. A language model multiplying in its head got that one
 wrong by a factor of five before the calculator existed.
+
+![A cited answer: the dose for a 55-gallon drum, labelled "from your library, with calculation", the calculation shown under it, and the two sources it cites](docs/images/ask.png)
+
+Each source opens in the reader at the page it was cited from, so you can check the answer
+against the book:
+
+![The reader: the cited water-purification leaflet open at page 2, with the library's shelves beside it](docs/images/reader.png)
 
 Every answer is labelled by what actually produced it: *from your library*, *from your
 library, with calculation*, *computed*, or *general knowledge — not from your library,
@@ -162,6 +177,17 @@ time cut off, all in plain files on the same disk:
   receives short text messages with other radios nearby, no network needed, and keeps them
   in your notes. Optional, and so far tested only against simulated radios. See
   [docs/radio.md](docs/radio.md).
+
+What these look like, from the same session as the recording above, with Asheville, North
+Carolina, as the home area:
+
+![First steps after an ice storm: a plan for today and this week, from the household's own stores and the library, with the library's pages cited](docs/images/first-steps.png)
+
+![The stores keeper asking before it changes the stores record: the lines it would remove and add, with Allow and Deny](docs/images/allow.png)
+
+![The almanac in the Notes tab: frost dates and hardiness zone worked out from three nearby weather stations, and garden tasks timed from them](docs/images/almanac.png)
+
+![The Map tab: an offline map of Asheville made by Museion from OpenStreetMap, with a hospital, a water source and a meeting point marked](docs/images/map.png)
 
 ---
 
